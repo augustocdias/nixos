@@ -158,6 +158,7 @@ in {
           shfmt
           alejandra
           sqlfluff
+          mdformat
 
           harper
           eslint

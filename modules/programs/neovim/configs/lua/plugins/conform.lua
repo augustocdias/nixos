@@ -13,7 +13,7 @@ return {
                 javascriptreact = { 'prettier' },
                 json = { 'prettier' },
                 lua = { 'stylua' },
-                markdown = { 'markdownlint' },
+                markdown = { 'mdformat' },
                 nix = { 'alejandra' },
                 python = { 'black' },
                 rust = { 'rustfmt', lsp_format = 'fallback' },
