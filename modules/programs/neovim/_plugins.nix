@@ -79,11 +79,20 @@
     doCheck = false;
   };
 
+  disableChecks = drv:
+    drv.overrideAttrs (_: {
+      doCheck = false;
+      doInstallCheck = false;
+      dontCheckForBrokenSymlinks = true;
+      nvimRequireCheck = "";
+      nvimSkipModules = ["*"];
+    });
+
   buildPlugin = name: meta: let
     src = getInput name;
   in
     if meta ? useFlakePackage
-    then (getInput name).packages.${system}.default
+    then disableChecks (getInput name).packages.${system}.default
     else if meta ? buildFromSource && name == "codesnap"
     then
       pkgs.vimUtils.buildVimPlugin {
@@ -91,6 +100,7 @@
         version = "flake";
         inherit src;
         doCheck = false;
+        nvimRequireCheck = "";
         postInstall = ''
           ln -s ${codesnap-generator}/lib/libgenerator.so $out/lua/generator.so
         '';
@@ -101,6 +111,7 @@
         version = "flake";
         inherit src;
         doCheck = false;
+        nvimRequireCheck = "";
       };
 in {
   plugins = lib.mapAttrs buildPlugin pluginMeta;

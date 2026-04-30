@@ -17,7 +17,12 @@ in {
     neovim-nightly-overlay = mkFlakePlugin "github:nix-community/neovim-nightly-overlay";
 
     # Flake-enabled plugins (use their package outputs)
-    nvim-blink-cmp = mkFlakePlugin "github:Saghen/blink.cmp";
+    nvim-blink-lib = mkFlakePlugin "github:saghen/blink.lib";
+    nvim-blink-cmp = {
+      url = lib.mkDefault "github:Saghen/blink.cmp";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.blink-lib.follows = "nvim-blink-lib";
+    };
     nvim-blink-pairs = mkFlakePlugin "github:saghen/blink.pairs";
     nvim-lze = mkFlakePlugin "github:BirdeeHub/lze";
     nvim-rustaceanvim = mkFlakePlugin "github:mrcjkb/rustaceanvim";
@@ -70,7 +75,16 @@ in {
   };
 
   den.aspects.neovim = {
+    includes = with den.aspects; [
+      yamllint
+      stylua
+    ];
+
     nixos.nixpkgs.overlays = lib.optionals (inputs ? neovim-nightly-overlay) [
+      inputs.neovim-nightly-overlay.overlays.default
+    ];
+
+    darwin.nixpkgs.overlays = lib.optionals (inputs ? neovim-nightly-overlay) [
       inputs.neovim-nightly-overlay.overlays.default
     ];
 

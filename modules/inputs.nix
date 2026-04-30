@@ -18,5 +18,14 @@
       url = lib.mkDefault "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    darwin = {
+      url = lib.mkDefault "github:nix-darwin/nix-darwin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nix-homebrew = {
+      url = lib.mkDefault "github:zhaofengli/nix-homebrew";
+    };
   };
 }

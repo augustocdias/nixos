@@ -2,12 +2,12 @@
   den.hosts.x86_64-linux.laptop = {
     hostName = "nixos";
     aspect = den.aspects.laptop;
-    users.augusto = {};
+    users.augusto.aspect = den.aspects.user-linux;
   };
 
-  # den.hosts.aarch64-linux.raspi = {
-  #   hostName = "raspi";
-  #   aspect = "raspi";
-  #   users.augusto = {};
-  # };
+  den.hosts.aarch64-darwin.macmini = {
+    hostName = "macmini";
+    aspect = den.aspects.macmini;
+    users.augusto.aspect = den.aspects.user-macos;
+  };
 }

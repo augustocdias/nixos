@@ -15,10 +15,13 @@
 
     homeManager = {
       pkgs,
+      lib,
       config,
       ...
     }: {
-      services.pass-secret-service.enable = true;
+      services.pass-secret-service = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+        enable = true;
+      };
 
       programs.password-store = {
         enable = true;
@@ -60,7 +63,6 @@
 
         direnv
         pipenv
-        just
 
         jq
         yq-go
@@ -68,8 +70,6 @@
         lnav
 
         tree-sitter
-
-        awscli2
       ];
     };
   };

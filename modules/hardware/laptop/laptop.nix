@@ -13,7 +13,6 @@
 
       users.users.augusto.extraGroups = ["i2c"];
 
-      # Per-machine disko layout (matches existing disk setup)
       disko.devices = {
         disk.main = {
           device = "/dev/nvme0n1";

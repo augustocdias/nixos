@@ -33,6 +33,7 @@ in {
 
         tui = {
           theme = "catppuccin-macchiato";
+          mouse = "true";
         };
 
         context = ''
@@ -98,7 +99,6 @@ in {
           ## Interaction Style
           - Tone: direct and informal, like a senior colleague in a code review
           - Default to short answers (1-3 paragraphs). Only give longer responses when the question demands it
-          - Be honest about capabilities and limitations
           - Challenge incorrect assumptions with clear reasoning
           - Don't apologize excessively or repeat the question back before answering
           - If a request is ambiguous, ask for clarification rather than guessing

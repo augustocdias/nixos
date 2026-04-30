@@ -115,7 +115,13 @@ in {
       ];
     };
 
-    homeManager = {pkgs, ...}: {
+    homeManager = {pkgs, ...}: let
+      isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+      pinentryPackage =
+        if isDarwin
+        then pkgs.pinentry_mac
+        else pkgs.pinentry-bemenu;
+    in {
       programs.gpg = {
         enable = true;
         publicKeys = [
@@ -134,9 +140,10 @@ in {
         enableFishIntegration = true;
         enableSshSupport = true;
         enableExtraSocket = true;
-        pinentry.package = pkgs.pinentry-bemenu;
+        pinentry.package = pinentryPackage;
         defaultCacheTtl = 1800;
         maxCacheTtl = 7200;
+        # Keep extra-socket on both Linux and macOS for SSH agent forwarding.
         extraConfig = ''
           allow-loopback-pinentry
           extra-socket /tmp/S.gpg-agent.extra

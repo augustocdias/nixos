@@ -4,7 +4,14 @@
       pkgs,
       lib,
       ...
-    }: {
+    }: let
+      isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+
+      clipboardPluginName =
+        if isDarwin
+        then "clipboard"
+        else "wl-clipboard";
+    in {
       programs.yazi = {
         enable = true;
         enableFishIntegration = true;
@@ -20,7 +27,7 @@
           keymap.mgr.prepend_keymap = [
             {
               on = "<C-y>";
-              run = ["plugin wl-clipboard"];
+              run = ["plugin ${clipboardPluginName}"];
               desc = "Copy file (or contents) to clipboard";
             }
             {
@@ -96,17 +103,22 @@
             ];
           };
         };
-        plugins = {
-          inherit
-            (pkgs.yaziPlugins)
-            git
-            diff
-            chmod
-            compress
-            wl-clipboard
-            rich-preview
-            ;
-        };
+        plugins =
+          {
+            inherit
+              (pkgs.yaziPlugins)
+              git
+              diff
+              chmod
+              compress
+              rich-preview
+              ;
+          }
+          // (
+            if isDarwin
+            then {inherit (pkgs.yaziPlugins) clipboard;}
+            else {inherit (pkgs.yaziPlugins) wl-clipboard;}
+          );
       };
     };
   };

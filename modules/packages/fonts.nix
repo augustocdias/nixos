@@ -17,7 +17,7 @@
         ]
         ++ builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
 
-      fonts.fontconfig = {
+      fonts.fontconfig = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         enable = true;
         hinting = "full";
       };

@@ -1,6 +1,56 @@
 {den, ...}: {
   den.aspects.fish = {
-    homeManager = {pkgs, ...}: {
+    homeManager = {pkgs, ...}: let
+      isLinux = pkgs.stdenv.hostPlatform.isLinux;
+
+      commonAliases = {
+        ls = "eza";
+        ll = "eza -l";
+        la = "eza -la";
+        lt = "eza --tree";
+
+        cat = "bat";
+        grep = "rg";
+
+        v = "nvim";
+        vim = "nvim";
+
+        nix-clean = "sudo nix-collect-garbage -d && nix-collect-garbage -d";
+        nix-flake-update = "nix flake update --flake ~/nixos";
+        nix-check = "nix flake check ~/nixos";
+
+        gpg-restart = "gpgconf --kill gpg-agent && gpgconf --launch gpg-agent";
+      };
+
+      linuxAliases = {
+        nix-history = "sudo nix profile history --profile /nix/var/nix/profiles/system";
+        nix-rollback = "sudo nixos-rebuild switch --rollback";
+        nix-preview = "nixos-rebuild build --flake ~/nixos#laptop -o /tmp/nixos-preview && nix store diff-closures /run/current-system /tmp/nixos-preview";
+
+        afk = "dms ipc call lock lock";
+        lock-restore = "hyprctl --instance 0 'keyword misc:allow_session_lock_restore 1' && dms ipc call lock lock";
+      };
+
+      darwinAliases = {
+        nix-history = "sudo nix profile history --profile /nix/var/nix/profiles/system";
+        nix-rollback = "sudo darwin-rebuild switch --rollback";
+        nix-preview = "darwin-rebuild build --flake ~/nixos#macmini -o /tmp/darwin-preview && nix store diff-closures /run/current-system /tmp/darwin-preview";
+      };
+
+      commonFunctions = {};
+
+      linuxFunctions = {
+        nix-rebuild = ''
+          sudo nixos-rebuild switch --flake ~/nixos#laptop $argv
+        '';
+      };
+
+      darwinFunctions = {
+        nix-rebuild = ''
+          sudo darwin-rebuild switch --flake ~/nixos#macmini $argv
+        '';
+      };
+    in {
       home.sessionVariables = {
         EDITOR = "nvim";
         VISUAL = "nvim";
@@ -59,35 +109,21 @@
           source ${./init.fish}
         '';
 
-        shellAliases = {
-          ls = "eza";
-          ll = "eza -l";
-          la = "eza -la";
-          lt = "eza --tree";
+        shellAliases =
+          commonAliases
+          // (
+            if isLinux
+            then linuxAliases
+            else darwinAliases
+          );
 
-          cat = "bat";
-          grep = "rg";
-
-          v = "nvim";
-          vim = "nvim";
-
-          nix-clean = "sudo nix-collect-garbage -d && nix-collect-garbage -d";
-          nix-flake-update = "nix flake update --flake ~/nixos";
-          nix-check = "nix flake check ~/nixos";
-          nix-history = "sudo nix profile history --profile /nix/var/nix/profiles/system";
-          nix-rollback = "sudo nixos-rebuild switch --rollback";
-          nix-preview = "nixos-rebuild build --flake ~/nixos#laptop -o /tmp/nixos-preview && nix store diff-closures /run/current-system /tmp/nixos-preview";
-
-          afk = "dms ipc call lock lock";
-          lock-restore = "hyprctl --instance 0 'keyword misc:allow_session_lock_restore 1' && dms ipc call lock lock";
-          gpg-restart = "gpgconf --kill gpg-agent && gpgconf --launch gpg-agent";
-        };
-
-        functions = {
-          nix-rebuild = ''
-            sudo nixos-rebuild switch --flake ~/nixos#laptop $argv
-          '';
-        };
+        functions =
+          commonFunctions
+          // (
+            if isLinux
+            then linuxFunctions
+            else darwinFunctions
+          );
 
         shellAbbrs = {
           g = "git";

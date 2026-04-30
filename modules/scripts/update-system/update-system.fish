@@ -15,13 +15,10 @@ function run
     end
 end
 
-set -l rebuild false
 set -l show_help false
 
 for arg in $argv
     switch $arg
-        case -r --rebuild
-            set rebuild true
         case -h --help
             set show_help true
         case '*'
@@ -35,11 +32,10 @@ if test $show_help = true
     echo ""
     echo "Update all system components:"
     echo "  - Nix flake inputs (including neovim plugins)"
-    echo "  - Firefox extensions"
-    echo "  - Thunderbird extensions"
+    echo "  - Firefox extensions (if installed)"
+    echo "  - Thunderbird extensions (if installed)"
     echo ""
     echo "Options:"
-    echo "  -r, --rebuild    Rebuild NixOS configuration after updating"
     echo "  -h, --help       Show this help message"
     exit 0
 end
@@ -54,26 +50,21 @@ run nix flake update --flake ~/nixos
 echo ""
 
 echo -e $YELLOW"[2/3] Updating Firefox extensions..."$NC
-run update-firefox
+if command -v update-firefox >/dev/null
+    run update-firefox
+else
+    echo -e $YELLOW"  update-firefox not installed on this system, skipping"$NC
+end
 echo ""
 
 echo -e $YELLOW"[3/3] Updating Thunderbird extensions..."$NC
-run update-thunderbird
+if command -v update-thunderbird >/dev/null
+    run update-thunderbird
+else
+    echo -e $YELLOW"  update-thunderbird not installed on this system, skipping"$NC
+end
 echo ""
 
 echo -e $GREEN"══════════════════════════════════════════"$NC
 echo -e $GREEN"       All updates complete!"$NC
 echo -e $GREEN"══════════════════════════════════════════"$NC
-
-if test $rebuild = true
-    echo ""
-    echo -e $YELLOW"Rebuilding NixOS configuration..."$NC
-    run sudo nixos-rebuild switch --flake ~/nixos#laptop
-    echo ""
-    echo -e $GREEN"System rebuild complete!"$NC
-else
-    echo ""
-    echo "To apply changes, run:"
-    echo "  sudo nixos-rebuild switch --flake ~/nixos#laptop"
-    echo "  update-system --rebuild"
-end

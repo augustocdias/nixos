@@ -19,6 +19,8 @@
 
       programs.firefox = {
         enable = true;
+        # HM changed this but the package wrapper still forces it to .mozilla folder
+        configPath = ".mozilla/firefox";
         nativeMessagingHosts = [pkgs.firefoxpwa];
 
         policies = {

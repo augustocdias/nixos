@@ -10,6 +10,10 @@
       url = "github:catppuccin/grub/0a37ab19f654e77129b409fed371891c01ffd0b9";
       flake = false;
     };
+    darwin = {
+      url = "github:nix-darwin/nix-darwin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     den.url = "github:vic/den";
     disko = {
       url = "github:nix-community/disko/latest";
@@ -43,6 +47,7 @@
       url = "github:nix-community/neovim-nightly-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-homebrew.url = "github:zhaofengli/nix-homebrew";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     nvim-SchemaStore = {
       url = "github:b0o/SchemaStore.nvim";
@@ -54,6 +59,13 @@
     };
     nvim-blink-cmp = {
       url = "github:Saghen/blink.cmp";
+      inputs = {
+        blink-lib.follows = "nvim-blink-lib";
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+    nvim-blink-lib = {
+      url = "github:saghen/blink.lib";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nvim-blink-pairs = {

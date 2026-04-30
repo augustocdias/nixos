@@ -1,38 +1,22 @@
 {den, ...}: {
-  den.aspects.augusto = {
+  # Cross-platform user base aspect. Every aspect listed here must work on
+  # BOTH nixos and darwin classes. Platform-specific user aspects
+  # (`user-linux`, `user-macos`) include this and add their own extras.
+  den.aspects.user-base = {
     includes = with den.aspects; [
-      users
       security
       secrets
-      hyprland
-      login-manager
-      podman
-      virtualization
-      teamviewer
-      lotion
-      datagrip
-      slack
-      wireguard
-      sqlit
       neovim
       git
       fish
       ghostty
-      firefox
-      thunderbird
       zellij
       starship
       bat
       yazi
-      mpv
       skim
       neovide
       opencode
-      udiskie
-      stylua
-      yamllint
-      xdg
-      gcalcli
       cli-tools
       fonts
       development

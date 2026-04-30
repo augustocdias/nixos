@@ -1,6 +1,12 @@
-# Load GPG-encrypted secrets
-if test -f $XDG_RUNTIME_DIR/env-secrets.fish
-    source $XDG_RUNTIME_DIR/env-secrets.fish
+if test (uname) = Darwin
+    set -l _runtime_dir (getconf DARWIN_USER_TEMP_DIR 2>/dev/null | string trim)
+    if test -n "$_runtime_dir" -a -f "$_runtime_dir/env-secrets.fish"
+        source "$_runtime_dir/env-secrets.fish"
+    end
+else
+    if test -n "$XDG_RUNTIME_DIR" -a -f "$XDG_RUNTIME_DIR/env-secrets.fish"
+        source "$XDG_RUNTIME_DIR/env-secrets.fish"
+    end
 end
 
 # Set SSH to use GPG agent
