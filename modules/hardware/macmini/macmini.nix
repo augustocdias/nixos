@@ -23,6 +23,8 @@
 
       system.primaryUser = "augusto";
 
+      programs._1password-gui.enable = true;
+
       system.defaults = {
         NSGlobalDomain = {
           AppleInterfaceStyle = "Dark";
@@ -131,9 +133,11 @@
         brews = [];
 
         casks = [
-          "fusion360"
+          "autodesk-fusion"
           "vlc"
           "blender"
+          "orcaslicer"
+          "snapmaker-orca"
         ];
 
         masApps = {};

@@ -68,6 +68,7 @@
   };
 
   codesnap-generator = pkgs.rustPlatform.buildRustPackage {
+    dontPatchELF = pkgs.stdenv.hostPlatform.isDarwin;
     pname = "codesnap-generator";
     version = "unstable";
     src = getInput "codesnap";
@@ -101,9 +102,7 @@
         inherit src;
         doCheck = false;
         nvimRequireCheck = "";
-        postInstall = ''
-          ln -s ${codesnap-generator}/lib/libgenerator.so $out/lua/generator.so
-        '';
+        postInstall = let ext = if pkgs.stdenv.hostPlatform.isDarwin then "dylib" else "so"; in ''ln -s ${codesnap-generator}/lib/libgenerator.${ext} $out/lua/generator.so'';
       }
     else
       pkgs.vimUtils.buildVimPlugin {

@@ -36,13 +36,23 @@
 
         extraConfig = ''
           # Float common dialog/utility windows
-          yabai -m rule --add app="^System Settings$" manage=off
           yabai -m rule --add app="^System Information$" manage=off
           yabai -m rule --add app="^Calculator$" manage=off
           yabai -m rule --add app="^Finder$" title="^Copy" manage=off
           yabai -m rule --add app="^Finder$" title="(Co(py|nnect)|Move|Info|Pref)" manage=off
           yabai -m rule --add app="^1Password" manage=off
           yabai -m rule --add title="^Preferences$" manage=off
+          yabai -m rule --add app="^System Settings$" manage=off
+          yabai -m rule --add app="^Activity Monitor$" manage=off
+          yabai -m rule --add app="^Maps$" manage=off
+          yabai -m rule --add app="^Music$" manage=off
+          yabai -m rule --add app="^Notes$" manage=off
+          yabai -m rule --add app="^Messages$" manage=off
+          yabai -m rule --add app="WhatsApp" manage=off
+          yabai -m rule --add app="^Godot$" title!="Godot Engine$|^$" manage=off
+          yabai -m rule --add app="^QuickTime Player$" manage=off
+          yabai -m rule --add app="^Safari$" title="Advanced" manage=off
+          yabai -m rule --apply
         '';
       };
 

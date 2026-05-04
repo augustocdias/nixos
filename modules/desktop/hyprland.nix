@@ -17,7 +17,6 @@
           xwayland.enable = true;
         };
         dconf.enable = true;
-        direnv.enable = true;
         gpu-screen-recorder.enable = true;
       };
 

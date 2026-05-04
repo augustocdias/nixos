@@ -4,6 +4,7 @@ keys:
   - &nixos age1auxycyhq85dvlpf5jds4zdyyc36m5qg6afk8xh8dr59ue97p5p0qsce7ld
   # Master key (YubiKey) - can decrypt on any machine
   - &yubikey 7D8396F74725A208D835CE3730E62A1E4F078650
+  - '&macmini age1vaevu0nh0njp06aylzgn8fgx6nfltk469dtvn7xkq0rdtmfp2gkqprgpxz'
 creation_rules:
   - path_regex: modules/security/secrets/.*\.ya?ml$
     age: [*nixos]

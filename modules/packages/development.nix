@@ -23,6 +23,8 @@
         enable = true;
       };
 
+      programs.direnv.enable = true;
+
       programs.password-store = {
         enable = true;
         settings = {
@@ -60,9 +62,6 @@
         git-cliff
         git-extras
         gh
-
-        direnv
-        pipenv
 
         jq
         yq-go
