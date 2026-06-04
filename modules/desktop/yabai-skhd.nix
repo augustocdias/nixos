@@ -19,7 +19,7 @@
 
           mouse_follows_focus = "off";
           focus_follows_mouse = "autoraise";
-          mouse_modifier = "fn";
+          mouse_modifier = "alt";
           mouse_action1 = "move";
           mouse_action2 = "resize";
           mouse_drop_action = "swap";
@@ -27,11 +27,11 @@
           window_origin_display = "default";
           window_zoom_persist = "on";
           window_shadow = "float";
-          window_animation_duration = 0.0;
-          window_opacity_duration = 0.0;
+          window_animation_duration = 5.0;
+          window_opacity_duration = 5.0;
           active_window_opacity = 1.0;
           normal_window_opacity = 1.0;
-          window_opacity = "off";
+          window_opacity = "on";
         };
 
         extraConfig = ''
