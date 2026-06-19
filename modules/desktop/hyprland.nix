@@ -63,12 +63,13 @@
             "uwsm app -- slack"
             "uwsm app -- thunderbird"
             "uwsm app -- lotion"
-            "uwsm app -- ghostty --class=ghostty-startup +new-window"
-            "hyprctl dispatch workspace 7 && uwsm app -- firefox"
             "uwsm app -- datagrip"
             "uwsm app -- virt-manager"
             "uwsm app -- firefoxpwa site launch 01KKC8KPKEX5XZPBBK02D5ZM67"
             "uwsm app -- cider-2 --ozone-platform=wayland"
+            "hyprctl dispatch workspace 7 && uwsm app -- firefox"
+            "uwsm app -- ghostty --class=ghostty-startup +new-window"
+            "uwsm app -- dcal show"
           ];
 
           env = [
@@ -76,6 +77,9 @@
             "XCURSOR_THEME,catppuccin-mocha-blue-cursors"
             "QT_QPA_PLATFORMTHEME,qt6ct"
             "QT_QUICK_CONTROLS_STYLE,org.hyprland.style"
+            # ccs is broken in hyprland portal apparently
+            "INTEL_DEBUG,noccs"
+            "AQ_NO_MODIFIERS,1"
           ];
 
           general = {
@@ -267,7 +271,8 @@
           windowrule = [
             "workspace 1 silent, match:class ^(Slack)$"
             "workspace 2 silent, match:class ^(thunderbird)$"
-            "workspace 3 silent, match:class ^(Lotion)$"
+            "workspace 3 silent, match:class ^(com\\.danklinux\\.dankcalendar)$"
+            "workspace 4 silent, match:class ^(Lotion)$"
             "workspace 6 silent, match:class ^(ghostty-startup)$"
             "workspace 8 silent, match:class ^(jetbrains-datagrip)$"
             "workspace 9 silent, match:class ^(\\.virt-manager-wrapped)$"
