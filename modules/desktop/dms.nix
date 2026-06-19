@@ -12,6 +12,10 @@
     url = lib.mkDefault "github:AvengeMedia/dms-plugin-registry";
     inputs.nixpkgs.follows = "nixpkgs";
   };
+  flake-file.inputs.dankcalendar = {
+    url = lib.mkDefault "github:AvengeMedia/dankcalendar";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   den.aspects.dms = {
     nixos = {
@@ -57,7 +61,8 @@
     }: {
       imports =
         lib.optionals (inputs ? dms) [inputs.dms.homeModules.dank-material-shell]
-        ++ lib.optionals (inputs ? dms-plugins) [inputs.dms-plugins.modules.default];
+        ++ lib.optionals (inputs ? dms-plugins) [inputs.dms-plugins.homeModules.default]
+        ++ lib.optionals (inputs ? dankcalendar) [inputs.dankcalendar.homeModules.default];
 
       xsession.preferStatusNotifierItems = true;
 
@@ -74,7 +79,7 @@
         enableVPN = true;
         enableDynamicTheming = true;
         enableAudioWavelength = true;
-        enableCalendarEvents = false;
+        enableCalendarEvents = true;
         enableClipboardPaste = true;
 
         settings = {
@@ -731,6 +736,18 @@
               saveToDisk = false;
             };
           };
+        };
+      };
+
+      programs.dank-calendar = {
+        enable = true;
+        systemd.enable = true;
+
+        settings = {
+          firstDayOfWeek = 0;
+          timeFormat = "24h";
+          use24HourClock = true;
+          showWeekNumbers = true;
         };
       };
 

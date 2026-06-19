@@ -10,6 +10,10 @@
       url = "github:catppuccin/grub/0a37ab19f654e77129b409fed371891c01ffd0b9";
       flake = false;
     };
+    dankcalendar = {
+      url = "github:AvengeMedia/dankcalendar";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     darwin = {
       url = "github:nix-darwin/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
