@@ -130,45 +130,59 @@ Add the secret key to `modules/security/secrets/secrets.nix` and the environment
 
 ### FirefoxPWA (Progressive Web Apps)
 
-#### Creating a profile
+PWAs are declared entirely in Nix via `programs.firefoxpwa` in
+`modules/programs/firefox/firefox.nix`. The module writes
+`~/.local/share/firefoxpwa/config.json` (a read-only Nix-store symlink), so PWAs
+can no longer be added/removed through the firefoxpwa GUI or CLI — everything is
+declarative. WhatsApp is configured as a working example.
 
-```fish
-firefoxpwa profile create --name "WhatsApp"
-```
+#### Adding a PWA
 
-#### Installing a PWA
+1. Pick a unique site ULID (26 chars, `0123456789ABCDEFGHJKMNPQRSTVWXYZ`):
 
-```fish
-firefoxpwa site install https://web.whatsapp.com/data/manifest.json \
-  --profile <PROFILE_ID> \
-  --name "WhatsApp" \
-  --icon-url "https://pngimg.com/uploads/whatsapp/whatsapp_PNG95154.png" \
-  --document-url "https://web.whatsapp.com/" \
-  --categories social
-```
+   ```fish
+   nix run nixpkgs#ulid
+   ```
+
+1. Fetch the app icon hash (use the manifest's highest-res icon):
+
+   ```fish
+   nix-prefetch-url "<ICON_URL>" | xargs nix hash to-sri --type sha256
+   ```
+
+1. Add a `sites."<SITE_ULID>"` entry under the Default profile
+   (`00000000000000000000000000`) in `programs.firefoxpwa`:
+
+   ```nix
+   sites."<SITE_ULID>" = {
+     name = "MyApp";
+     url = "https://example.com/";
+     manifestUrl = "https://example.com/manifest.json";
+     desktopEntry = {
+       icon = pkgs.fetchurl {
+         url = "<ICON_URL>";
+         hash = "<SRI_HASH>";
+       };
+       categories = ["Network"];
+     };
+     settings.config = {
+       icon_url = "<ICON_URL>";
+       categories = ["social"];
+     };
+   };
+   ```
 
 #### Hiding the browser toolbar
 
-1. Launch the PWA once: `firefoxpwa site launch <SITE_ID>`
-1. Enable custom stylesheets:
-
-```fish
-printf 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);\nuser_pref("media.hardwaremediakeys.enabled", false);\nuser_pref("firefoxpwa.openOutOfScopeInDefaultBrowser", true);\nuser_pref("pdfjs.disabled", true);\n' > \
-  ~/.local/share/firefoxpwa/profiles/<PROFILE_ID>/user.js
-```
-
-3. Create userChrome.css:
-
-```fish
-echo '#nav-bar { display: none !important; }
-#TabsToolbar { display: none !important; }' > \
-  ~/.local/share/firefoxpwa/profiles/<PROFILE_ID>/chrome/userChrome.css
-```
+Per-profile `user.js` prefs and `chrome/userChrome.css` are declared via
+`home.file` against the Default profile path in `firefox.nix` — no manual steps.
+The CSS hides `#titlebar`, `#nav-bar`, and `#TabsToolbar` so the PWA looks like a
+native app window. Adjust those declarations to change the chrome.
 
 #### Auto-launching on login
 
 Add to the `exec-once` section in `modules/desktop/hyprland.nix`:
 
 ```nix
-"uwsm app -- firefoxpwa site launch <SITE_ID>"
+"uwsm app -- firefoxpwa site launch <SITE_ULID>"
 ```

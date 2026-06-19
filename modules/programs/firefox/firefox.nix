@@ -15,7 +15,7 @@
 
       update-firefox = pkgs.writeScriptBin "update-firefox" (builtins.readFile ./update-extensions.fish);
     in {
-      home.packages = [pkgs.firefoxpwa update-firefox];
+      home.packages = [update-firefox];
 
       programs.firefox = {
         enable = true;
@@ -139,6 +139,64 @@
             };
           };
         };
+      };
+
+      programs.firefoxpwa = {
+        enable = true;
+
+        profiles."00000000000000000000000000" = {
+          name = "Default";
+          sites."01KKC8KPKEX5XZPBBK02D5ZM67" = {
+            name = "WhatsApp";
+            url = "https://web.whatsapp.com/";
+            manifestUrl = "https://web.whatsapp.com/data/manifest.json";
+            desktopEntry = {
+              icon = pkgs.fetchurl {
+                url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
+                hash = "sha256-INh2EnJyenlgdfPTEN2SHGSGamVJ58qkw6MLwhNsvkc=";
+              };
+              categories = ["Network" "InstantMessaging"];
+            };
+            settings.config = {
+              icon_url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
+              categories = ["social"];
+            };
+          };
+        };
+
+        settings.config = {
+          always_patch = false;
+          runtime_enable_wayland = true;
+          runtime_use_xinput2 = false;
+          runtime_use_portals = true;
+          use_linked_runtime = false;
+        };
+      };
+
+      home.file = let
+        pwaProfile = ".local/share/firefoxpwa/profiles/00000000000000000000000000";
+      in {
+        "${pwaProfile}/user.js".text = ''
+          user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+          user_pref("media.hardwaremediakeys.enabled", false);
+          user_pref("firefoxpwa.openOutOfScopeInDefaultBrowser", true);
+          user_pref("pdfjs.disabled", true);
+        '';
+
+        # Hide the browser chrome so the PWA looks like a native app window.
+        "${pwaProfile}/chrome/userChrome.css".text = ''
+          #titlebar {
+            display: none !important;
+          }
+
+          #nav-bar {
+            display: none !important;
+          }
+
+          #TabsToolbar {
+            display: none !important;
+          }
+        '';
       };
     };
   };

@@ -14,7 +14,7 @@
   "onepassword-password-manager": {
     "slug": "1password-x-password-manager",
     "name": "1Password",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4814970/1password_x_password_manager-8.12.21.2.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4853670/1password_x_password_manager-8.12.24.34.xpi",
     "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}"
   },
   "vimium-ff": {
@@ -38,7 +38,7 @@
   "pia": {
     "slug": "pia",
     "name": "PAYBACK Internet Assistent",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4520480/pia-3.80.4.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4834550/pia-3.82.0.xpi",
     "addonId": "toolbar-ff@payback.de"
   },
   "catppuccin-mocha-blue": {
