@@ -33,7 +33,8 @@ in {
 
         tui = {
           theme = "catppuccin-macchiato";
-          mouse = "true";
+          mouse = true;
+          scroll_accelereation = true;
         };
 
         context = ''
