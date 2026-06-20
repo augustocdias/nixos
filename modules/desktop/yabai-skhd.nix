@@ -18,7 +18,7 @@
           window_gap = 8;
 
           mouse_follows_focus = "off";
-          focus_follows_mouse = "autoraise";
+          focus_follows_mouse = "off";
           mouse_modifier = "alt";
           mouse_action1 = "move";
           mouse_action2 = "resize";
