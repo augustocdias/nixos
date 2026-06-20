@@ -5,14 +5,17 @@
       lib,
       ...
     }: {
-      home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux (with pkgs; [
-        cider-2
-        zed-editor
-        imv
-        peazip
-        drawio
-        zmk-studio
-      ]);
+      home.packages = with pkgs;
+        [
+          zed-editor
+          zmk-studio
+          drawio
+        ]
+        ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+          cider-2
+          imv
+          peazip
+        ];
     };
   };
 }

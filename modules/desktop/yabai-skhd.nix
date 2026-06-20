@@ -53,6 +53,10 @@
           yabai -m rule --add app="^QuickTime Player$" manage=off
           yabai -m rule --add app="^Safari$" title="Advanced" manage=off
           yabai -m rule --apply
+
+          # Focus the first/topmost window when switching into a space
+          yabai -m signal --add event=space_changed \
+            action="yabai -m window --focus \$(yabai -m query --windows --space mouse | jq -re 'map(select(.\"is-minimized\"==false)) | sort_by(.frame.x, .frame.y) | .[0].id') 2>/dev/null || true"
         '';
       };
 
