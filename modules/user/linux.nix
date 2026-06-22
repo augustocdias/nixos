@@ -11,7 +11,6 @@
       mpv
       udiskie
       xdg
-      gcalcli
       work
     ];
   };

@@ -76,7 +76,6 @@ modules/
     bat/                    # Bat with Catppuccin theme
     firefox/                # Firefox with policy-installed extensions, privacy-hardened
     fish/                   # Fish shell with plugins, aliases, env vars, git abbreviations
-    gcalcli/                # Google Calendar CLI + reminder daemon (systemd timer)
     ghostty/                # Ghostty terminal: Catppuccin, 80% opacity, cursor-trail shader
     git/                    # Git: GPG signing, delta pager, extensive aliases
     mpv.nix                 # MPV with hardware decoding
