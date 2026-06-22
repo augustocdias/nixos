@@ -19,7 +19,7 @@
         nix-flake-update = "nix flake update --flake ~/nixos";
         nix-check = "nix flake check ~/nixos";
 
-        gpg-restart = "gpgconf --kill gpg-agent && gpgconf --launch gpg-agent";
+        gpg-restart = "pkill -9 scdaemon && gpgconf --kill gpg-agent && gpgconf --launch gpg-agent";
       };
 
       linuxAliases = {
