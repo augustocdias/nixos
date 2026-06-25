@@ -35,7 +35,13 @@
             diff-sbs = "-c delta.features=side-by-side diff";
             wls = "worktree list";
             wrm = "worktree remove";
-            wa = "!git worktree add ~/dev/$1 --checkout $2 #";
+            wa = ''              !f() { \
+                            local common project path; \
+                            common=$(git rev-parse --path-format=absolute --git-common-dir) || return 1; \
+                            project=$(dirname "$(dirname "$common")"); \
+                            path="$project/$1"; \
+                            git worktree add "$path" -B "$1"; \
+                          }; f'';
             ls = ''log --pretty=format:"%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn]" --decorate'';
             ll = ''log --pretty=format:"%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn]" --decorate --numstat'';
             lds = ''log --pretty=format:"%C(yellow)%h\ %ad%Cred%d\ %Creset%s%Cblue\ [%cn]" --decorate --date=short'';
