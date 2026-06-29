@@ -439,13 +439,17 @@
                 }
               ];
               centerWidgets = [
+                "weather"
                 "music"
                 {
                   id = "clock";
                   enabled = true;
                   clockCompactMode = false;
                 }
-                "weather"
+                {
+                  id = "dcalUpcoming";
+                  enabled = true;
+                }
               ];
               rightWidgets = [
                 {
@@ -734,6 +738,13 @@
               customPath = "${config.home.homeDirectory}/pictures/screenshots";
               videoCustomPath = "${config.home.homeDirectory}/videos/recordings";
               saveToDisk = false;
+            };
+          };
+
+          dcalUpcoming = {
+            enable = true;
+            settings = {
+              refreshInterval = 300;
             };
           };
         };
