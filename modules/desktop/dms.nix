@@ -745,6 +745,12 @@
             enable = true;
             settings = {
               refreshInterval = 300;
+              calendarIds = [
+                # this list has to be updated on a new system
+                "f98a6a1a-3d56-4d95-984f-7729848ec462" # Work
+                "41dfaaff-d579-4479-8f01-2d8155ae4f30" # Personal G
+                "52bdfe8c-9aa2-48a7-92a2-9c20028e60c9" # Personal A
+              ];
             };
           };
         };

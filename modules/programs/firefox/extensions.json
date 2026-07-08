@@ -8,7 +8,7 @@
   "ublock-origin": {
     "slug": "ublock-origin",
     "name": "uBlock Origin",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4814095/ublock_origin-1.71.0.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4872816/ublock_origin-1.72.0.xpi",
     "addonId": "uBlock0@raymondhill.net"
   },
   "onepassword-password-manager": {
@@ -16,12 +16,6 @@
     "name": "1Password",
     "url": "https://addons.mozilla.org/firefox/downloads/file/4853670/1password_x_password_manager-8.12.24.34.xpi",
     "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}"
-  },
-  "vimium-ff": {
-    "slug": "vimium-ff",
-    "name": "Vimium",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4717567/vimium_ff-2.4.2.xpi",
-    "addonId": "{d7742d87-e61d-4b78-b8a1-b469842139fa}"
   },
   "translate-web-pages": {
     "slug": "traduzir-paginas-web",
@@ -50,7 +44,7 @@
   "pwas-for-firefox": {
     "slug": "pwas-for-firefox",
     "name": "PWAs for Firefox",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4734250/pwas_for_firefox-2.18.2.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4864693/pwas_for_firefox-2.18.4.xpi",
     "addonId": "firefoxpwa@filips.si"
   },
   "open-in-notion-app": {
