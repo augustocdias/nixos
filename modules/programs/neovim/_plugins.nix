@@ -24,7 +24,7 @@
     blink-cmp = {useFlakePackage = true;};
     blink-pairs = {useFlakePackage = true;};
     rustaceanvim = {useFlakePackage = true;};
-    codesnap = {buildFromSource = true;};
+    codesnap = {useFlakePackage = true;};
     gx = {};
     plenary = {};
     nui = {};
@@ -67,19 +67,6 @@
     markdown-plus = {};
   };
 
-  codesnap-generator = pkgs.rustPlatform.buildRustPackage {
-    dontPatchELF = pkgs.stdenv.hostPlatform.isDarwin;
-    pname = "codesnap-generator";
-    version = "unstable";
-    src = getInput "codesnap";
-    sourceRoot = "source/generator";
-    cargoLock.lockFile = "${getInput "codesnap"}/generator/Cargo.lock";
-    nativeBuildInputs = with pkgs; [pkg-config];
-    buildInputs = with pkgs; [openssl];
-    OPENSSL_NO_VENDOR = 1;
-    doCheck = false;
-  };
-
   disableChecks = drv:
     drv.overrideAttrs (_: {
       doCheck = false;
@@ -94,16 +81,6 @@
   in
     if meta ? useFlakePackage
     then disableChecks (getInput name).packages.${system}.default
-    else if meta ? buildFromSource && name == "codesnap"
-    then
-      pkgs.vimUtils.buildVimPlugin {
-        pname = name;
-        version = "flake";
-        inherit src;
-        doCheck = false;
-        nvimRequireCheck = "";
-        postInstall = let ext = if pkgs.stdenv.hostPlatform.isDarwin then "dylib" else "so"; in ''ln -s ${codesnap-generator}/lib/libgenerator.${ext} $out/lua/generator.so'';
-      }
     else
       pkgs.vimUtils.buildVimPlugin {
         pname = name;

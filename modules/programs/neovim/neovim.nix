@@ -67,7 +67,7 @@ in {
     nvim-markview = mkPlugin "github:OXY2DEV/markview.nvim";
 
     nvim-gatekeeper = mkPlugin "github:augustocdias/gatekeeper.nvim";
-    nvim-codesnap = mkPlugin "github:mistricky/codesnap.nvim";
+    nvim-codesnap = mkFlakePlugin "github:augustocdias/codesnap.nvim/feat/nix-flake";
 
     nvim-crates = mkPlugin "github:Saecki/crates.nvim";
     nvim-refactoring = mkPlugin "github:ThePrimeagen/refactoring.nvim";
@@ -161,7 +161,6 @@ in {
           docker-compose-language-service
           taplo
           emmylua-ls
-          typescript
           rust-analyzer
           typescript-go
           nixd

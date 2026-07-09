@@ -1,6 +1,6 @@
 -- Generates an image from selected text. Needs silicon installed (cargo install silicon)
 return {
-    'codesnap',
+    'codesnap.nvim',
     cmd = { 'CodeSnap', 'CodeSnapSave', 'CodeSnapASCII', 'CodeSnapHighlight' },
     after = function()
         require('codesnap').setup({
