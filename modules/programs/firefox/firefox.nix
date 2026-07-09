@@ -157,9 +157,14 @@
               };
               categories = ["Network" "InstantMessaging"];
             };
-            settings.config = {
-              icon_url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
-              categories = ["social"];
+            settings = {
+              config = {
+                icon_url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
+                categories = ["social"];
+              };
+              manifest = {
+                scope = "https://web.whatsapp.com";
+              };
             };
           };
         };
