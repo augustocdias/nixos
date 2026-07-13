@@ -85,7 +85,7 @@
       flake = false;
     };
     nvim-codesnap = {
-      url = "github:augustocdias/codesnap.nvim/feat/nix-flake";
+      url = "github:mistricky/codesnap.nvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nvim-colorful-menu = {

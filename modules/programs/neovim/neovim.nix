@@ -26,8 +26,6 @@ in {
     nvim-blink-pairs = mkFlakePlugin "github:saghen/blink.pairs";
     nvim-lze = mkFlakePlugin "github:BirdeeHub/lze";
     nvim-rustaceanvim = mkFlakePlugin "github:mrcjkb/rustaceanvim";
-
-    # Source-only plugins (nvim- prefix for selective updates via update-neovim-plugins)
     nvim-gx = mkPlugin "github:chrishrb/gx.nvim";
     nvim-plenary = mkPlugin "github:nvim-lua/plenary.nvim";
     nvim-nui = mkPlugin "github:MunifTanjim/nui.nvim";
@@ -63,12 +61,9 @@ in {
     nvim-conform = mkPlugin "github:stevearc/conform.nvim";
     nvim-nvim-lint = mkPlugin "github:mfussenegger/nvim-lint";
     nvim-lightbulb = mkPlugin "github:kosayoda/nvim-lightbulb";
-
     nvim-markview = mkPlugin "github:OXY2DEV/markview.nvim";
-
     nvim-gatekeeper = mkPlugin "github:augustocdias/gatekeeper.nvim";
-    nvim-codesnap = mkFlakePlugin "github:augustocdias/codesnap.nvim/feat/nix-flake";
-
+    nvim-codesnap = mkFlakePlugin "github:mistricky/codesnap.nvim";
     nvim-crates = mkPlugin "github:Saecki/crates.nvim";
     nvim-refactoring = mkPlugin "github:ThePrimeagen/refactoring.nvim";
     nvim-markdown-plus = mkPlugin "github:yousefhadder/markdown-plus.nvim";
