@@ -166,7 +166,7 @@ in {
           shfmt
           alejandra
           sqlfluff
-          mdformat
+          (mdformat.withPlugins (ps: [ps.mdformat-frontmatter ps.mdformat-gfm]))
 
           harper
           eslint

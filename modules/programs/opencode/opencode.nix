@@ -9,6 +9,287 @@
       export NVIM_ADDRESS="$HOME/.cache/nvim/server-''${session}.pipe"
       exec ${lib.getExe' pkgs.nix "nix"} run github:paulburgess1357/nvim-mcp -- "$@"
     '';
+
+  readOnlyBash = {
+    "*" = "ask";
+
+    # -- Git: core read-only -------------------------------------------
+    "git status*" = "allow";
+    "git log*" = "allow";
+    "git show*" = "allow";
+    "git diff*" = "allow";
+    "git blame*" = "allow";
+    "git reflog*" = "allow";
+    "git describe*" = "allow";
+    "git shortlog*" = "allow";
+    "git whatchanged*" = "allow";
+
+    # -- Git: plumbing / inspection ------------------------------------
+    "git rev-parse*" = "allow";
+    "git symbolic-ref*" = "allow";
+    "git ls-files*" = "allow";
+    "git ls-remote*" = "allow";
+    "git ls-tree*" = "allow";
+    "git cat-file*" = "allow";
+    "git rev-list*" = "allow";
+    "git name-rev*" = "allow";
+    "git merge-base*" = "allow";
+    "git count-objects*" = "allow";
+    "git fsck*" = "allow";
+    "git verify-commit*" = "allow";
+    "git verify-tag*" = "allow";
+    "git check-ignore*" = "allow";
+    "git check-attr*" = "allow";
+    "git check-mailmap*" = "allow";
+    "git for-each-ref*" = "allow";
+    "git hash-object*" = "allow";
+
+    # -- Git: misc read-only -------------------------------------------
+    "git archive*" = "allow";
+    "git bundle*" = "allow";
+    "git help*" = "allow";
+    "git --version*" = "allow";
+
+    # -- Git: conditional read-only (with flags) -----------------------
+    "git branch --list*" = "allow";
+    "git branch -l*" = "allow";
+    "git branch --show-current*" = "allow";
+    "git branch --contains*" = "allow";
+    "git branch --merged*" = "allow";
+    "git branch --no-merged*" = "allow";
+    "git remote -v*" = "allow";
+    "git remote show*" = "allow";
+    "git remote get-url*" = "allow";
+    "git tag --list*" = "allow";
+    "git tag -l*" = "allow";
+    "git tag --contains*" = "allow";
+    "git tag --merged*" = "allow";
+    "git tag --points-at*" = "allow";
+    "git config --get*" = "allow";
+    "git config --get-all*" = "allow";
+    "git config --get-regexp*" = "allow";
+    "git config --list*" = "allow";
+    "git config -l*" = "allow";
+    "git stash list*" = "allow";
+    "git stash show*" = "allow";
+    "git worktree list*" = "allow";
+
+    # -- File / directory inspection -----------------------------------
+    "ls" = "allow";
+    "ls*" = "allow";
+    "eza" = "allow";
+    "eza*" = "allow";
+    "tree" = "allow";
+    "tree*" = "allow";
+    "cat" = "allow";
+    "cat *" = "allow";
+    "bat" = "allow";
+    "bat *" = "allow";
+    "head" = "allow";
+    "head *" = "allow";
+    "tail" = "allow";
+    "tail *" = "allow";
+    "wc" = "allow";
+    "wc *" = "allow";
+    "file *" = "allow";
+    "stat *" = "allow";
+    "du" = "allow";
+    "du *" = "allow";
+    "df" = "allow";
+    "df *" = "allow";
+    "readlink *" = "allow";
+
+    # -- Search --------------------------------------------------------
+    "rg *" = "allow";
+    "fd *" = "allow";
+    "find *" = "allow";
+    "grep *" = "allow";
+    "which *" = "allow";
+    "whereis *" = "allow";
+    "type *" = "allow";
+
+    # -- Text processing (read-only) -----------------------------------
+    "sort" = "allow";
+    "sort *" = "allow";
+    "uniq" = "allow";
+    "uniq *" = "allow";
+    "diff *" = "allow";
+    "comm *" = "allow";
+    "cut *" = "allow";
+    "tr *" = "allow";
+    "awk *" = "allow";
+    "sed -n*" = "allow";
+    "jq *" = "allow";
+    "yq *" = "allow";
+    "column *" = "allow";
+    "tac" = "allow";
+    "tac *" = "allow";
+    "rev" = "allow";
+    "rev *" = "allow";
+    "paste *" = "allow";
+    "expand *" = "allow";
+    "unexpand *" = "allow";
+    "fold *" = "allow";
+    "fmt *" = "allow";
+    "nl" = "allow";
+    "nl *" = "allow";
+
+    # -- System info ---------------------------------------------------
+    "uname*" = "allow";
+    "hostname*" = "allow";
+    "whoami*" = "allow";
+    "id*" = "allow";
+    "env" = "allow";
+    "env*" = "allow";
+    "printenv*" = "allow";
+    "date*" = "allow";
+    "uptime*" = "allow";
+    "pwd*" = "allow";
+    "locale*" = "allow";
+    "getconf*" = "allow";
+
+    # -- Process inspection --------------------------------------------
+    "ps *" = "allow";
+    "pgrep *" = "allow";
+
+    # -- Network (read-only) -------------------------------------------
+    "curl *" = "allow";
+    "dig *" = "allow";
+    "nslookup *" = "allow";
+    "ping *" = "allow";
+    "host *" = "allow";
+
+    # -- Cargo / Rust --------------------------------------------------
+    "cargo check*" = "allow";
+    "cargo test*" = "allow";
+    "cargo clippy*" = "allow";
+    "cargo build*" = "allow";
+    "cargo doc*" = "allow";
+    "cargo fmt --check*" = "allow";
+    "cargo tree*" = "allow";
+    "cargo metadata*" = "allow";
+    "cargo pkgid*" = "allow";
+    "cargo verify-project*" = "allow";
+    "cargo bench*" = "allow";
+    "rustc --version*" = "allow";
+    "rustc --explain*" = "allow";
+    "rustup show*" = "allow";
+    "rustup target list*" = "allow";
+    "rustup toolchain list*" = "allow";
+
+    # -- Node / JS -----------------------------------------------------
+    "node --version*" = "allow";
+    "npm list*" = "allow";
+    "npm info*" = "allow";
+    "npm view*" = "allow";
+    "npm ls*" = "allow";
+    "npm outdated*" = "allow";
+    "npm audit*" = "allow";
+    "npm explain*" = "allow";
+    "pnpm list*" = "allow";
+    "pnpm info*" = "allow";
+    "pnpm outdated*" = "allow";
+    "pnpm audit*" = "allow";
+    "npx --version*" = "allow";
+
+    # -- Python --------------------------------------------------------
+    "python3 --version*" = "allow";
+
+    # -- Nix -----------------------------------------------------------
+    "nix eval*" = "allow";
+    "nix flake show*" = "allow";
+    "nix flake metadata*" = "allow";
+    "nix flake info*" = "allow";
+    "nix-info*" = "allow";
+    "nix path-info*" = "allow";
+    "nix show-derivation*" = "allow";
+    "nix-store --query*" = "allow";
+
+    # -- Just ----------------------------------------------------------
+    "just --list*" = "allow";
+    "just --summary*" = "allow";
+    "just --show*" = "allow";
+    "just --evaluate*" = "allow";
+    "just --dump*" = "allow";
+
+    # -- GH CLI (read-only, supplements custom tools) ------------------
+    "gh issue list*" = "allow";
+    "gh issue view*" = "allow";
+    "gh issue status*" = "allow";
+    "gh pr list*" = "allow";
+    "gh pr view*" = "allow";
+    "gh pr diff*" = "allow";
+    "gh pr checks*" = "allow";
+    "gh pr status*" = "allow";
+    "gh repo view*" = "allow";
+    "gh repo list*" = "allow";
+    "gh run list*" = "allow";
+    "gh run view*" = "allow";
+    "gh run watch*" = "allow";
+    "gh workflow list*" = "allow";
+    "gh workflow view*" = "allow";
+    "gh search *" = "allow";
+    "gh status*" = "allow";
+    "gh auth status*" = "allow";
+    "gh api *" = "allow";
+  };
+
+  ghCustomTools = {
+    gh_issue_read = "allow";
+    gh_issue_write = "ask";
+    gh_pr_read = "allow";
+    gh_pr_write = "ask";
+    gh_workflow_read = "allow";
+    gh_workflow_write = "ask";
+    gh_run_read = "allow";
+    gh_run_write = "ask";
+    gh_search = "allow";
+    gh_status = "allow";
+    gh_repo_read = "allow";
+    gh_repo_write = "ask";
+    google_calendar = "allow";
+    date = "allow";
+  };
+
+  ghCustomToolsReadOnly =
+    ghCustomTools
+    // {
+      gh_issue_write = "deny";
+      gh_pr_write = "deny";
+      gh_workflow_write = "deny";
+      gh_run_write = "deny";
+      gh_repo_write = "deny";
+    };
+
+  denyDatadog = {"datadog_*" = "deny";};
+
+  denyTicketWrites = {
+    "linear_save_*" = "deny";
+    "linear_create_*" = "deny";
+    "linear_delete_*" = "deny";
+    "linear_prepare_attachment_upload" = "deny";
+    "Notion_notion-create-*" = "deny";
+    "Notion_notion-update-*" = "deny";
+    "Notion_notion-move-pages" = "deny";
+    "Notion_notion-duplicate-page" = "deny";
+  };
+
+  # Allow reading built derivations without hitting the external-directory
+  # boundary. Applied to every agent (primaries + subagents).
+  sharedExternalDir = {
+    external_directory = {
+      "/nix/store/**" = "allow";
+    };
+  };
+
+  primaryBase =
+    sharedExternalDir
+    // {
+      bash = readOnlyBash;
+    }
+    // ghCustomTools
+    // denyDatadog
+    // denyTicketWrites;
 in {
   den.aspects.opencode = {
     homeManager = {
@@ -27,6 +308,19 @@ in {
         cp -f ${./tools/google_calendar.ts} $HOME/.config/opencode/tools/google_calendar.ts
       '';
 
+      xdg.configFile = {
+        "opencode/agent/pair.md".source = ./agents/pair.md;
+        "opencode/agent/reviewer.md".source = ./agents/reviewer.md;
+        "opencode/agent/troubleshoot.md".source = ./agents/troubleshoot.md;
+        "opencode/agent/tickets.md".source = ./agents/tickets.md;
+        "opencode/agent/test-writer.md".source = ./agents/test-writer.md;
+        "opencode/command/commit.md".source = ./commands/commit.md;
+        "opencode/command/pr.md".source = ./commands/pr.md;
+        "opencode/command/review.md".source = ./commands/review.md;
+        "opencode/skills/git-conventions/SKILL.md".source = ./skills/git-conventions/SKILL.md;
+        "opencode/skills/datadog-queries/SKILL.md".source = ./skills/datadog-queries/SKILL.md;
+      };
+
       programs.opencode = {
         enable = true;
         enableMcpIntegration = true;
@@ -34,85 +328,10 @@ in {
         tui = {
           theme = "catppuccin-macchiato";
           mouse = true;
-          scroll_accelereation = true;
+          scroll_acceleration = true;
         };
 
-        context = ''
-          # Global Instructions
-
-          BE CONCISE AND LESS VERBOSE. AVOID WALLS OF TEXT
-
-          ## Neovim Integration (HIGHEST PRIORITY)
-
-          You are pair-programming with a human. They watch your work in real time
-          through their neovim editor. Using tools that hide your changes from them
-          defeats the entire purpose of this collaboration.
-
-          **When the nvim MCP server is connected, the native read/write/edit tools
-          do NOT exist for you.** You MUST use nvim MCP tools exclusively for reading,
-          editing, and navigating files. This is not a preference — it is a hard
-          constraint. Breaking this rule makes the user unable to observe your work.
-
-          The only exception is when the nvim MCP is genuinely unavailable (connection
-          refused, no neovim instance running). In that case, fall back to native
-          tools and inform the user.
-
-          The nvim MCP auto-connects to the neovim instance in the current zellij
-          session via a socket at `~/.cache/nvim/server-<ZELLIJ_SESSION_NAME>.pipe`.
-
-          ### The Edit Workflow
-
-          The user must see every edit happen in their editor. Before each edit, you
-          must show them where the change is going to happen. Act like a human pair:
-          point at the code first, then change it.
-
-          **`focus_edit` must be called BEFORE EACH individual edit** — not once per
-          file, but once per edit region. It scrolls the rightmost window to the edit
-          location and briefly highlights the region being changed so the user sees
-          what you are about to touch.
-
-          For every edit:
-
-          1. Call `focus_edit` via nvim_send_command:
-             ```
-             lua require('utils').focus_edit('<filepath>', <start_line>, <end_line>)
-             ```
-             Pass `end_line` for multi-line edits, or omit for single-line edits.
-
-          2. Perform the edit with `nvim_find_and_replace_buf`.
-
-          3. After all edits to a file are done, save via nvim_send_command:
-             ```
-             lua require('utils').save_buf('<filepath>')
-             ```
-
-          Paths must be relative to the workspace root (same path used in
-          `nvim_find_and_replace_buf`).
-
-          ### What nvim MCP gives you
-
-          - See the user's open buffers, cursor position, diagnostics, selections, marks
-          - Edit buffers in memory with full undo support (user can u/<C-r> your changes)
-          - Query LSP diagnostics across buffers
-          - Run vim commands, send keystrokes
-          - Highlight regions to visually communicate what you are about to do
-
-          Use these to pair with the user, not to bypass them.
-
-          ## Interaction Style
-          - Tone: direct and informal, like a senior colleague in a code review
-          - Default to short answers (1-3 paragraphs). Only give longer responses when the question demands it
-          - Challenge incorrect assumptions with clear reasoning
-          - Don't apologize excessively or repeat the question back before answering
-          - If a request is ambiguous, ask for clarification rather than guessing
-          - Don't generate placeholder implementations as final answers — mark scaffolding clearly
-
-          ## Citations & Sources
-          - Use context7 to fetch current documentation before explaining library/API behavior
-          - Provide links to official docs or authoritative sources for technical claims
-          - If no source is available, state the claim is based on general knowledge and may need verification
-          - Never present unverified information as fact
-        '';
+        context = builtins.readFile ./context.md;
 
         settings = {
           model = "anthropic/claude-opus-4-8";
@@ -156,236 +375,76 @@ in {
               };
             };
 
-          permission = {
-            external_directory = {
-              "/nix/store/**" = "allow";
+          permission =
+            sharedExternalDir
+            // {
+              bash = readOnlyBash;
+            }
+            // ghCustomTools;
+
+          agent = {
+            build.permission =
+              primaryBase
+              // {
+                edit = "allow";
+              };
+
+            plan.permission =
+              primaryBase
+              // {
+                edit = "deny";
+              }
+              // ghCustomToolsReadOnly;
+
+            pair = {
+              mode = "primary";
+              description = "Read-only pairing companion: discusses, investigates, and points at code in your editor via highlights and virtual text, but never edits.";
+              permission =
+                primaryBase
+                // ghCustomToolsReadOnly
+                // {
+                  edit = "deny";
+                  nvim_find_and_replace_buf = "deny";
+                  nvim_write_full_buf = "deny";
+                  nvim_send_keys = "deny";
+                  nvim_send_command = "ask";
+                };
             };
-            # --- Custom tools ---------------------------------------------------
-            gh_issue_read = "allow";
-            gh_issue_write = "ask";
-            gh_pr_read = "allow";
-            gh_pr_write = "ask";
-            gh_workflow_read = "allow";
-            gh_workflow_write = "ask";
-            gh_run_read = "allow";
-            gh_run_write = "ask";
-            gh_search = "allow";
-            gh_status = "allow";
-            gh_repo_read = "allow";
-            gh_repo_write = "ask";
-            google_calendar = "allow";
-            date = "allow";
 
-            # --- Bash -----------------------------------------------------------
-            bash = {
-              "*" = "ask";
+            troubleshoot.permission =
+              sharedExternalDir
+              // {
+                edit = "deny";
+                bash = readOnlyBash;
+                "datadog_*" = "allow";
+              }
+              // ghCustomToolsReadOnly;
 
-              # -- Git: core read-only -------------------------------------------
-              "git status*" = "allow";
-              "git log*" = "allow";
-              "git show*" = "allow";
-              "git diff*" = "allow";
-              "git blame*" = "allow";
-              "git reflog*" = "allow";
-              "git describe*" = "allow";
-              "git shortlog*" = "allow";
-              "git whatchanged*" = "allow";
+            tickets.permission =
+              sharedExternalDir
+              // {
+                edit = "deny";
+                bash = readOnlyBash;
+                "linear_*" = "ask";
+                "Notion_*" = "ask";
+              }
+              // ghCustomToolsReadOnly;
 
-              # -- Git: plumbing / inspection ------------------------------------
-              "git rev-parse*" = "allow";
-              "git symbolic-ref*" = "allow";
-              "git ls-files*" = "allow";
-              "git ls-remote*" = "allow";
-              "git ls-tree*" = "allow";
-              "git cat-file*" = "allow";
-              "git rev-list*" = "allow";
-              "git name-rev*" = "allow";
-              "git merge-base*" = "allow";
-              "git count-objects*" = "allow";
-              "git fsck*" = "allow";
-              "git verify-commit*" = "allow";
-              "git verify-tag*" = "allow";
-              "git check-ignore*" = "allow";
-              "git check-attr*" = "allow";
-              "git check-mailmap*" = "allow";
-              "git for-each-ref*" = "allow";
-              "git hash-object*" = "allow";
+            reviewer.permission =
+              sharedExternalDir
+              // {
+                edit = "deny";
+                bash = readOnlyBash;
+              }
+              // ghCustomToolsReadOnly
+              // denyDatadog
+              // denyTicketWrites;
 
-              # -- Git: misc read-only -------------------------------------------
-              "git archive*" = "allow";
-              "git bundle*" = "allow";
-              "git help*" = "allow";
-              "git --version*" = "allow";
-
-              # -- Git: conditional read-only (with flags) -----------------------
-              "git branch --list*" = "allow";
-              "git branch -l*" = "allow";
-              "git branch --show-current*" = "allow";
-              "git branch --contains*" = "allow";
-              "git branch --merged*" = "allow";
-              "git branch --no-merged*" = "allow";
-              "git remote -v*" = "allow";
-              "git remote show*" = "allow";
-              "git remote get-url*" = "allow";
-              "git tag --list*" = "allow";
-              "git tag -l*" = "allow";
-              "git tag --contains*" = "allow";
-              "git tag --merged*" = "allow";
-              "git tag --points-at*" = "allow";
-              "git config --get*" = "allow";
-              "git config --get-all*" = "allow";
-              "git config --get-regexp*" = "allow";
-              "git config --list*" = "allow";
-              "git config -l*" = "allow";
-              "git stash list*" = "allow";
-              "git stash show*" = "allow";
-              "git worktree list*" = "allow";
-
-              # -- File / directory inspection -----------------------------------
-              "ls*" = "allow";
-              "eza*" = "allow";
-              "tree*" = "allow";
-              "cat *" = "allow";
-              "bat *" = "allow";
-              "head *" = "allow";
-              "tail *" = "allow";
-              "wc *" = "allow";
-              "file *" = "allow";
-              "stat *" = "allow";
-              "du *" = "allow";
-              "df *" = "allow";
-              "readlink *" = "allow";
-
-              # -- Search --------------------------------------------------------
-              "rg *" = "allow";
-              "fd *" = "allow";
-              "find *" = "allow";
-              "grep *" = "allow";
-              "which *" = "allow";
-              "whereis *" = "allow";
-              "type *" = "allow";
-
-              # -- Text processing (read-only) -----------------------------------
-              "sort *" = "allow";
-              "uniq *" = "allow";
-              "diff *" = "allow";
-              "comm *" = "allow";
-              "cut *" = "allow";
-              "tr *" = "allow";
-              "awk *" = "allow";
-              "sed -n*" = "allow";
-              "jq *" = "allow";
-              "yq *" = "allow";
-              "column *" = "allow";
-              "tac *" = "allow";
-              "rev *" = "allow";
-              "paste *" = "allow";
-              "expand *" = "allow";
-              "unexpand *" = "allow";
-              "fold *" = "allow";
-              "fmt *" = "allow";
-              "nl *" = "allow";
-
-              # -- System info ---------------------------------------------------
-              "uname*" = "allow";
-              "hostname*" = "allow";
-              "whoami*" = "allow";
-              "id*" = "allow";
-              "env*" = "allow";
-              "printenv*" = "allow";
-              "date*" = "allow";
-              "uptime*" = "allow";
-              "pwd*" = "allow";
-              "locale*" = "allow";
-              "getconf*" = "allow";
-
-              # -- Process inspection --------------------------------------------
-              "ps *" = "allow";
-              "pgrep *" = "allow";
-
-              # -- Network (read-only) -------------------------------------------
-              "curl *" = "allow";
-              "dig *" = "allow";
-              "nslookup *" = "allow";
-              "ping *" = "allow";
-              "host *" = "allow";
-
-              # -- Cargo / Rust --------------------------------------------------
-              "cargo check*" = "allow";
-              "cargo test*" = "allow";
-              "cargo clippy*" = "allow";
-              "cargo build*" = "allow";
-              "cargo doc*" = "allow";
-              "cargo fmt --check*" = "allow";
-              "cargo tree*" = "allow";
-              "cargo metadata*" = "allow";
-              "cargo pkgid*" = "allow";
-              "cargo verify-project*" = "allow";
-              "cargo bench*" = "allow";
-              "rustc --version*" = "allow";
-              "rustc --explain*" = "allow";
-              "rustup show*" = "allow";
-              "rustup target list*" = "allow";
-              "rustup toolchain list*" = "allow";
-
-              # -- Node / JS -----------------------------------------------------
-              "node --version*" = "allow";
-              "node -e*" = "allow";
-              "npm list*" = "allow";
-              "npm info*" = "allow";
-              "npm view*" = "allow";
-              "npm ls*" = "allow";
-              "npm outdated*" = "allow";
-              "npm audit*" = "allow";
-              "npm explain*" = "allow";
-              "pnpm list*" = "allow";
-              "pnpm info*" = "allow";
-              "pnpm outdated*" = "allow";
-              "pnpm audit*" = "allow";
-              "npx --version*" = "allow";
-
-              # -- Python --------------------------------------------------------
-              "python3 --version*" = "allow";
-              "python3 -c*" = "allow";
-
-              # -- Nix -----------------------------------------------------------
-              "nix eval*" = "allow";
-              "nix flake show*" = "allow";
-              "nix flake metadata*" = "allow";
-              "nix flake info*" = "allow";
-              "nix-info*" = "allow";
-              "nix path-info*" = "allow";
-              "nix show-derivation*" = "allow";
-              "nix-store --query*" = "allow";
-
-              # -- Just ----------------------------------------------------------
-              "just --list*" = "allow";
-              "just --summary*" = "allow";
-              "just --show*" = "allow";
-              "just --evaluate*" = "allow";
-              "just --dump*" = "allow";
-
-              # -- GH CLI (read-only, supplements custom tools) ------------------
-              "gh issue list*" = "allow";
-              "gh issue view*" = "allow";
-              "gh issue status*" = "allow";
-              "gh pr list*" = "allow";
-              "gh pr view*" = "allow";
-              "gh pr diff*" = "allow";
-              "gh pr checks*" = "allow";
-              "gh pr status*" = "allow";
-              "gh repo view*" = "allow";
-              "gh repo list*" = "allow";
-              "gh run list*" = "allow";
-              "gh run view*" = "allow";
-              "gh run watch*" = "allow";
-              "gh workflow list*" = "allow";
-              "gh workflow view*" = "allow";
-              "gh search *" = "allow";
-              "gh status*" = "allow";
-              "gh auth status*" = "allow";
-              "gh api *" = "allow";
-            };
+            "test-writer".permission =
+              primaryBase
+              // {
+                edit = "ask";
+              };
           };
         };
       };

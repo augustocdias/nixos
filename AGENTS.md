@@ -1,6 +1,8 @@
-# NixOS Configuration — Dendritic Flake
+# NixOS + nix-darwin Configuration — Dendritic Flake
 
-A fully declarative NixOS configuration for a single-user Intel laptop running Hyprland + DankMaterialShell on Wayland. Managed with the **Den** framework for composable, aspect-based module organization.
+A fully declarative cross-platform configuration for a single user (`augusto`) spanning two machines: an Intel laptop running NixOS + Hyprland + DankMaterialShell on Wayland, and a Mac mini running macOS via nix-darwin. Managed with the **Den** framework for composable, aspect-based module organization.
+
+> **Keep this file current.** When you change hosts, aspects, module layout, inputs, LSP/formatter/linter sets, OpenCode config, or any documented behavior, update the relevant section of this AGENTS.md in the same change. Treat it as part of the diff, not an afterthought.
 
 ## Framework & Module System
 
@@ -12,6 +14,11 @@ A fully declarative NixOS configuration for a single-user Intel laptop running H
 | **flake-parts** | `hercules-ci/flake-parts` | Modular flake composition |
 | **import-tree** | `vic/import-tree` | Recursive auto-discovery of all `.nix` files under `modules/` |
 | **flake-file** | `vic/flake-file` | Distributed flake input declarations — each module declares its own inputs |
+| **flake-aspects** | `vic/flake-aspects` | Aspect schema support for Den |
+| **home-manager** | `nix-community/home-manager` | User-level config on both NixOS and Darwin |
+| **nix-darwin** | `nix-darwin/nix-darwin` | macOS system management for the Mac mini |
+| **nix-homebrew** | `zhaofengli/nix-homebrew` | Declarative Homebrew (casks) on Darwin |
+| **sops-nix** | `Mic92/sops-nix` | Secrets management |
 
 ### How it works
 
@@ -25,10 +32,16 @@ A fully declarative NixOS configuration for a single-user Intel laptop running H
 Aspects are the fundamental composable unit. Each aspect can contain:
 
 - `nixos = { ... }` — NixOS system-level config
+- `darwin = { ... }` — nix-darwin (macOS) system-level config
 - `homeManager = { ... }` — Home Manager user-level config
 - `includes = [ ... ]` — Dependencies on other aspects
 
-The composition chain: `den.hosts.x86_64-linux.laptop` -> `den.aspects.laptop` (hardware) -> `users.augusto` -> `den.aspects.augusto` (includes 40+ aspects).
+Composition chains (one per host):
+
+- **laptop**: `den.hosts.x86_64-linux.laptop` -> `den.aspects.laptop` (hardware) -> `users.augusto` -> `den.aspects.user-linux`
+- **macmini**: `den.hosts.aarch64-darwin.macmini` -> `den.aspects.macmini` (hardware) -> `users.augusto` -> `den.aspects.user-macos`
+
+The user aspects are layered: `user-base` (cross-platform aspects that must build on both classes) is included by both `user-linux` (adds Hyprland/DMS/Firefox/work/etc.) and `user-macos` (adds a few Darwin-only packages).
 
 ### Conventions
 
@@ -43,10 +56,10 @@ The composition chain: `den.hosts.x86_64-linux.laptop` -> `den.aspects.laptop` (
 
 ```
 modules/
-  defaults.nix              # Global defaults: nix settings, GC, stateVersion 26.11
+  defaults.nix              # Global defaults: shared nix settings, GC/optimise, stateVersion (nixos 26.11 / darwin 6)
   dendritic.nix             # Bootstraps den + flake-file
-  hosts.nix                 # Host definitions (laptop active, raspi planned)
-  inputs.nix                # Core flake inputs (nixpkgs, den, home-manager, sops-nix)
+  hosts.nix                 # Host definitions (laptop / macmini)
+  inputs.nix                # Core flake inputs (nixpkgs, den, home-manager, sops-nix, darwin, nix-homebrew)
   dev-shells.nix            # devShells.nvim-dev for plugin development
   installer.nix             # Custom NixOS installer ISO
 
@@ -58,13 +71,15 @@ modules/
   hardware/
     input-devices.nix       # Fingerprint reader (fprintd), touchpad
     networking.nix          # NetworkManager, systemd-resolved, Bluetooth
-    laptop/laptop.nix       # Main hardware profile: NVMe, Intel GPU, PipeWire, CUPS
+    laptop/laptop.nix       # NixOS hardware profile: NVMe, Intel GPU, PipeWire, CUPS
+    macmini/macmini.nix     # Darwin host: nix-homebrew, Touch ID sudo, system.defaults, EurKEY-Next layout, 1Password, casks
 
   desktop/
     boot.nix                # GRUB (Catppuccin theme), Plymouth, LUKS/TPM2
     hyprland.nix            # Hyprland Wayland compositor (see Desktop section)
     login-manager.nix       # Pulls in the DMS aspect
-    dms/dms.nix             # DankMaterialShell — full desktop shell (see DMS section)
+    dms.nix                 # DankMaterialShell — full desktop shell (see DMS section)
+    yabai-skhd.nix          # macOS tiling WM (yabai) + hotkey daemon (skhd), alt-based hjkl bindings
 
   packages/
     applications.nix        # GUI apps: Cider, Zed, imv, PeaZip, DrawIO
@@ -95,6 +110,7 @@ modules/
   services/
     podman.nix              # Podman with Docker compatibility
     work/
+      work.nix              # `work` aspect: aggregates the below + just, awscli2
       datagrip.nix          # JetBrains DataGrip with plugins
       virtualization.nix    # libvirtd/QEMU
       wireguard.nix         # WireGuard tools
@@ -111,15 +127,28 @@ modules/
     update-system/          # System update script
 
   user/
-    augusto.nix             # User aspect: includes all 40+ aspects
+    base.nix                # `user-base` aspect: cross-platform aspects (build on both nixos + darwin)
+    linux.nix               # `user-linux` aspect: user-base + Hyprland, DMS login, Firefox, Thunderbird, work, etc.
+    mac.nix                 # `user-macos` aspect: user-base + Darwin-only packages (1Password CLI, godot, raycast)
 ```
 
 ## Host Configuration
 
-| Host | Platform | Status | Description |
-|------|----------|--------|-------------|
-| `laptop` | x86_64-linux | Active | Intel laptop (Arrow Lake, NPU, Thunderbolt), dual monitor (eDP-1 + DP-1) |
-| `raspi` | aarch64-linux | Planned | Headless Raspberry Pi server (empty directory) |
+| Host | Platform | hostName | Status | Description |
+|------|----------|----------|--------|-------------|
+| `laptop` | x86_64-linux | `nixos` | Active | Intel laptop (Arrow Lake, NPU, Thunderbolt), dual monitor (eDP-1 + DP-1). NixOS + Hyprland + DMS. |
+| `macmini` | aarch64-darwin | `macmini` | Active | Apple Silicon Mac mini. macOS via nix-darwin + nix-homebrew, yabai/skhd tiling, EurKEY-Next layout. |
+
+### macOS (nix-darwin) host — `macmini`
+
+Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.aspects.macmini`, class `darwin`):
+
+- **nix-homebrew**: declarative Homebrew, Rosetta disabled, `cleanup = "zap"` (removes anything not declared). Casks: autodesk-fusion, vlc, blender, orcaslicer, snapmaker-orca, mac-mouse-fix, freecad.
+- **Auth**: Touch ID for `sudo` (`security.pam.services.sudo_local.touchIdAuth`).
+- **system.defaults**: dark mode, show-all-extensions/files, fast key repeat, disabled autocorrect/substitutions, dock autohide, Finder list view + path/status bar, screenshots to `~/pictures/screenshots`, trackpad tap-to-click + three-finger drag, Spotlight hotkeys disabled.
+- **Keyboard**: CapsLock -> Control; **EurKEY-Next** layout bundle built from the `eurkey-next` flake input and installed to `/Library/Keyboard Layouts/` via a post-activation script.
+- **Window management**: `yabai-skhd` aspect (bsp layout, 8px gaps/padding, `alt`-based hjkl focus/swap/resize, `alt+1..9` spaces, `alt+return` Ghostty, `alt+b` 1Password). yabai scripting addition enabled.
+- **Other**: 1Password GUI, fish as login shell.
 
 ## Desktop Environment
 
@@ -267,19 +296,56 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 ### Configuration (`modules/programs/opencode/opencode.nix`)
 
-- **Model**: `anthropic/claude-opus-4-6`
+- **Model**: `anthropic/claude-opus-4-8` (Opus everywhere, including subagents)
 - **Default agent**: `plan`
 - **TUI theme**: `catppuccin-macchiato`
+- **Other settings**: `autoupdate = false`, `lsp = false`; anthropic + openai providers keyed from env (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+
+### Agents (`modules/programs/opencode/agents/*.md` → `~/.config/opencode/agent/`)
+
+Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `opencode.nix` (`settings.agent.<name>.permission`). Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments (`readOnlyBash`, `ghCustomTools`, `denyDatadog`, `denyTicketWrites`, `primaryBase`) explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
+
+**Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`), so denying an MCP's tools on the primaries strips those definitions from every session; they reappear only inside the subagent that needs them.
+
+| Agent | Mode | Role | Notable permissions |
+|-------|------|------|---------------------|
+| `build` | primary | Full development (unchanged) | `edit: allow`; `datadog_*` + ticket writes denied |
+| `plan` | primary (default) | Read-only analysis/planning | `edit: deny`; gh/ticket writes + `datadog_*` denied |
+| `pair` | primary | Read-only pairing companion — annotates the editor (highlights/virtual text) but never edits | `edit: deny`; mutating nvim tools (`nvim_find_and_replace_buf`, `nvim_write_full_buf`, `nvim_send_keys`) denied, `nvim_send_command: ask`; read/annotation nvim tools allowed |
+| `reviewer` | subagent | Pre-commit/PR code review | `edit: deny`; read-only git bash + `gh_*_read` |
+| `troubleshoot` | subagent | Incident/issue investigation via Datadog (only agent with `datadog_*` enabled). Prompt encodes skill-discovery-first + logs→traces→metrics methodology | `datadog_*: allow`; `edit: deny` |
+| `tickets` | subagent | Linear/Notion triage, spec writing, status updates | reads allowed; `linear_*`/`Notion_*` writes `ask` |
+| `test-writer` | subagent | Writes tests only; prompt forbids editing implementation | `edit: ask` (build-tier) |
+
+### Commands (`modules/programs/opencode/commands/*.md` → `~/.config/opencode/command/`)
+
+Markdown command templates using `!` `` `cmd` `` shell injection and `$ARGUMENTS`.
+
+| Command | Agent | Purpose |
+|---------|-------|---------|
+| `/commit` | build | Drafts a conventional commit message from `git diff --cached`, commits after approval (never pushes) |
+| `/pr` | build | Drafts a PR description from the branch diff, opens via `gh_pr_write` after approval |
+| `/review` | reviewer (subtask) | Delegates the current diff/branch/PR to the `reviewer` subagent |
+
+Both agents and commands are plain markdown, so they deploy via `xdg.configFile` **symlinks** (the Bun symlink issue only affects the `.ts` custom tools). The loader scans both `agent/`+`agents/` and `command/`+`commands/`.
 
 ### MCP servers
+
+Always available:
+
+| Server | Type | Purpose |
+|--------|------|---------|
+| Context7 | local (`@upstash/context7-mcp`) | Library documentation (64k min tokens) |
+| nvim | local (nix run `nvim-mcp` wrapper) | Neovim instance access via msgpack-RPC (auto-connects to zellij session socket) |
+| nixos | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup |
+
+Linux-only (gated via `lib.optionalAttrs (!isDarwin)` — not present on the Mac mini):
 
 | Server | Type | Purpose |
 |--------|------|---------|
 | Notion | remote | Notion workspace access |
-| Linear | local (npx mcp-remote) | Issue tracking |
-| Context7 | local (@upstash/context7-mcp) | Library documentation (64k min tokens) |
-| Datadog | remote (EU endpoint) | Observability/monitoring |
-| nvim | local (uvx nvim-mcp) | Neovim instance access via msgpack-RPC (auto-connects to zellij session socket) |
+| linear | local (npx mcp-remote) | Issue tracking |
+| datadog | remote (EU endpoint) | Observability/monitoring |
 
 ### Custom tools (deployed to `~/.config/opencode/tools/`)
 
@@ -299,6 +365,8 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 - Read-only commands auto-allowed: git inspection, file reading (`cat`, `ls`, `bat`), search (`rg`, `fd`, `grep`), text processing (`jq`, `yq`, `awk`), system info, network inspection (`curl`, `dig`), language toolchains (cargo, node, nix), gh CLI reads
 - All mutations require approval: file writes, git commits/push, package installs, gh writes
 - Custom tools: `*_read` tools are `"allow"`, `*_write` tools are `"ask"`
+- **The whitelist is factored into a `readOnlyBash` `let` binding and applied per-agent.** Agent permissions override the global block, so a built-in agent (e.g. `plan`) would otherwise reset `bash` to `ask` and ignore the global allows — every agent that should run read-only bash re-applies `readOnlyBash` explicitly.
+- Whitelist entries include **bare-command variants** (`"head"` alongside `"head *"`) because each segment of a pipeline (`rg foo | head`) is matched individually — a bare `head` would not match `"head *"`.
 
 ## Security Model
 
@@ -321,8 +389,11 @@ The entire system uses **Catppuccin Mocha**:
 ## Common Operations
 
 ```bash
-# Rebuild NixOS
+# Rebuild NixOS (laptop)
 sudo nixos-rebuild switch --flake .
+
+# Rebuild macOS (macmini)
+darwin-rebuild switch --flake .
 
 # Regenerate flake.nix after changing module inputs
 nix run .#write-flake
@@ -345,10 +416,12 @@ nix develop .#nvim-dev
 
 ## Editing Guidelines
 
+- **Use the `nixos` MCP** when working with anything Nix: look up package names/attributes, verify NixOS / home-manager / nix-darwin option names and types, check flake inputs, or confirm a package exists in a channel — before writing or changing config. Your training data lags nixpkgs, so prefer it over guessing option/package names. It can also **read the Nix store directly** (`action: store` with `type: ls` or `type: read` on a `/nix/store/...` path) — use it to inspect a built derivation's contents, wrappers, `nix-support/` metadata, or config files without shelling out.
 - **Nix files**: Format with `alejandra`. Follow `den.aspects` pattern for new modules.
 - **Lua files**: Format with `stylua`. Follow `plugins/<name>.lua` pattern for new plugin configs. Use `lze` spec format (event, cmd, keys, ft for lazy loading).
 - **KDL files** (zellij): All directional bindings use hjkl, no arrow keys.
 - **Hyprland config**: All directional bindings use hjkl, no arrow keys. `$mainMod` is SUPER.
+- **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. yabai/skhd bindings use hjkl with `alt` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
 - **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).
 - **Secrets**: Never commit plaintext secrets. All secrets go through sops-nix. API keys are in `modules/security/secrets/env.yaml`.
 - **Flake inputs**: Declare per-module using `flake-file.inputs`, not in `flake.nix` directly.
