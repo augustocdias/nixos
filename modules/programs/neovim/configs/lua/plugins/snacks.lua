@@ -377,13 +377,6 @@ return {
             noremap = true,
         },
         {
-            '<leader>vz',
-            '<cmd>lua Snacks.picker.lazy()<CR>',
-            mode = { 'n' },
-            desc = 'Lazy Plugins',
-            noremap = true,
-        },
-        {
             '<leader>vq',
             '<cmd>lua Snacks.picker.qflist()<CR>',
             mode = { 'n' },
@@ -406,6 +399,13 @@ return {
         },
         {
             '<leader>vy',
+            "<cmd>let @+=expand('%')<CR>",
+            mode = { 'n' },
+            desc = 'Normal Mode Keymaps',
+            noremap = true,
+        },
+        {
+            '<leader>vz',
             '<cmd>lua Snacks.picker.keymaps()<CR>',
             mode = { 'n' },
             desc = 'Normal Mode Keymaps',
