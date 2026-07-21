@@ -16,6 +16,10 @@
     url = lib.mkDefault "github:AvengeMedia/dankcalendar";
     inputs.nixpkgs.follows = "nixpkgs";
   };
+  flake-file.inputs.dank-greeter = {
+    url = lib.mkDefault "github:AvengeMedia/dank-greeter";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   den.aspects.dms = {
     nixos = {
@@ -23,14 +27,14 @@
       config,
       ...
     }: {
-      imports = lib.optionals (inputs ? dms) [inputs.dms.nixosModules.greeter];
+      imports = lib.optionals (inputs ? dank-greeter) [inputs.dank-greeter.nixosModules.default];
 
       qt.enable = true;
       programs.kdeconnect.enable = true;
 
       users.users.augusto.extraGroups = ["greeter"];
 
-      programs.dank-material-shell.greeter = {
+      programs.dms-greeter = {
         enable = true;
         compositor.name = "hyprland";
         compositor.customConfig = ''

@@ -205,7 +205,7 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - **Bar**: top position, 50% transparency, Catppuccin theme, widgets: launcher, workspaces, window title, apps, MPRIS, clock, weather, tray, recorder, notifications, clipboard, CPU/RAM/battery, control center, session power
 - **Launcher**: list view, compact, recent-first sorting, DuckDuckGo web search, emoji (`:` trigger), calculator
 - **Lock screen**: password + fingerprint + FIDO2/U2F parallel auth, video wallpaper from `~/media/animated/`
-- **Greeter**: DMS also serves as the display manager. Shares theme state with user session via symlinks in `/var/cache/dms-greeter/`
+ - **Greeter**: the greeter now ships as a **separate flake** (`AvengeMedia/dank-greeter`, input `dank-greeter`), driven by `programs.dms-greeter` (Hyprland compositor). It syncs the user's DMS theme/wallpaper/settings into its cache dir `/var/lib/dms-greeter` (copied from `~/.config/DankMaterialShell/` etc. via `configHome`) before greetd starts.
 - **Control center**: volume, brightness, WiFi, Bluetooth, audio I/O, DND, idle inhibitor, VPN, KDE Connect
 - **Notifications**: 5s timeout (normal), persistent (critical), 50 history items, 7-day retention
 - **Desktop widgets**: system monitor (CPU/RAM/network/disk) + weather forecast
@@ -217,7 +217,7 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 
 #### DMS Nix structure
 
-- NixOS module (`nixosModules.greeter`): greeter service with Hyprland as compositor, PAM service `dankshell`
+- Greeter (`dank-greeter` flake input, `nixosModules.default` → `programs.dms-greeter`): greetd-based greeter with Hyprland as compositor, cache dir `/var/lib/dms-greeter`. Lives in its own repo now, not the DMS flake.
 - Home Manager module (`homeModules.dank-material-shell`): 700+ lines of declarative config
 - Plugin registry: separate flake input (`dms-plugins`)
 - SOPS secrets injected via systemd environment file at `%t/dms-env`
