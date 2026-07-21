@@ -100,6 +100,7 @@
     "readlink *" = "allow";
 
     # -- Search --------------------------------------------------------
+    "grep" = "allow";
     "rg *" = "allow";
     "fd *" = "allow";
     "find *" = "allow";
@@ -109,6 +110,8 @@
     "type *" = "allow";
 
     # -- Text processing (read-only) -----------------------------------
+    "echo" = "allow";
+    "echo *" = "allow";
     "sort" = "allow";
     "sort *" = "allow";
     "uniq" = "allow";
@@ -274,16 +277,18 @@
     "Notion_notion-duplicate-page" = "deny";
   };
 
-  # Allow reading built derivations without hitting the external-directory
-  # boundary. Applied to every agent (primaries + subagents).
-  sharedExternalDir = {
+  # Applied to every agent (primaries + subagents). Allows reading built
+  # derivations without hitting the external-directory boundary, and lets any
+  # agent ask the user questions.
+  sharedBase = {
     external_directory = {
       "/nix/store/**" = "allow";
     };
+    question = "allow";
   };
 
   primaryBase =
-    sharedExternalDir
+    sharedBase
     // {
       bash = readOnlyBash;
     }
@@ -376,7 +381,7 @@ in {
             };
 
           permission =
-            sharedExternalDir
+            sharedBase
             // {
               bash = readOnlyBash;
             }
@@ -412,7 +417,7 @@ in {
             };
 
             troubleshoot.permission =
-              sharedExternalDir
+              sharedBase
               // {
                 edit = "deny";
                 bash = readOnlyBash;
@@ -421,7 +426,7 @@ in {
               // ghCustomToolsReadOnly;
 
             tickets.permission =
-              sharedExternalDir
+              sharedBase
               // {
                 edit = "deny";
                 bash = readOnlyBash;
@@ -431,7 +436,7 @@ in {
               // ghCustomToolsReadOnly;
 
             reviewer.permission =
-              sharedExternalDir
+              sharedBase
               // {
                 edit = "deny";
                 bash = readOnlyBash;
