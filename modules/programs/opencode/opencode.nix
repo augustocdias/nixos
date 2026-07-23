@@ -1,5 +1,6 @@
 {
   den,
+  inputs,
   lib,
   ...
 }: let
@@ -296,6 +297,11 @@
     // denyDatadog
     // denyTicketWrites;
 in {
+  flake-file.inputs.opencode-vim = {
+    url = lib.mkDefault "github:leohenon/opencode-vim/ocv";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+
   den.aspects.opencode = {
     homeManager = {
       pkgs,
@@ -329,6 +335,9 @@ in {
       programs.opencode = {
         enable = true;
         enableMcpIntegration = true;
+
+        # Keyboard-first fork with vim controls across the TUI (leohenon/opencode-vim).
+        package = inputs.opencode-vim.packages.${pkgs.system}.opencode;
 
         tui = {
           theme = "catppuccin-macchiato";

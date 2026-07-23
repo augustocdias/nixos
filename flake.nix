@@ -248,6 +248,10 @@
       url = "github:folke/which-key.nvim";
       flake = false;
     };
+    opencode-vim = {
+      url = "github:leohenon/opencode-vim/ocv";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";

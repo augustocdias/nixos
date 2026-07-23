@@ -2179,6 +2179,27 @@
         "type": "github"
       }
     },
+    "opencode-vim": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784790185,
+        "narHash": "sha256-uwcCEahCqlTd2FVid4pbGg1FvKwIMWasHogTuEG7uAE=",
+        "owner": "leohenon",
+        "repo": "opencode-vim",
+        "rev": "91de6e357be15bd65273fc4b4b85960ffa859397",
+        "type": "github"
+      },
+      "original": {
+        "owner": "leohenon",
+        "ref": "ocv",
+        "repo": "opencode-vim",
+        "type": "github"
+      }
+    },
     "pre-commit-hooks": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -2288,6 +2309,7 @@
         "nvim-trouble": "nvim-trouble",
         "nvim-vim-matchup": "nvim-vim-matchup",
         "nvim-which-key": "nvim-which-key",
+        "opencode-vim": "opencode-vim",
         "sops-nix": "sops-nix",
         "sqlit": "sqlit"
       }
