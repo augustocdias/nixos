@@ -113,7 +113,7 @@
       flake = false;
     };
     nvim-flash = {
-      url = "github:folke/flash.nvim";
+      url = "github:onion108/flash.nvim/main";
       flake = false;
     };
     nvim-gatekeeper = {

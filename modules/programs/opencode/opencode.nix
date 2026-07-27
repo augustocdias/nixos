@@ -336,8 +336,7 @@ in {
         enable = true;
         enableMcpIntegration = true;
 
-        # Keyboard-first fork with vim controls across the TUI (leohenon/opencode-vim).
-        package = inputs.opencode-vim.packages.${pkgs.system}.opencode;
+        package = inputs.opencode-vim.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
 
         tui = {
           theme = "catppuccin-macchiato";
@@ -348,7 +347,7 @@ in {
         context = builtins.readFile ./context.md;
 
         settings = {
-          model = "anthropic/claude-opus-4-8";
+          model = "anthropic/claude-opus-5";
           autoupdate = false;
           default_agent = "plan";
           lsp = false;

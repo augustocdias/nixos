@@ -49,7 +49,11 @@ in {
     nvim-gitsigns = mkPlugin "github:lewis6991/gitsigns.nvim";
     nvim-diffview = mkPlugin "github:dlyongemallo/diffview.nvim";
     nvim-octo = mkPlugin "github:pwntester/octo.nvim";
-    nvim-flash = mkPlugin "github:folke/flash.nvim";
+    # FIXME: temporary fork — folke/flash.nvim's FFI hacks break on nvim 0.13+
+    # (undefined symbol: search_match_lines, removed by neovim#39485 SearchState
+    # refactor). Points at the open fix PR https://github.com/folke/flash.nvim/pull/492
+    # (onion108:main). Revert to folke/flash.nvim once that PR merges.
+    nvim-flash = mkPlugin "github:onion108/flash.nvim/main";
     nvim-trouble = mkPlugin "github:folke/trouble.nvim";
     nvim-todo-comments = mkPlugin "github:folke/todo-comments.nvim";
     nvim-vim-matchup = mkPlugin "github:andymass/vim-matchup";

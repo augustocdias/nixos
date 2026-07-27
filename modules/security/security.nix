@@ -35,7 +35,6 @@ in {
             };
           };
           services = lib.mkIf u2fKeysExist {
-            greetd = pamAuthConfig;
             sudo = pamAuthConfig;
             polkit-1 = pamAuthConfig;
             login = pamAuthConfig;
