@@ -1,6 +1,5 @@
 {
   den,
-  inputs,
   lib,
   ...
 }: let
@@ -74,76 +73,67 @@
     "git stash list*" = "allow";
     "git stash show*" = "allow";
     "git worktree list*" = "allow";
+    "git -C * status*" = "allow";
+    "git -C * log*" = "allow";
+    "git -C * diff*" = "allow";
+    "git -C * show*" = "allow";
+    "git -C * branch --list*" = "allow";
+    "git -C * branch -a*" = "allow";
+    "git -C * rev-parse*" = "allow";
+    "git -C * ls-files*" = "allow";
+    "git -C * for-each-ref*" = "allow";
 
     # -- File / directory inspection -----------------------------------
-    "ls" = "allow";
     "ls*" = "allow";
-    "eza" = "allow";
     "eza*" = "allow";
-    "tree" = "allow";
     "tree*" = "allow";
-    "cat" = "allow";
-    "cat *" = "allow";
-    "bat" = "allow";
-    "bat *" = "allow";
-    "head" = "allow";
-    "head *" = "allow";
-    "tail" = "allow";
-    "tail *" = "allow";
-    "wc" = "allow";
-    "wc *" = "allow";
-    "file *" = "allow";
-    "stat *" = "allow";
-    "du" = "allow";
-    "du *" = "allow";
-    "df" = "allow";
-    "df *" = "allow";
-    "readlink *" = "allow";
+    "cat*" = "allow";
+    "bat*" = "allow";
+    "head*" = "allow";
+    "tail*" = "allow";
+    "wc*" = "allow";
+    "file*" = "allow";
+    "stat*" = "allow";
+    "du*" = "allow";
+    "df*" = "allow";
+    "readlink*" = "allow";
 
     # -- Search --------------------------------------------------------
-    "grep" = "allow";
-    "rg *" = "allow";
-    "fd *" = "allow";
-    "find *" = "allow";
-    "grep *" = "allow";
-    "which *" = "allow";
-    "whereis *" = "allow";
-    "type *" = "allow";
+    "rg*" = "allow";
+    "fd*" = "allow";
+    "find*" = "allow";
+    "grep*" = "allow";
+    "which*" = "allow";
+    "whereis*" = "allow";
+    "type*" = "allow";
 
     # -- Text processing (read-only) -----------------------------------
-    "echo" = "allow";
-    "echo *" = "allow";
-    "sort" = "allow";
-    "sort *" = "allow";
-    "uniq" = "allow";
-    "uniq *" = "allow";
-    "diff *" = "allow";
-    "comm *" = "allow";
-    "cut *" = "allow";
-    "tr *" = "allow";
-    "awk *" = "allow";
+    "echo*" = "allow";
+    "sort*" = "allow";
+    "uniq*" = "allow";
+    "diff*" = "allow";
+    "comm*" = "allow";
+    "cut*" = "allow";
+    "tr*" = "allow";
+    "awk*" = "allow";
     "sed -n*" = "allow";
-    "jq *" = "allow";
-    "yq *" = "allow";
-    "column *" = "allow";
-    "tac" = "allow";
-    "tac *" = "allow";
-    "rev" = "allow";
-    "rev *" = "allow";
-    "paste *" = "allow";
-    "expand *" = "allow";
-    "unexpand *" = "allow";
-    "fold *" = "allow";
-    "fmt *" = "allow";
-    "nl" = "allow";
-    "nl *" = "allow";
+    "jq*" = "allow";
+    "yq*" = "allow";
+    "column*" = "allow";
+    "tac*" = "allow";
+    "rev*" = "allow";
+    "paste*" = "allow";
+    "expand*" = "allow";
+    "unexpand*" = "allow";
+    "fold*" = "allow";
+    "fmt*" = "allow";
+    "nl*" = "allow";
 
     # -- System info ---------------------------------------------------
     "uname*" = "allow";
     "hostname*" = "allow";
     "whoami*" = "allow";
     "id*" = "allow";
-    "env" = "allow";
     "env*" = "allow";
     "printenv*" = "allow";
     "date*" = "allow";
@@ -153,15 +143,15 @@
     "getconf*" = "allow";
 
     # -- Process inspection --------------------------------------------
-    "ps *" = "allow";
-    "pgrep *" = "allow";
+    "ps*" = "allow";
+    "pgrep*" = "allow";
 
     # -- Network (read-only) -------------------------------------------
-    "curl *" = "allow";
-    "dig *" = "allow";
-    "nslookup *" = "allow";
-    "ping *" = "allow";
-    "host *" = "allow";
+    "curl*" = "allow";
+    "dig*" = "allow";
+    "nslookup*" = "allow";
+    "ping*" = "allow";
+    "host*" = "allow";
 
     # -- Cargo / Rust --------------------------------------------------
     "cargo check*" = "allow";
@@ -180,6 +170,11 @@
     "rustup show*" = "allow";
     "rustup target list*" = "allow";
     "rustup toolchain list*" = "allow";
+    "*=* cargo *" = "allow";
+    "*=* rustc *" = "allow";
+    "timeout * cargo *" = "allow";
+    "timeout * rustc *" = "allow";
+    "*=* timeout * cargo *" = "allow";
 
     # -- Node / JS -----------------------------------------------------
     "node --version*" = "allow";
@@ -208,6 +203,8 @@
     "nix path-info*" = "allow";
     "nix show-derivation*" = "allow";
     "nix-store --query*" = "allow";
+    "timeout * nix eval*" = "allow";
+    "timeout * nix flake *" = "allow";
 
     # -- Just ----------------------------------------------------------
     "just --list*" = "allow";
@@ -235,7 +232,6 @@
     "gh search *" = "allow";
     "gh status*" = "allow";
     "gh auth status*" = "allow";
-    "gh api *" = "allow";
   };
 
   ghCustomTools = {
@@ -297,11 +293,6 @@
     // denyDatadog
     // denyTicketWrites;
 in {
-  flake-file.inputs.opencode-vim = {
-    url = lib.mkDefault "github:leohenon/opencode-vim/ocv";
-    inputs.nixpkgs.follows = "nixpkgs";
-  };
-
   den.aspects.opencode = {
     homeManager = {
       pkgs,
@@ -330,18 +321,29 @@ in {
         "opencode/command/review.md".source = ./commands/review.md;
         "opencode/skills/git-conventions/SKILL.md".source = ./skills/git-conventions/SKILL.md;
         "opencode/skills/datadog-queries/SKILL.md".source = ./skills/datadog-queries/SKILL.md;
+        "opencode/opencode-notifier.json".source = ./opencode-notifier.json;
       };
 
       programs.opencode = {
         enable = true;
         enableMcpIntegration = true;
 
-        package = inputs.opencode-vim.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
-
         tui = {
           theme = "catppuccin-macchiato";
           mouse = true;
-          scroll_acceleration = true;
+          scroll_acceleration.enabled = true;
+          keybinds.leader = "ctrl+space";
+
+          plugin = [
+            [
+              "@leohenon/opencode-vim-plugin"
+              {
+                enabled = true;
+                vim_insert_after_submit = true;
+                vim_system_clipboard_register = true;
+              }
+            ]
+          ];
         };
 
         context = builtins.readFile ./context.md;
@@ -351,6 +353,8 @@ in {
           autoupdate = false;
           default_agent = "plan";
           lsp = false;
+
+          plugin = ["@mohak34/opencode-notifier"];
 
           provider = {
             anthropic.options.apiKey = "{env:ANTHROPIC_API_KEY}";

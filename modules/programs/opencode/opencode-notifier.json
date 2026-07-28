@@ -1,0 +1,6 @@
+{
+  "sound": false,
+  "notification": true,
+  "bell": false,
+  "suppressWhenFocused": false
+}
