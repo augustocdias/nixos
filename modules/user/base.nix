@@ -10,7 +10,6 @@
       git
       fish
       ghostty
-      zellij
       herdr
       starship
       bat

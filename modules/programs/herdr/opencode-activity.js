@@ -21,8 +21,14 @@ let reportSeq = Date.now() * 1000;
 let requestChain = Promise.resolve();
 
 const childSessions = new Set();
+// The pane's own session. Subagents get their own sessions and their own idle
+// events, so the id is needed to tell whose idle just arrived.
+let rootSessionID;
 
 const state = { agent: "", title: "", todo: "" };
+// `agent` is remembered but only published while the session is active: the
+// value stays correct across a turn even if idle arrives between steps.
+let agentActive = false;
 const subagents = new Map();
 
 function nextReportSeq() {
@@ -90,7 +96,7 @@ function requestOnce(method, params) {
 
 function publish() {
   const tokens = {
-    agent: state.agent,
+    agent: agentActive ? state.agent : "",
     title: state.title,
     todo: state.todo,
   };
@@ -122,7 +128,65 @@ function sessionIDFromProperties(properties) {
     : undefined;
 }
 
-export const HerdrActivityPlugin = async () => {
+// Anything that is not this pane's own session: a known subagent, or any other
+// session once the pane's own id is known.
+function foreignSession(sessionID) {
+  if (!sessionID) {
+    return false;
+  }
+  if (childSessions.has(sessionID)) {
+    return true;
+  }
+  return rootSessionID ? sessionID !== rootSessionID : false;
+}
+
+async function markAgentActive() {
+  if (state.agent && !agentActive) {
+    agentActive = true;
+    await publish();
+  }
+}
+
+// A resumed session emits no session.updated, so the title and todo list have
+// to be fetched once instead of waited for.
+const seeded = new Set();
+
+async function seedFromSession(client, sessionID) {
+  if (!sessionID || seeded.has(sessionID) || !client?.session) {
+    return;
+  }
+  seeded.add(sessionID);
+
+  if (!state.title) {
+    try {
+      const title = (await client.session.get({ sessionID }))?.data?.title;
+      if (typeof title === "string" && title && !DEFAULT_TITLE.test(title)) {
+        state.title = clean(title);
+        await publish();
+      }
+    } catch {
+      // A missing or renamed endpoint must not break the reporting below.
+    }
+  }
+
+  if (!state.todo) {
+    try {
+      const todos = (await client.session.todo({ sessionID }))?.data;
+      if (Array.isArray(todos) && todos.length) {
+        state.todo = clean(todoSummary(todos));
+        await publish();
+      }
+    } catch {}
+  }
+}
+
+function todoSummary(todos) {
+  const active = todos.find((todo) => todo.status === "in_progress");
+  const done = todos.filter((todo) => todo.status === "completed").length;
+  return `${done}/${todos.length} ${active?.content ?? ""}`;
+}
+
+export const HerdrActivityPlugin = async ({ client } = {}) => {
   if (
     process.env.HERDR_ENV !== "1" ||
     !process.env.HERDR_SOCKET_PATH ||
@@ -133,17 +197,29 @@ export const HerdrActivityPlugin = async () => {
 
   return {
     "chat.message": async ({ sessionID, agent }) => {
-      if (sessionID && childSessions.has(sessionID)) {
+      if (foreignSession(sessionID)) {
         return;
       }
-      if (agent && agent !== state.agent) {
-        state.agent = clean(agent);
+      if (sessionID && !rootSessionID) {
+        rootSessionID = sessionID;
+      }
+      const next = agent ? clean(agent) : state.agent;
+      if (next !== state.agent || !agentActive) {
+        state.agent = next;
+        agentActive = true;
         await publish();
       }
+      await seedFromSession(client, sessionID);
     },
 
-    "tool.execute.before": async ({ tool, callID }, output) => {
+    "tool.execute.before": async ({ tool, sessionID, callID }, output) => {
+      if (foreignSession(sessionID)) {
+        return;
+      }
       if (tool !== "task") {
+        // Any tool call means the turn is still running, so re-show the agent
+        // if an idle event hid it mid-turn.
+        await markAgentActive();
         return;
       }
       const args = output?.args ?? {};
@@ -151,13 +227,19 @@ export const HerdrActivityPlugin = async () => {
         type: clean(args.subagent_type ?? "subagent"),
         description: clean(args.description ?? ""),
       });
+      agentActive = state.agent ? true : agentActive;
       await publish();
     },
 
-    "tool.execute.after": async ({ tool, callID }) => {
+    "tool.execute.after": async ({ tool, sessionID, callID }) => {
+      if (foreignSession(sessionID)) {
+        return;
+      }
       if (tool === "task" && subagents.delete(callID)) {
         await publish();
+        return;
       }
+      await markAgentActive();
     },
 
     event: async ({ event }) => {
@@ -168,10 +250,16 @@ export const HerdrActivityPlugin = async () => {
       if (info?.id && info.parentID) {
         childSessions.add(info.id);
       }
+      if (info?.id && !info.parentID && !rootSessionID) {
+        rootSessionID = info.id;
+      }
 
       const sessionID = sessionIDFromProperties(properties);
-      if (sessionID && childSessions.has(sessionID)) {
+      if (foreignSession(sessionID)) {
         return;
+      }
+      if (sessionID) {
+        await seedFromSession(client, sessionID);
       }
 
       switch (type) {
@@ -193,21 +281,28 @@ export const HerdrActivityPlugin = async () => {
 
         case "todo.updated": {
           const todos = Array.isArray(properties.todos) ? properties.todos : [];
-          const active = todos.find((todo) => todo.status === "in_progress");
-          const done = todos.filter(
-            (todo) => todo.status === "completed",
-          ).length;
-          const todo = todos.length
-            ? `${done}/${todos.length} ${active?.content ?? ""}`
-            : "";
-          state.todo = clean(todo);
+          state.todo = todos.length ? clean(todoSummary(todos)) : "";
           await publish();
           break;
         }
 
+        case "session.status": {
+          const kind =
+            typeof properties.status === "string"
+              ? properties.status
+              : properties.status?.type;
+          if (kind && kind !== "idle") {
+            await markAgentActive();
+          }
+          break;
+        }
+
         case "session.idle": {
-          if (state.agent) {
-            state.agent = "";
+          if (rootSessionID && sessionID !== rootSessionID) {
+            break;
+          }
+          if (agentActive) {
+            agentActive = false;
             await publish();
           }
           break;

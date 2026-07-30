@@ -18,8 +18,7 @@ refused, no neovim instance running). In that case, fall back to native
 tools and inform the user.
 
 The nvim MCP auto-connects to the neovim instance in the current herdr
-workspace (or zellij session) via a socket at
-`~/.cache/nvim/server-<HERDR_WORKSPACE_ID|ZELLIJ_SESSION_NAME>.pipe`.
+workspace via a socket at `~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`.
 
 ### The Edit Workflow
 
@@ -42,7 +41,7 @@ For every edit:
 
    Pass `end_line` for multi-line edits, or omit for single-line edits.
 
-1. Perform the edit with `nvim_find_and_replace_buf`.
+2. Perform the edit with `nvim_find_and_replace_buf`.
 
 1. After all edits to a file are done, save via nvim_send_command:
 

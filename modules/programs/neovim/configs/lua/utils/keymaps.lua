@@ -1,20 +1,18 @@
 local wincmd_to_direction = { ['j'] = 'down', ['k'] = 'up', ['h'] = 'left', ['l'] = 'right' }
 
-local function multiplexer_focus(direction)
-    if vim.env.HERDR_PANE_ID and vim.env.HERDR_PANE_ID ~= '' then
-        return {
-            vim.env.HERDR_BIN_PATH ~= '' and vim.env.HERDR_BIN_PATH or 'herdr', 'pane', 'focus', '--direction',
-            direction, '--pane', vim.env.HERDR_PANE_ID
-        }
+local function herdr_focus(direction)
+    if not vim.env.HERDR_PANE_ID or vim.env.HERDR_PANE_ID == '' then
+        return
     end
 
-    if vim.env.ZELLIJ and vim.env.ZELLIJ ~= '' then
-        return { 'zellij', 'action', 'move-focus', direction }
-    end
+    return {
+        vim.env.HERDR_BIN_PATH ~= '' and vim.env.HERDR_BIN_PATH or 'herdr', 'pane', 'focus', '--direction', direction,
+        '--pane', vim.env.HERDR_PANE_ID
+    }
 end
 
--- Move between splits, and cross into the surrounding multiplexer's panes when
--- already at an edge.
+-- Move between splits, and cross into the surrounding herdr pane when already
+-- at an edge. Outside herdr this is a plain wincmd.
 local mux_move = function (direction)
     local cur_winnr = vim.fn.winnr()
     vim.cmd.wincmd(direction)
@@ -24,7 +22,7 @@ local mux_move = function (direction)
         return
     end
 
-    local cmd = multiplexer_focus(wincmd_to_direction[direction])
+    local cmd = herdr_focus(wincmd_to_direction[direction])
     if not cmd then
         return
     end

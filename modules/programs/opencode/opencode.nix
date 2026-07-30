@@ -5,7 +5,7 @@
 }: let
   nvim-mcp-wrapper = pkgs:
     pkgs.writeShellScriptBin "nvim-mcp" ''
-      session="''${HERDR_WORKSPACE_ID:-''${ZELLIJ_SESSION_NAME:-dettached}}"
+      session="''${HERDR_WORKSPACE_ID:-dettached}"
       export NVIM_ADDRESS="$HOME/.cache/nvim/server-''${session}.pipe"
       exec ${lib.getExe' pkgs.nix "nix"} run github:paulburgess1357/nvim-mcp -- "$@"
     '';

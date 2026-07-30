@@ -1,9 +1,11 @@
 -- Register LzeStatus command
-vim.api.nvim_create_user_command('LzeStatus', function()
+vim.api.nvim_create_user_command('LzeStatus', function ()
     require('utils.lze').show_status()
-end, { desc = 'Show lze plugin status' })
+end, { desc = 'Show lze plugin status' }
+)
 
 return {
+    -- stylua: ignore
     { import = 'plugins.autopairs' },
     { import = 'plugins.autosession' },
     { import = 'plugins.catppuccin' },
@@ -39,5 +41,5 @@ return {
     { import = 'plugins.trouble' },
     { import = 'plugins.undotree' },
     { import = 'plugins.utils' },
-    { import = 'plugins.which-key' },
+    { import = 'plugins.which-key' }
 }
