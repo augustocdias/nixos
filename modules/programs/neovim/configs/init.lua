@@ -2,7 +2,7 @@ local pipe_suffix
 if vim.g.godot then
     pipe_suffix = 'godot'
 else
-    pipe_suffix = os.getenv('ZELLIJ_SESSION_NAME') or 'dettached'
+    pipe_suffix = os.getenv('HERDR_WORKSPACE_ID') or os.getenv('ZELLIJ_SESSION_NAME') or 'dettached'
 end
 
 local pipepath = vim.fn.stdpath('cache') .. '/server-' .. pipe_suffix .. '.pipe'

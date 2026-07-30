@@ -93,6 +93,7 @@ modules/
     fish/                   # Fish shell with plugins, aliases, env vars, git abbreviations
     ghostty/                # Ghostty terminal: Catppuccin, 80% opacity, cursor-trail shader
     git/                    # Git: GPG signing, delta pager, extensive aliases
+    herdr/                  # Herdr agent multiplexer (see Herdr section)
     mpv.nix                 # MPV with hardware decoding
     neovide/                # Neovide (Neovim GUI)
     neovim/                 # Neovim — extensive config (see Neovim section)
@@ -159,7 +160,7 @@ Wayland tiling compositor with:
 - **Layout**: dwindle (default) + scrolling workspace (plugin)
 - **Monitors**: eDP-1 (laptop, workspaces 1-5) + DP-1 (external, workspaces 6-10)
 - **Keybindings**: `SUPER` as main modifier. All directional bindings use hjkl (no arrow keys).
-- **Auto-start**: Slack, Thunderbird, Firefox, Ghostty+zellij, DataGrip (assigned to specific workspaces)
+- **Auto-start**: Slack, Thunderbird, Firefox, Ghostty, DataGrip (assigned to specific workspaces). The Ghostty window starts a plain shell; the multiplexer is launched by hand.
 - **Window rules**: Float dialogs, PiP, file pickers. Size constraints for various apps.
 
 ### DankMaterialShell (DMS)
@@ -222,6 +223,146 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - Plugin registry: separate flake input (`dms-plugins`)
 - SOPS secrets injected via systemd environment file at `%t/dms-env`
 
+## Herdr
+
+[Herdr](https://herdr.dev) is an agent-aware terminal multiplexer: `pkgs.herdr` configured through home-manager's `programs.herdr` (no flake input for herdr itself; the package and the module both come from the pinned nixpkgs/home-manager). It currently runs **alongside zellij** — both aspects sit in `user-base`, and Neovim/OpenCode detect at runtime which one they are inside.
+
+### Module layout (`modules/programs/herdr/`)
+
+| File                   | Purpose                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `herdr.nix`            | aspect `herdr`: `programs.herdr.settings`, the fish helpers, the plugin list, herdr's own OpenCode integration |
+| `_plugins.nix`         | `mkHerdrPlugin` — builds and installs herdr plugins declaratively                                              |
+| `nav.fish`             | `herdr-nav <dir>` — vim-aware pane focus                                                                       |
+| `resize.fish`          | `herdr-resize <dir>` — pane resize through the CLI                                                             |
+| `workspace.fish`       | `herdr-workspace [dir] [label]` — opens a workspace with the default layout                                    |
+| `worktree.fish`        | `herdr-worktree [branch]` — creates/reuses the checkout, then opens the workspace                              |
+| `plugins-sync.fish`    | converges herdr's plugin registry with the declared set during home-manager activation                         |
+| `opencode-activity.js` | OpenCode plugin feeding the Agents sidebar tokens (see Agents sidebar)                                         |
+
+Config is generated from a nix attrset (`settings` → `~/.config/herdr/config.toml`) rather than kept as a static file like `zellij/config.kdl`, because the keybindings interpolate store paths. The home-manager module runs `herdr server reload-config` on change. All helper scripts are fish (`pkgs.writers.writeFishBin`, syntax-checked at build time) with `@herdr@`/`@jq@` substituted for absolute store paths.
+
+Non-key settings: `theme.name = "catppuccin"`, `ui.pane_borders = false` (matching zellij's `pane_frames false`), `ui.copy_on_select`, `ui.sound.enabled = false`, `ui.toast.delivery = "system"` (agent notifications go to the OS notification service, i.e. DMS on the laptop, instead of an in-app toast), `session.resume_agents_on_restore`, `experimental.kitty_graphics` (required by the browser plugin), `onboarding = false`.
+
+### Keybindings
+
+Herdr has a tmux-style one-shot prefix — `ctrl+g` here, mirroring zellij's mode key — plus direct chords. There is no locked mode and no modal submodes, so nothing like `zellij-autolock` is needed: unbound keys always reach the pane.
+
+| Keys                                   | Action                                              |
+| -------------------------------------- | --------------------------------------------------- |
+| `ctrl+h/j/k/l`                         | pane focus, vim-aware (via `herdr-nav`)             |
+| `ctrl+alt+h/j/k/l`                     | pane resize (via `herdr-resize`)                    |
+| `prefix+h/j/k/l`                       | pane focus                                          |
+| `prefix+shift+h/j/k/l`                 | swap pane                                           |
+| `prefix+v` / `prefix+minus`            | split right / down                                  |
+| `prefix+x` / `prefix+shift+x`          | close pane / tab                                    |
+| `prefix+z`, `prefix+f`, `alt+m`        | zoom                                                |
+| `prefix+c`, `prefix+t`                 | new tab                                             |
+| `prefix+n`/`prefix+p`, `alt+]`/`alt+[` | next / previous tab                                 |
+| `prefix+1..9`                          | switch to tab                                       |
+| `prefix+[`, `prefix+s`                 | copy mode                                           |
+| `prefix+e`                             | edit scrollback in `$EDITOR`                        |
+| `prefix+r`, `alt+r`                    | resize mode                                         |
+| `prefix+w`/`prefix+g`, `alt+w`         | workspace picker / session navigator                |
+| `prefix+q`, `alt+d`                    | detach                                              |
+| `prefix+shift+t`/`prefix+shift+p`      | rename tab / pane                                   |
+| `prefix+shift+s`                       | settings                                            |
+| `prefix+shift+l`                       | apply the default layout                            |
+| `prefix+shift+g`                       | new worktree (popup, via `herdr-worktree`)          |
+| `prefix+alt+g` / `prefix+ctrl+d`       | open / remove worktree                              |
+| `prefix+b`, `ctrl+alt+b`               | toggle the sidebar                                  |
+| `prefix+ctrl+p` / `prefix+ctrl+n`      | previous / next workspace                           |
+| `prefix+shift+1..9`                    | switch to workspace                                 |
+| `prefix+a` / `prefix+shift+a`          | next / previous agent                               |
+| `prefix+alt+1..9`                      | focus agent                                         |
+| `prefix+backtick`                      | last pane (across tabs and workspaces)              |
+| `shift+j` / `shift+k`                  | workspace selection **in navigate mode**            |
+| `prefix+shift+{n,w,d,r}`, `prefix+?`   | herdr defaults (workspace ops, reload config, help) |
+
+Everything from `prefix+shift+g` down to `shift+j`/`shift+k` is unbound in stock herdr; `navigate_workspace_*` defaulted to arrow keys and moved to the shifted pair because plain `j`/`k` already move panes inside navigate mode. `new_worktree` is explicitly set to `""` (herdr's own spelling for unbound) so `prefix+shift+g` can go to our wrapper, which is the only way to get repo-relative checkouts.
+
+`ctrl+alt+h/j/k/l` and `alt+r` are why `yabai-skhd.nix` puts yabai's window resize, space balance and bsp layout on `ctrl+cmd` instead.
+
+Gaps versus the zellij setup, all inherent to herdr: no split left/up, no direct resize *action* (only resize mode, hence the CLI helper), no stacked panes, and no responsive layout swapping (`wide.kdl` has no equivalent).
+
+### Layout and persistence
+
+`prefix+shift+l` (or `herdr-workspace [dir] [label]` from any shell) opens one workspace: tab `neovim` = nvim (70%) | opencode (30%), tab `terminal` = main (70%) | tooling (30%).
+
+`herdr-workspace` is **ensure**, not create: it looks up the workspace by pane cwd (workspaces do not report a cwd, panes do), creates one only when none matches, and lays out tabs/panes only when the workspace still has nothing but its root pane. So it is safe to re-run, and `herdr-worktree` reuses it by passing the new checkout as `[dir]` plus the branch as `[label]`.
+
+`[label]` names the workspace; passing it also renames an existing one, while the derived default never overrides a name set in the sidebar. The default is `<repo>/<checkout dir>` for a **main** checkout (`integrations-mono/main` rather than a bare `main`, since sibling-worktree layouts would otherwise produce a pile of workspaces all called `main`), collapsing to one segment when the repo name already equals the directory name (`nixos`), and the **bare directory name** for a linked worktree (`async-core-client`) because the sidebar already nests those under their repo. Outside git it is just the directory name. Linked worktrees are detected by `git-dir != git-common-dir`. When `$dir/.envrc` exists it runs `direnv allow` **before** any pane shell starts — otherwise nvim and opencode come up with an untrusted environment. Directories without an `.envrc` are left alone.
+
+Herdr has **no layout files**. Panes are always interactive shells — `pane split`/`tab create` accept no argv and `pane run` types into the shell — so killing nvim or opencode drops back to a prompt and the pane survives, unlike zellij's `command` panes. Recreating a session is herdr's own job: snapshot restore rebuilds workspaces/tabs/panes/cwd/focus after a server restart, and with `session.resume_agents_on_restore` the OpenCode pane resumes its conversation (`opencode --session <id>`) via the integration below.
+
+### Worktrees
+
+`herdr-worktree [branch]` prompts for the branch when called without one, which is how `prefix+shift+g` uses it (a popup is the only custom command type with a terminal); passing the branch as an argument makes it run unattended from a shell or script. It then makes sure a checkout exists, runs `direnv allow` when that checkout has an `.envrc`, registers it with `herdr worktree open --label <branch> --focus`, and finishes with `herdr-workspace <checkout> <branch>`. So the binding is open-or-create: an existing branch name jumps to its worktree, a new one creates it. The label is the branch alone — the sidebar already nests the workspace under its repo — and it is passed explicitly rather than left to herdr's auto-label, which uses the checkout's directory name and would drop the `feature/` from a slashed branch.
+
+How the checkout is obtained, in order:
+
+| Precondition                                          | Action                                                                          |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| a worktree already exists for `refs/heads/<branch>`   | reuse it, no git mutation (herdr focuses the workspace when it is already open) |
+| that checkout is registered but its directory is gone | fail with a `git worktree prune` hint                                           |
+| `<repo folder>/<branch>` exists but is not a worktree | fail, distinguishing a leftover directory from git's generic `already exists`   |
+| the branch exists locally without a worktree          | `git worktree add <repo folder>/<branch> <branch>` — checked out untouched      |
+| the branch does not exist                             | `git worktree add <repo folder>/<branch> -b <branch>` — new branch from HEAD    |
+
+The git calls are made in `worktree.fish` rather than through **`git wa`**, so the wrapper does not break when that alias changes shape — it already did once mid-work, losing its `-B` and with it the ability to create a branch at all (`git worktree add <path> <branch>` treats an unknown branch as a commit-ish and fails with `invalid reference`). The cost is that the path convention (`<repo folder>/<branch>`, raw branch name, no slug) is duplicated from the alias; change it in `git.nix` and `worktree.fish` needs the same edit. After any creation the path is re-read from `git worktree list --porcelain` rather than trusted from the formula.
+
+Two reasons it is a wrapper rather than herdr's built-in `new_worktree`:
+
+- **`worktrees.directory` cannot express the convention.** Checkouts go to `<worktrees.directory>/<repo_name>/<branch-slug>`, and `repo_name` is the *directory name of the repo root* — for `~/dev/integrations-mono/main` that is `main`, so herdr would create `~/dev/main/<branch>`. `worktrees.directory = "~/dev/worktrees"` therefore only governs repos that do not keep worktrees as siblings.
+- **herdr refuses worktree actions from a linked worktree** (`linked_worktree_source`: "New and open worktree actions start from the repo parent workspace"). The wrapper resolves the main checkout through `rev-parse --git-common-dir` and passes it as `--cwd`, so the binding works from any worktree of the repo.
+
+The repo half of the label comes from `git remote get-url origin` (basename minus `.git`), falling back to the repo folder's name.
+
+### Agents sidebar
+
+`ui.sidebar.agents.rows` is fed by `opencode-activity.js` (deployed to `~/.config/opencode/plugins/herdr-activity.js`), which reports **display-only** pane metadata through `pane.report_metadata` and never calls `pane.report_agent` — so it cannot disturb the lifecycle state or session identity owned by herdr's own integration sitting next to it.
+
+| Token                     | OpenCode event → field                                                               | Example                              |
+| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
+| `$agent`                  | `chat.message` → `input.agent`, cleared on `session.idle`                            | `build`                              |
+| `$title`                  | `session.updated` → `info.title`, minus OpenCode's `New session - <iso>` placeholder | `Async core client block_on…`        |
+| `$todo`                   | `todo.updated` → completed count + the `in_progress` item                            | `1/3 wire the plugin into herdr.nix` |
+| `$sub1`, `$sub2`, `$sub3` | `tool.execute.before` where `tool == "task"` → `subagent_type` + `description`       | `explore: find zellij couplings`     |
+| `$submore`                | the overflow beyond three slots, subagent types joined by `, `                       | `test-writer, tickets`               |
+
+`rows` is static, so one subagent per line means one fixed slot per line. Values are pre-truncated at 72 characters (herdr caps at 80) so the ellipsis is ours, every report carries the full token set (an empty value is how herdr clears a key), a monotonic `seq` drops stale writes, and a 12h TTL keeps a `kill -9` from leaving stale lines. Events from sessions with a `parentID` are dropped, so a subagent's todo list can never overwrite yours; the `$subN` slots come from the parent's own `task` tool calls and each clears when its `callID` finishes. `$agent` clears on `session.idle`, because `Tab` cycles the agent purely inside the TUI (`local.agent.move` writes an in-memory store, with no bus event, no persistence and no `agent` field in the plugin's `TuiState` view) — an idle pane would otherwise keep showing whichever agent last sent a message.
+
+Line one is the only undimmed row, and the rest carry explicit muted foregrounds because `dim` alone is not quiet enough: `#6f8f6b` for `$todo`, `#6c7086` for the subagent slots. `ui.agent_panel_sort = "priority"` floats agents needing attention to the top, and the sidebar is pinned to 36 columns because these rows clip badly at the default 26.
+
+### OpenCode integration and skills
+
+`herdr.nix` owns these (not `opencode.nix` — herdr's integration is herdr's business):
+
+- `~/.config/opencode/plugins/herdr-agent-state.js` ← `${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js`. Reports lifecycle state and session identity, which is what makes the sidebar show `working`/`blocked`/`idle` and makes agent panes resumable. Deployed from the same source revision as the binary, so it can never skew — never run `herdr integration install opencode`.
+- `~/.config/opencode/skills/herdr/SKILL.md` ← `${pkgs.herdr.src}/SKILL.md`. Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`.
+- Skills shipped by plugins, picked up from `mkHerdrPlugin`'s `passthru.skills`.
+
+`opencode.nix` allows herdr inspection and topology in `readOnlyBash` (`pane list/get/read/split/focus/resize`, `tab create`, `agent wait`, …). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.
+
+### Plugins (`mkHerdrPlugin`)
+
+`herdr plugin install` clones from GitHub and runs the manifest's `[[build]]` commands at install time. Instead, `mkHerdrPlugin` reads `herdr-plugin.toml` at eval time, builds with nix, strips `[[build]]` from the installed manifest, and prefixes every remaining command with a generated fish wrapper that puts `runtimeDeps` on `PATH`. The wrapper (rather than argv[0] rewriting) is what makes dependencies work when a plugin resolves binaries by PATH name or shells out from its own scripts.
+
+```nix
+mkHerdrPlugin {
+  src = inputs.herdr-plugin-browser;      # flake input with flake = false
+  runtimeDeps = [pkgs.bun pkgs.ungoogled-chromium];
+  # subdir, build ("auto"|"rust"|"node"|"none"), npmDepsHash, commands, env
+}
+```
+
+- Build detection: `Cargo.toml` → `buildRustPackage` with `cargoLock.lockFile` (hash-free); `package.json` with a `build` script or real dependencies → `buildNpmPackage` with `importNpmLock` (hash-free when `package-lock.json` exists, otherwise `npmDepsHash` is required — a `bun.lock` alone cannot be fetched without one); anything else → source only.
+- Asserts `min_herdr_version` against `pkgs.herdr.version` at eval time.
+- Registration: a one-line `home.activation` entry runs `herdr-plugins-sync`, which reads `~/.config/herdr/plugins.json` (herdr's file — we never write it) and converges through `herdr plugin link|unlink`. Entries whose root is not under `/nix/store` are left alone, so hand-installed plugins survive; a store-path change relinks automatically.
+- **Unproven paths**: only the source-only strategy is exercised today. The rust and node builds (including how built artifacts are linked back to the paths a manifest expects) are implemented but untested until a plugin needs them.
+
+Installed: `official.browser` (`ogulcancelik/herdr-browser`) — Linux only, drives a headless Chromium in a pane over CDP, needs `bun` + `ungoogled-chromium` on `PATH` and `experimental.kitty_graphics = true`.
+
 ## Neovim
 
 ### Architecture
@@ -272,7 +413,7 @@ Dockerfile: hadolint | JS/TS: eslint | Lua: selene | Markdown: markdownlint + wr
 - **Leader**: Space. **Local leader**: `\`
 - **Vim-centric**: modal editing, motions enhanced (flash, treesitter textobjects)
 - **Mnemonic groups**: `<leader>l` LSP, `<leader>g` Git, `<leader>h` Gitsigns, `<leader>r` Rust, `<leader>t` Trouble, `<leader>p` search/grep, `<leader>v` Vim internals, `<leader>a` AI
-- **Zellij integration**: `<C-h/j/k/l>` in normal mode moves between Neovim splits and falls through to Zellij panes at edges (via vim-zellij-navigator)
+- **Multiplexer integration**: `<C-h/j/k/l>` moves between Neovim splits and falls through to herdr or Zellij panes at edges. Hand-rolled in `utils/keymaps.lua` (`mux_move`), not a plugin: it runs `wincmd <dir>` and, when the window did not change, dispatches on the environment — `HERDR_PANE_ID` → `herdr pane focus --direction`, `ZELLIJ` → `zellij action move-focus`, neither → no-op.
 - **No arrow key dependency**: `<C-h/j/k/l>` provides cursor movement in insert/command mode
 - **Clipboard isolation**: system clipboard NOT synced by default; `<leader>c` in visual mode copies explicitly
 
@@ -282,7 +423,7 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 - **Vim mode**: Full modal editing in the TUI prompt input (hjkl, w/b/e, dd, cw, yy, p, u, visual mode)
 - **nvim-mcp**: MCP server connecting OpenCode to the running neovim instance via msgpack-RPC socket. Gives OpenCode access to open buffers, cursor position, diagnostics, selections, and in-buffer editing with full undo support.
-- **Socket discovery**: Neovim creates a socket at `~/.cache/nvim/server-<ZELLIJ_SESSION_NAME>.pipe`. The nvim-mcp wrapper reads `ZELLIJ_SESSION_NAME` at runtime to connect to the correct instance.
+- **Socket discovery**: Neovim creates a socket at `~/.cache/nvim/server-<suffix>.pipe`, where the suffix is `HERDR_WORKSPACE_ID`, else `ZELLIJ_SESSION_NAME`, else `dettached`. The nvim-mcp wrapper resolves the same chain at runtime, so an OpenCode pane reaches the Neovim instance of its own herdr workspace (or zellij session).
 - **Global instructions**: Personal coding style preferences in `~/.config/opencode/AGENTS.md` (managed via `programs.opencode.context`), applied to all projects alongside project-level AGENTS.md files.
 
 ### Notable custom features
@@ -333,11 +474,11 @@ Both agents and commands are plain markdown, so they deploy via `xdg.configFile`
 
 Always available:
 
-| Server   | Type                                        | Purpose                                                                         |
-| -------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
-| Context7 | local (`@upstash/context7-mcp`)             | Library documentation (64k min tokens)                                          |
-| nvim     | local (nix run `nvim-mcp` wrapper)          | Neovim instance access via msgpack-RPC (auto-connects to zellij session socket) |
-| nixos    | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup                           |
+| Server   | Type                                        | Purpose                                                                                               |
+| -------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Context7 | local (`@upstash/context7-mcp`)             | Library documentation (64k min tokens)                                                                |
+| nvim     | local (nix run `nvim-mcp` wrapper)          | Neovim instance access via msgpack-RPC (auto-connects to the herdr workspace / zellij session socket) |
+| nixos    | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup                                                 |
 
 Linux-only (gated via `lib.optionalAttrs (!isDarwin)` — not present on the Mac mini):
 
@@ -362,11 +503,15 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 **Default-deny, explicit-allow with read/write split:**
 
 - `"*" = "ask"` — global default, all unknown commands require approval
-- Read-only commands auto-allowed: git inspection, file reading (`cat`, `ls`, `bat`), search (`rg`, `fd`, `grep`), text processing (`jq`, `yq`, `awk`), system info, network inspection (`curl`, `dig`), language toolchains (cargo, node, nix), gh CLI reads
+- Read-only commands auto-allowed: git inspection, file reading (`cat`, `ls`, `bat`), search (`rg`, `fd`, `grep`, `find`), text processing (`jq`, `yq`, `cut`, `tr`), system info, network inspection (`curl`, `dig`), language toolchains (cargo, node, nix), gh CLI reads, herdr inspection
+- **Commands that can execute or write are deliberately absent from the allowlist**, because they defeat every deny rule below: `env` (runs whatever follows it), `awk` (`system()`, `print | "sh"`), `sed` (`e` runs shell commands, `w` writes files, and `-i` still matches a `sed -n*` pattern — all three verified), `sort` (`--compress-program`). They fall through to `"*" = "ask"`. `find` stays allowed, with `-exec`/`-ok`/`-delete`/`-fprintf` pulled back to `ask`.
 - All mutations require approval: file writes, git commits/push, package installs, gh writes
 - Custom tools: `*_read` tools are `"allow"`, `*_write` tools are `"ask"`
 - **The whitelist is factored into a `readOnlyBash` `let` binding and applied per-agent.** Agent permissions override the global block, so a built-in agent (e.g. `plan`) would otherwise reset `bash` to `ask` and ignore the global allows — every agent that should run read-only bash re-applies `readOnlyBash` explicitly.
-- **Matching semantics** (verified against the running binary): each pattern is matched against a whole command segment, anchored `^…$` (`*`→`.*`), and a pattern ending in `" *"` also matches the bare command (trailing space+args made optional). So `"cat*"` covers `cat`, `cat x`, `cat -n x`. Rules are evaluated **sorted by pattern length ascending, last match wins** — nix/JSON key order is irrelevant, and `"*"` (the shortest) is always the weakest fallback. A longer, more specific pattern always beats it.
+- **Matching semantics** (verified empirically against opencode 1.18.4): each pattern is a glob matched against a whole command segment, anchored `^…$`, with `*`→`.*` and `?`→`.`; a pattern ending in `" *"` also matches the bare command. So `"cat*"` covers `cat`, `cat x`, `cat -n x`. Rules are evaluated with `findLast` over **JSON key order**, and nix emits attrset keys in byte order, so the **lexicographically last matching pattern wins**. This is not the same as "most specific wins", and it has two consequences worth internalising:
+  - A `"*"`-prefixed pattern sorts before everything (`*` is 0x2A) and is therefore the **weakest** rule, not the strongest. `"*nixos-rebuild*" = "deny"` loses to any letter-prefixed allow that matches the same segment.
+  - To beat an allow with a narrower rule, the narrower pattern must **share the allow's prefix and be longer** — `"find*-exec*"` beats `"find*"`, while `"find -exec*"` would lose, because space (0x20) sorts before `*`.
+  - Probe it after any change: `nix build --version` must be denied and `env nix build --version` must not print a version.
 - **Pipelines are all-or-nothing**: a piped/`&&`-chained command needs approval if *any* single segment resolves to `ask`. Env-assignment or `timeout`/`git -C` prefixes defeat a plain whitelist entry (they change the segment), so `readOnlyBash` includes transparent-prefix patterns (`"*=* cargo *"`, `"timeout * cargo *"`, `"git -C * log*"`, …). These require a real prefix (`=` or literal `timeout`/`git -C`), so `sudo cargo …` still asks.
 
 ## Security Model
@@ -381,7 +526,7 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 
 The entire system uses **Catppuccin Mocha**:
 
-- GRUB, Plymouth, Hyprland, DMS, Ghostty, Neovim, Firefox, bat, delta, starship, skim, yazi, zellij
+- GRUB, Plymouth, Hyprland, DMS, Ghostty, Neovim, Firefox, bat, delta, starship, skim, yazi, zellij, herdr
 - Cursors: catppuccin-mocha-blue-cursors
 - GTK/Qt: synced via DMS Matugen templates
 - Monospace font: MonaspiceNe Nerd Font (terminal), MonaspiceRn Nerd Font (italic)
@@ -413,6 +558,14 @@ update-thunderbird
 
 # Dev shell for neovim plugin development
 nix develop .#nvim-dev
+
+# Update herdr plugin sources (herdr itself follows nixpkgs)
+nix flake update herdr-plugin-browser
+
+# Open (or create) a herdr workspace with the default layout
+herdr-workspace                                    # current directory
+herdr-workspace ~/dev/integrations-mono/main       # label defaults to integrations-mono/main
+herdr-workspace ~/dev/some-repo my-name            # explicit workspace name
 ```
 
 ## Editing Guidelines
@@ -421,6 +574,8 @@ nix develop .#nvim-dev
 - **Nix files**: Format with `alejandra`. Follow `den.aspects` pattern for new modules.
 - **Lua files**: Format with `stylua`. Follow `plugins/<name>.lua` pattern for new plugin configs. Use `lze` spec format (event, cmd, keys, ft for lazy loading).
 - **KDL files** (zellij): All directional bindings use hjkl, no arrow keys.
+- **Herdr helpers**: shell helpers are fish, built with `pkgs.writers.writeFishBin` (syntax-checked at build time) and referenced from `settings.keys.command` by absolute store path. Never add a bash/sh helper here.
+- **Herdr plugins**: add a `flake = false` input plus one `mkHerdrPlugin` entry in `herdr.nix`; never `herdr plugin install`/`link` by hand, and never write `~/.config/herdr/plugins.json`.
 - **Hyprland config**: All directional bindings use hjkl, no arrow keys. `$mainMod` is SUPER.
 - **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. yabai/skhd bindings use hjkl with `alt` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
 - **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).

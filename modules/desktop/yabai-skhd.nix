@@ -77,17 +77,17 @@
           shift + alt - l : yabai -m window --swap east
 
           # ---- Resize windows ----
-          ctrl + alt - h : yabai -m window --resize left:-40:0 || yabai -m window --resize right:-40:0
-          ctrl + alt - j : yabai -m window --resize bottom:0:40 || yabai -m window --resize top:0:40
-          ctrl + alt - k : yabai -m window --resize top:0:-40   || yabai -m window --resize bottom:0:-40
-          ctrl + alt - l : yabai -m window --resize right:40:0  || yabai -m window --resize left:40:0
-          ctrl + alt - 0 : yabai -m space --balance
+          ctrl + cmd - h : yabai -m window --resize left:-40:0 || yabai -m window --resize right:-40:0
+          ctrl + cmd - j : yabai -m window --resize bottom:0:40 || yabai -m window --resize top:0:40
+          ctrl + cmd - k : yabai -m window --resize top:0:-40   || yabai -m window --resize bottom:0:-40
+          ctrl + cmd - l : yabai -m window --resize right:40:0  || yabai -m window --resize left:40:0
+          ctrl + cmd - 0 : yabai -m space --balance
 
           # ---- Window state ----
           alt - f               : yabai -m window --toggle zoom-fullscreen
           shift + alt - f       : yabai -m window --toggle float --grid 6:6:1:1:4:4
           alt - e               : yabai -m space --rotate 90
-          alt - r               : yabai -m space --layout bsp
+          ctrl + cmd - r        : yabai -m space --layout bsp
           shift + alt - r       : yabai -m space --layout float
           alt - t               : yabai -m window --toggle split
 

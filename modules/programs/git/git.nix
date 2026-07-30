@@ -40,7 +40,7 @@
                             common=$(git rev-parse --path-format=absolute --git-common-dir) || return 1; \
                             project=$(dirname "$(dirname "$common")"); \
                             path="$project/$1"; \
-                            git worktree add "$path" -B "$1"; \
+                            git worktree add "$path" -b "$1"; \
                           }; f'';
             ls = ''log --pretty=format:"%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn]" --decorate'';
             ll = ''log --pretty=format:"%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn]" --decorate --numstat'';

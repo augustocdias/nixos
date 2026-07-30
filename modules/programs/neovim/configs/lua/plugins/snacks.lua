@@ -4,7 +4,7 @@ return {
     'snacks',
     priority = 1000,
     lazy = false,
-    after = function()
+    after = function ()
         require('snacks').setup({
             bigfile = { enabled = true },
             bufdelete = { enabled = true },
@@ -19,23 +19,23 @@ return {
                 blame_line = { border = 'none' },
                 notification = { border = 'none' },
                 notification_history = { border = 'none' },
-                input = { relative = 'cursor' },
+                input = { relative = 'cursor' }
             },
             statuscolumn = {
                 enabled = true,
                 left = { 'sign', 'fold', 'mark' }, -- priority of signs on the left (high to low)
-                right = { 'git' }, -- priority of signs on the right (high to low)
+                right = { 'git' }                  -- priority of signs on the right (high to low)
             },
             picker = {
                 matcher = {
                     frecency = true,
-                    history_bonus = true,
+                    history_bonus = true
                 },
                 layout = {
                     preset = 'ivy',
                     layout = {
-                        backdrop = 70,
-                    },
+                        backdrop = 70
+                    }
                 },
                 layouts = {
                     -- If any plugin tries to use the default, overwrite with the ivy preset
@@ -53,10 +53,10 @@ return {
                             {
                                 box = 'horizontal',
                                 { win = 'list', border = 'none' },
-                                { win = 'preview', title = '{preview}', width = 0.6, border = 'left' },
-                            },
-                        },
-                    },
+                                { win = 'preview', title = '{preview}', width = 0.6, border = 'left' }
+                            }
+                        }
+                    }
                 },
                 ui_select = true, -- replace `vim.ui.select` with the snacks picker
                 win = {
@@ -68,31 +68,31 @@ return {
                             ['<c-l>'] = { 'select_and_next', mode = { 'i', 'n' } },
                             ['<c-h>'] = { 'select_and_prev', mode = { 'i', 'n' } },
                             ['<c-c>'] = {
-                                function()
+                                function ()
                                     vim.cmd('stopinsert')
                                 end,
-                                mode = { 'i' },
-                            },
-                        },
-                    },
+                                mode = { 'i' }
+                            }
+                        }
+                    }
                 },
                 icons = {
                     ui = {
                         ignored = ' ',
                         hidden = ' ',
-                        follow = '󰭔 ',
+                        follow = '󰭔 '
                     },
                     git = {
-                        enabled = true, -- show git icons
+                        enabled = true,   -- show git icons
                         commit = '󰜘 ', -- used by git log
-                        staged = '● ', -- staged changes. always overrides the type icons
+                        staged = '● ',  -- staged changes. always overrides the type icons
                         added = ' ',
                         deleted = ' ',
                         ignored = ' ',
                         modified = '○ ',
                         renamed = '󰑕 ',
                         unmerged = ' ',
-                        untracked = ' ',
+                        untracked = ' '
                     },
                     kinds = {
                         Control = ' ',
@@ -134,10 +134,10 @@ return {
                         Operator = '',
                         TypeParameter = '',
                         Boolean = ' ',
-                        Array = ' ',
-                    },
-                },
-            },
+                        Array = ' '
+                    }
+                }
+            }
         })
     end,
     keys = {
@@ -147,7 +147,7 @@ return {
             mode = { 'n' },
             desc = 'Close current buffer',
             noremap = true,
-            silent = true,
+            silent = true
         },
         {
             '<C-S-x>',
@@ -155,7 +155,7 @@ return {
             mode = { 'n' },
             desc = 'Close call buffers',
             noremap = true,
-            silent = true,
+            silent = true
         },
         {
             '<M-p>',
@@ -163,7 +163,7 @@ return {
             mode = { 'n' },
             desc = 'Open buffers',
             noremap = true,
-            silent = true,
+            silent = true
         },
         {
             '<C-p>',
@@ -171,270 +171,270 @@ return {
             mode = { 'n' },
             desc = 'Open file in workspace',
             noremap = true,
-            silent = true,
+            silent = true
         },
         {
             '<leader>gb',
             '<cmd>lua Snacks.picker.git_branches()<CR>',
             mode = { 'n' },
             desc = 'Branches',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gc',
             '<cmd>lua Snacks.picker.git_log()<CR>',
             mode = { 'n' },
             desc = 'Commit Log',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gf',
             '<cmd>lua Snacks.picker.git_files()<CR>',
             mode = { 'n' },
             desc = 'Files',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gg',
             '<cmd>lua Snacks.picker.git_diff()<CR>',
             mode = { 'n' },
             desc = 'Git Diff (Hunks)',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gl',
             '<cmd>lua Snacks.picker.git_log_file()<CR>',
             mode = { 'n' },
             desc = 'Commit Log Current Buffer',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gs',
             '<cmd>lua Snacks.picker.git_status()<CR>',
             mode = { 'n' },
             desc = 'Status',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>gt',
             '<cmd>lua Snacks.picker.git_stash()<CR>',
             mode = { 'n' },
             desc = 'Stash',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>go',
             '<cmd>lua Snacks.gitbrowse()<CR>',
             mode = { 'n' },
             desc = 'Open file in remote repo',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>ld',
             '<cmd>lua Snacks.picker.lsp_definitions()<CR>',
             mode = { 'n' },
             desc = 'Definitions',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>li',
             '<cmd>lua Snacks.picker.lsp_implementations()<CR>',
             mode = { 'n' },
             desc = 'Implementations',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>lr',
             '<cmd>lua Snacks.picker.lsp_references()<CR>',
             mode = { 'n' },
             desc = 'References',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>ls',
             '<cmd>lua Snacks.picker.lsp_symbols()<CR>',
             mode = { 'n' },
             desc = 'Document Symbols',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>lt',
             '<cmd>lua Snacks.picker.lsp_type_definitions()<CR>',
             mode = { 'n' },
             desc = 'Type Definitions',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>lw',
             '<cmd>lua Snacks.picker.lsp_workspace_symbols()<CR>',
             mode = { 'n' },
             desc = 'Workspace Symbols',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>pw',
             '<cmd>lua Snacks.picker.grep_word()<CR>',
             mode = { 'n' },
             desc = 'Grep Word',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>pl',
             '<cmd>lua Snacks.picker.grep()<CR>',
             mode = { 'n' },
             desc = 'Live Grep',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>pb',
             '<cmd>lua Snacks.picker.grep_buffers()<CR>',
             mode = { 'n' },
             desc = 'Grep Buffers',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>va',
             '<cmd>lua Snacks.picker.autocmds()<CR>',
             mode = { 'n' },
             desc = 'Autocommands',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vc',
             '<cmd>lua Snacks.picker.commands()<CR>',
             mode = { 'n' },
             desc = 'Commands',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>ve',
             '<cmd>lua Snacks.picker.spelling()<CR>',
             mode = { 'n' },
             desc = 'Spell Suggestions',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vh',
             '<cmd>lua Snacks.picker.help()<CR>',
             mode = { 'n' },
             desc = 'Help Pages',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vb',
             '<cmd>lua Snacks.picker.command_history()<CR>',
             mode = { 'n' },
             desc = 'Command History',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vj',
             '<cmd>lua Snacks.picker.jumps()<CR>',
             mode = { 'n' },
             desc = 'Jump List',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vk',
             '<cmd>lua Snacks.picker.marks()<CR>',
             mode = { 'n' },
             desc = 'Marks',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vl',
             '<cmd>lua Snacks.picker.loclist()<CR>',
             mode = { 'n' },
             desc = 'Location List',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vm',
             '<cmd>lua Snacks.picker.man()<CR>',
             mode = { 'n' },
             desc = 'Man Pages',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vo',
             '<cmd>lua Snacks.picker.colorschemes()<CR>',
             mode = { 'n' },
             desc = 'Colorscheme',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vi',
             '<cmd>lua Snacks.picker.highlights()<CR>',
             mode = { 'n' },
             desc = 'Highlights',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vp',
             '<cmd>lua Snacks.picker.resume()<CR>',
             mode = { 'n' },
             desc = 'Resume Last Picker',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vq',
             '<cmd>lua Snacks.picker.qflist()<CR>',
             mode = { 'n' },
             desc = 'Quickfix List',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vr',
             '<cmd>lua Snacks.picker.registers()<CR>',
             mode = { 'n' },
             desc = 'Registers',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vs',
             '<cmd>lua Snacks.picker.search_history()<CR>',
             mode = { 'n' },
             desc = 'Search History',
-            noremap = true,
+            noremap = true
         },
         {
             '<leader>vy',
             "<cmd>let @+=expand('%')<CR>",
             mode = { 'n' },
-            desc = 'Normal Mode Keymaps',
-            noremap = true,
+            desc = 'Copy file relative path to clipboard',
+            noremap = true
         },
         {
             '<leader>vz',
             '<cmd>lua Snacks.picker.keymaps()<CR>',
             mode = { 'n' },
             desc = 'Normal Mode Keymaps',
-            noremap = true,
+            noremap = true
         },
         {
             'grn',
-            function()
+            function ()
                 Snacks.words.jump(1, true)
             end,
             mode = { 'n' },
             desc = 'Go to next reference',
-            silent = true,
+            silent = true
         },
         {
             'grp',
-            function()
+            function ()
                 Snacks.words.jump(-1, true)
             end,
             mode = { 'n' },
             desc = 'Go to previous reference',
-            silent = true,
+            silent = true
         },
         {
             '<leader>vn',
             ':lua Snacks.notifier.show_history()<CR>',
             mode = { 'n' },
             desc = 'Notifications history',
-            silent = true,
-        },
-    },
+            silent = true
+        }
+    }
 }

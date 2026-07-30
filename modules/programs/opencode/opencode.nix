@@ -5,13 +5,38 @@
 }: let
   nvim-mcp-wrapper = pkgs:
     pkgs.writeShellScriptBin "nvim-mcp" ''
-      session="''${ZELLIJ_SESSION_NAME:-dettached}"
+      session="''${HERDR_WORKSPACE_ID:-''${ZELLIJ_SESSION_NAME:-dettached}}"
       export NVIM_ADDRESS="$HOME/.cache/nvim/server-''${session}.pipe"
       exec ${lib.getExe' pkgs.nix "nix"} run github:paulburgess1357/nvim-mcp -- "$@"
     '';
 
   readOnlyBash = {
     "*" = "ask";
+
+    # deny
+    "nix build*" = "deny";
+    "nix-build*" = "deny";
+    "nix run*" = "deny";
+    "nix develop*" = "deny";
+    "nix shell*" = "deny";
+    "nix profile*" = "deny";
+    "nix flake check*" = "deny";
+    "nix-store -r*" = "deny";
+    "nix-store --realise*" = "deny";
+    "nix-collect-garbage*" = "deny";
+    "nixos-rebuild*" = "deny";
+    "darwin-rebuild*" = "deny";
+    "home-manager*" = "deny";
+    "update-system*" = "deny";
+    "update-nvim*" = "deny";
+    "*nix build*" = "deny";
+    "*nix-build*" = "deny";
+    "*nix run*" = "deny";
+    "*nix develop*" = "deny";
+    "*nix shell*" = "deny";
+    "*nix flake check*" = "deny";
+    "*nixos-rebuild*" = "deny";
+    "*darwin-rebuild*" = "deny";
 
     # -- Git: core read-only -------------------------------------------
     "git status*" = "allow";
@@ -102,6 +127,10 @@
     "rg*" = "allow";
     "fd*" = "allow";
     "find*" = "allow";
+    "find*-exec*" = "ask";
+    "find*-ok*" = "ask";
+    "find*-delete*" = "ask";
+    "find*-fprintf*" = "ask";
     "grep*" = "allow";
     "which*" = "allow";
     "whereis*" = "allow";
@@ -109,14 +138,11 @@
 
     # -- Text processing (read-only) -----------------------------------
     "echo*" = "allow";
-    "sort*" = "allow";
     "uniq*" = "allow";
     "diff*" = "allow";
     "comm*" = "allow";
     "cut*" = "allow";
     "tr*" = "allow";
-    "awk*" = "allow";
-    "sed -n*" = "allow";
     "jq*" = "allow";
     "yq*" = "allow";
     "column*" = "allow";
@@ -134,7 +160,6 @@
     "hostname*" = "allow";
     "whoami*" = "allow";
     "id*" = "allow";
-    "env*" = "allow";
     "printenv*" = "allow";
     "date*" = "allow";
     "uptime*" = "allow";
@@ -195,7 +220,6 @@
     "python3 --version*" = "allow";
 
     # -- Nix -----------------------------------------------------------
-    "nix eval*" = "allow";
     "nix flake show*" = "allow";
     "nix flake metadata*" = "allow";
     "nix flake info*" = "allow";
@@ -203,8 +227,6 @@
     "nix path-info*" = "allow";
     "nix show-derivation*" = "allow";
     "nix-store --query*" = "allow";
-    "timeout * nix eval*" = "allow";
-    "timeout * nix flake *" = "allow";
 
     # -- Just ----------------------------------------------------------
     "just --list*" = "allow";
@@ -232,6 +254,43 @@
     "gh search *" = "allow";
     "gh status*" = "allow";
     "gh auth status*" = "allow";
+
+    # -- Herdr: inspection + topology -----------------------------------
+    "herdr status*" = "allow";
+    "herdr --version*" = "allow";
+    "herdr session list*" = "allow";
+    "herdr workspace list*" = "allow";
+    "herdr workspace get*" = "allow";
+    "herdr workspace create*" = "allow";
+    "herdr workspace focus*" = "allow";
+    "herdr tab list*" = "allow";
+    "herdr tab create*" = "allow";
+    "herdr tab focus*" = "allow";
+    "herdr pane list*" = "allow";
+    "herdr pane get*" = "allow";
+    "herdr pane current*" = "allow";
+    "herdr pane layout*" = "allow";
+    "herdr pane process-info*" = "allow";
+    "herdr pane neighbor*" = "allow";
+    "herdr pane edges*" = "allow";
+    "herdr pane read*" = "allow";
+    "herdr pane wait-output*" = "allow";
+    "herdr pane split*" = "allow";
+    "herdr pane focus*" = "allow";
+    "herdr pane zoom*" = "allow";
+    "herdr pane rename*" = "allow";
+    "herdr pane resize*" = "allow";
+    "herdr agent list*" = "allow";
+    "herdr agent get*" = "allow";
+    "herdr agent read*" = "allow";
+    "herdr agent wait*" = "allow";
+    "herdr agent focus*" = "allow";
+    "herdr agent rename*" = "allow";
+    "herdr agent start*" = "ask";
+    "herdr agent prompt*" = "ask";
+    "herdr integration status*" = "allow";
+    "herdr plugin list*" = "allow";
+    "herdr notification show*" = "allow";
   };
 
   ghCustomTools = {

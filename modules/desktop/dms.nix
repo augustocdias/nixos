@@ -339,7 +339,6 @@
           qtThemingEnabled = true;
           syncModeWithPortal = true;
           terminalsAlwaysDark = false;
-          muxType = "zellij";
           runDmsMatugenTemplates = true;
 
           matugenTemplateGtk = true;
