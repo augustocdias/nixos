@@ -62,6 +62,7 @@
         git-cliff
         git-extras
         gh
+        gh-stack
 
         jq
         yq-go
