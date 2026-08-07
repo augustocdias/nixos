@@ -41,7 +41,7 @@ For every edit:
 
    Pass `end_line` for multi-line edits, or omit for single-line edits.
 
-2. Perform the edit with `nvim_find_and_replace_buf`.
+1. Perform the edit with `nvim_find_and_replace_buf`.
 
 1. After all edits to a file are done, save via nvim_send_command:
 
@@ -62,6 +62,30 @@ Paths must be relative to the workspace root (same path used in
 
 Use these to pair with the user, not to bypass them.
 
+## Shell / Tooling (HIGH PRIORITY)
+
+### NEVER `cd` into the directory you are already in
+
+Every bash command already starts in the workspace root. Prepending
+`cd <workspace> &&` is **always wrong**. Do not do it.
+
+```
+WRONG:  cd /home/augusto/nixos && git status
+RIGHT:  git status
+
+WRONG:  cd /home/augusto/nixos && cat modules/foo.nix
+RIGHT:  cat modules/foo.nix
+
+WRONG:  cd "$(git rev-parse --show-toplevel)" && rg foo
+RIGHT:  rg foo
+```
+
+Use relative paths. When a command genuinely needs a *different* directory,
+use the tool's own flag (`git -C <dir>`, `make -C <dir>`, a `workdir`
+parameter) rather than `cd`. The only acceptable `cd` is into a
+*subdirectory* that a command truly requires — never to re-enter the
+directory you are already in.
+
 ## Interaction Style
 
 - Tone: direct and informal, like a senior colleague in a code review
@@ -77,14 +101,6 @@ Use these to pair with the user, not to bypass them.
   a gotcha, a workaround, a subtle constraint. Never narrate *what* the code
   plainly does.
 - Do not add comments to every block/line. Well-named code needs none.
-
-## Shell / Tooling
-
-- You already start in the workspace root. Do NOT prepend `cd <workspace>` to
-  commands for paths inside it — just run the command. Use relative paths, or
-  the tool's own working-directory option when you genuinely need a different
-  dir. Reserve `cd` for stepping into a subdirectory that a command truly
-  requires, never to re-enter the directory you are already in.
 
 ## Citations & Sources
 

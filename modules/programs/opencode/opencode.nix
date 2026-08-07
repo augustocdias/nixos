@@ -138,6 +138,18 @@
 
     # -- Text processing (read-only) -----------------------------------
     "echo*" = "allow";
+    # sed: allow the read-only forms (-n, -E, s///, /d — all print to stdout)
+    # and pull back only the ones that write or execute. Longer patterns win
+    # (rules sort by length, last match wins), so these override "sed*".
+    #   -i / --in-place → edits files in place ("--in-place" contains "-i")
+    #   s///w file      → writes a file
+    #   s///e           → executes the result as a shell command
+    "sed*" = "allow";
+    "sed*-i*" = "ask";
+    "sed*/w *" = "ask";
+    "sed*/e *" = "ask";
+    "sed*/e'*" = "ask";
+    "sed*/e\"*" = "ask";
     "uniq*" = "allow";
     "diff*" = "allow";
     "comm*" = "allow";
@@ -484,6 +496,16 @@ in {
                   nvim_write_full_buf = "deny";
                   nvim_send_keys = "deny";
                   nvim_send_command = "ask";
+                  # Only delegate to read-only investigators. Denied subagents
+                  # are stripped from the Task tool description, so this also
+                  # trims context. (`general`/`test-writer` would edit.)
+                  task = {
+                    "*" = "deny";
+                    explore = "allow";
+                    reviewer = "allow";
+                    tickets = "allow";
+                    troubleshoot = "allow";
+                  };
                 };
             };
 
