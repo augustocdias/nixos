@@ -8,13 +8,13 @@
   "ublock-origin": {
     "slug": "ublock-origin",
     "name": "uBlock Origin",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4888680/ublock_origin-1.72.2.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4940584/ublock_origin-1.73.0.xpi",
     "addonId": "uBlock0@raymondhill.net"
   },
   "onepassword-password-manager": {
     "slug": "1password-x-password-manager",
     "name": "1Password",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4899098/1password_x_password_manager-8.12.28.25.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4925154/1password_x_password_manager-8.12.30.21.xpi",
     "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}"
   },
   "translate-web-pages": {

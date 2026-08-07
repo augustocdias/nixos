@@ -37,10 +37,18 @@
       programs.dms-greeter = {
         enable = true;
         compositor.name = "hyprland";
+        # Hyprland 0.56 parses every config as Lua. dms-greeter picks its
+        # template via launcher.isHyprlandLuaConfig, which sniffs the custom
+        # config for `hl.` -- so writing Lua here also makes the greeter append
+        # its own quickshell launch as `hl.on("hyprland.start", ...)` instead of
+        # a hyprlang `exec-once` line.
         compositor.customConfig = ''
-          env = XCURSOR_SIZE,24
-          env = XCURSOR_THEME,catppuccin-mocha-blue-cursors
-          exec-once = hyprctl setcursor catppuccin-mocha-blue-cursors 24
+          hl.env("XCURSOR_SIZE", "24")
+          hl.env("XCURSOR_THEME", "catppuccin-mocha-blue-cursors")
+
+          hl.on("hyprland.start", function()
+            hl.exec_cmd("hyprctl setcursor catppuccin-mocha-blue-cursors 24")
+          end)
         '';
         configHome = config.users.users.augusto.home;
       };
