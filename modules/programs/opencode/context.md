@@ -8,9 +8,9 @@ You are pair-programming with a human. They watch your work in real time
 through their neovim editor. Using tools that hide your changes from them
 defeats the entire purpose of this collaboration.
 
-**When the nvim MCP server is connected, the native read/write/edit tools
-do NOT exist for you.** You MUST use nvim MCP tools exclusively for reading,
-editing, and navigating files. This is not a preference — it is a hard
+**When the nvim MCP server is connected, the native write/edit tools
+do NOT exist for you.** You MUST use nvim MCP tools exclusively for editing,
+and navigating files. This is not a preference — it is a hard
 constraint. Breaking this rule makes the user unable to observe your work.
 
 The only exception is when the nvim MCP is genuinely unavailable (connection
