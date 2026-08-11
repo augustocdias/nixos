@@ -247,6 +247,8 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 
 Config is generated from a nix attrset (`settings` → `~/.config/herdr/config.toml`) rather than kept as a static file, because the keybindings interpolate store paths. The home-manager module runs `herdr server reload-config` on change. All helper scripts are fish (`pkgs.writers.writeFishBin`, syntax-checked at build time) with `@herdr@`/`@jq@` substituted for absolute store paths.
 
+**Validate config changes with `herdr config check`** (prints `config: ok` or diagnostics) — far cheaper than a full rebuild when iterating on `settings`. `herdr config reset-keys` backs up `config.toml` and drops custom keybindings if they ever get into a bad state. Note that keybind names are a fixed serde field list (`new_workspace`, `new_worktree`, `open_worktree`, `remove_worktree`, `close_workspace`, `navigate_workspace_up`/`_down`, `focus_pane_*`, `swap_pane_*`, `cycle_pane_*`, `last_pane`, `split_vertical`, `close_pane`, `resize_mode`, `toggle_sidebar`, …); anything absent from it is not bindable, no matter what appears in the changelog.
+
 ### Keybindings
 
 | Keys                                   | Action                                              |
@@ -334,7 +336,7 @@ Line one is the only undimmed row, and the rest carry explicit muted foregrounds
 `herdr.nix` owns these (not `opencode.nix` — herdr's integration is herdr's business):
 
 - `~/.config/opencode/plugins/herdr-agent-state.js` ← `${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js`. Reports lifecycle state and session identity, which is what makes the sidebar show `working`/`blocked`/`idle` and makes agent panes resumable. Deployed from the same source revision as the binary, so it can never skew — never run `herdr integration install opencode`.
-- `~/.config/opencode/skills/herdr/SKILL.md` ← `${pkgs.herdr.src}/SKILL.md`. Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`.
+- `~/.config/opencode/skills/herdr/SKILL.md` ← **`herdr --skill`** (a `runCommand` that pipes the flag's output to `$out`). Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`. Do **not** read this from `${pkgs.herdr.src}`: 0.8 moved the file from the repo root to `skills/herdr/SKILL.md` and the old path broke silently. The CLI flag is a stable contract and guarantees the skill matches the installed binary.
 - Skills shipped by plugins, picked up from `mkHerdrPlugin`'s `passthru.skills`.
 
 `opencode.nix` allows herdr inspection and topology in `readOnlyBash` (`pane list/get/read/split/focus/resize`, `tab create`, `agent wait`, …). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.

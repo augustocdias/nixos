@@ -16,6 +16,13 @@
     }: let
       inherit (import ./_plugins.nix {inherit pkgs lib;}) mkHerdrPlugin;
 
+      herdrSkill =
+        pkgs.runCommand "herdr-skill.md" {
+          nativeBuildInputs = [pkgs.herdr];
+        } ''
+          herdr --skill > $out
+        '';
+
       mkFish = name: file: extra: let
         substitutions =
           {
@@ -87,11 +94,9 @@
 
       xdg.configFile =
         {
-          # herdr's own opencode integration and agent skill, taken from the
-          # same source revision as the binary instead of `herdr integration
-          # install`, which would write them imperatively.
+          # opencode integration throgh skill and plugin
           "opencode/plugins/herdr-agent-state.js".source = "${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js";
-          "opencode/skills/herdr/SKILL.md".source = "${pkgs.herdr.src}/SKILL.md";
+          "opencode/skills/herdr/SKILL.md".source = herdrSkill;
 
           # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
           "opencode/plugins/herdr-activity.js".source = ./opencode-activity.js;
@@ -103,6 +108,7 @@
 
         settings = {
           onboarding = false;
+          update.version_check = false;
 
           theme.name = "catppuccin";
 
@@ -129,6 +135,9 @@
               delivery = "herdr";
               herdr.position = "top-right";
             };
+            right_click_passthrough_modifier = "ctrl";
+            pane_scrollbars = false;
+            hide_tab_bar_when_single_tab = true;
 
             # Tokens come from opencode-activity.js. Rows and tokens with no
             # value disappear, so an idle agent collapses to the first line.
