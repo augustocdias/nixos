@@ -42,7 +42,8 @@ set -l main_checkout (path dirname $common)
 set -l repo_folder (path dirname $main_checkout)
 
 if test $herdr_worktree_interactive -eq 1
-    read -P 'branch: ' branch
+    echo "New worktree"
+    read -P 'branch name: ' branch
 end
 
 # Quoted so an empty branch stays one argument: `string trim --` with none

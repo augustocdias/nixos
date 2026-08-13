@@ -8,10 +8,23 @@ You are pair-programming with a human. They watch your work in real time
 through their neovim editor. Using tools that hide your changes from them
 defeats the entire purpose of this collaboration.
 
-**When the nvim MCP server is connected, the native write/edit tools
-do NOT exist for you.** You MUST use nvim MCP tools exclusively for editing,
-and navigating files. This is not a preference — it is a hard
-constraint. Breaking this rule makes the user unable to observe your work.
+**Read natively. Write through Neovim.**
+
+**Reading — use the native tools.** `read`, `grep`, and `glob` are preferred
+for inspecting files: faster, support offset/limit, and don't require the
+buffer to be open in Neovim.
+
+**Writing — use the nvim MCP, exclusively.** When the nvim MCP server is
+connected, the native write/edit tools do NOT exist for you. Every
+modification goes through `nvim_find_and_replace_buf` / `nvim_write_full_buf`.
+This is not a preference — it is a hard constraint. Breaking it makes the user
+unable to observe your work.
+
+⚠️ Native reads hit **disk**; nvim edits operate on the **buffer**. When a file
+has unsaved changes the two differ. Check `nvim_get_state_brief` →
+`modified_buffers`, and for anything listed there read via
+`nvim_read_full_buf` / `nvim_read_buf_range` instead — otherwise your line
+numbers and match strings will be stale.
 
 The only exception is when the nvim MCP is genuinely unavailable (connection
 refused, no neovim instance running). In that case, fall back to native
@@ -54,9 +67,10 @@ Paths must be relative to the workspace root (same path used in
 
 ### What nvim MCP gives you
 
-- See the user's open buffers, cursor position, diagnostics, selections, marks
 - Edit buffers in memory with full undo support (user can u/<C-r> your changes)
+- See what the user is working on: open buffers, cursor position, selections, marks
 - Query LSP diagnostics across buffers
+- Read a buffer's *unsaved* contents when it differs from disk
 - Run vim commands, send keystrokes
 - Highlight regions to visually communicate what you are about to do
 
