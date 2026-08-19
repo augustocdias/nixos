@@ -4,23 +4,21 @@
   lib,
   ...
 }: {
-  flake-file.inputs.catppuccin-grub = {
-    url = lib.mkDefault "github:catppuccin/grub/0a37ab19f654e77129b409fed371891c01ffd0b9";
-    flake = false;
+  flake-file.inputs.grub2-themes = {
+    url = lib.mkDefault "github:vinceliuice/grub2-themes";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+  flake-file.inputs.win98se-plymouth = {
+    url = lib.mkDefault "github:nilp0inter/plymouth-theme-win98se-inspired-nixos-theme";
+    inputs.nixpkgs.follows = "nixpkgs";
   };
 
   den.aspects.boot = {
-    nixos = {pkgs, ...}: let
-      catppuccin-grub-theme = pkgs.stdenv.mkDerivation {
-        pname = "catppuccin-grub-theme";
-        version = "1.0.0";
-        src = inputs.catppuccin-grub;
-        installPhase = ''
-          mkdir -p $out
-          cp -r src/catppuccin-mocha-grub-theme/* $out/
-        '';
-      };
-    in {
+    nixos = {
+      imports =
+        lib.optionals (inputs ? win98se-plymouth) [inputs.win98se-plymouth.nixosModules.default]
+        ++ lib.optionals (inputs ? grub2-themes) [inputs.grub2-themes.nixosModules.default];
+
       boot = {
         initrd = {
           systemd.enable = true;
@@ -28,13 +26,7 @@
           availableKernelModules = ["tpm_crb" "tpm_tis"];
         };
 
-        plymouth = {
-          enable = true;
-          theme = "catppuccin-mocha";
-          themePackages = [
-            (pkgs.catppuccin-plymouth.override {variant = "mocha";})
-          ];
-        };
+        plymouth.enable = true;
 
         # ACPI AC adapter module reports online=1 permanently on this laptop,
         # preventing UPower from detecting battery state.
@@ -58,9 +50,15 @@
             device = "nodev";
             efiSupport = true;
             useOSProber = true;
-            theme = catppuccin-grub-theme;
           };
           efi.canTouchEfiVariables = true;
+
+          grub2-theme = {
+            enable = true;
+            theme = "stylish";
+            icon = "white";
+            screen = "4k";
+          };
         };
       };
 

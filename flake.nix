@@ -6,10 +6,6 @@
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    catppuccin-grub = {
-      url = "github:catppuccin/grub/0a37ab19f654e77129b409fed371891c01ffd0b9";
-      flake = false;
-    };
     dank-greeter = {
       url = "github:AvengeMedia/dank-greeter";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -44,6 +40,10 @@
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+    grub2-themes = {
+      url = "github:vinceliuice/grub2-themes";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     herdr-plugin-browser = {
       url = "github:ogulcancelik/herdr-browser";
@@ -258,6 +258,10 @@
     };
     sqlit = {
       url = "github:Maxteabag/sqlit";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    win98se-plymouth = {
+      url = "github:nilp0inter/plymouth-theme-win98se-inspired-nixos-theme";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

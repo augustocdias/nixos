@@ -71,23 +71,6 @@
         "type": "github"
       }
     },
-    "catppuccin-grub": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1752224239,
-        "narHash": "sha256-jgM22pvCQvb0bjQQXoiqGMgScR9AgCK3OfDF5Ud+/mk=",
-        "owner": "catppuccin",
-        "repo": "grub",
-        "rev": "0a37ab19f654e77129b409fed371891c01ffd0b9",
-        "type": "github"
-      },
-      "original": {
-        "owner": "catppuccin",
-        "repo": "grub",
-        "rev": "0a37ab19f654e77129b409fed371891c01ffd0b9",
-        "type": "github"
-      }
-    },
     "dank-greeter": {
       "inputs": {
         "dank-qml-common": "dank-qml-common",
@@ -718,6 +701,26 @@
       "original": {
         "owner": "hercules-ci",
         "repo": "gitignore.nix",
+        "type": "github"
+      }
+    },
+    "grub2-themes": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786498865,
+        "narHash": "sha256-yvnz/8Nh4iq67X27Vf2oD181SqnYi01M6VnSxBt5qcg=",
+        "owner": "vinceliuice",
+        "repo": "grub2-themes",
+        "rev": "241d3be041c2823cf2430fe2f44bca2215331d67",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vinceliuice",
+        "repo": "grub2-themes",
         "type": "github"
       }
     },
@@ -2240,7 +2243,6 @@
     },
     "root": {
       "inputs": {
-        "catppuccin-grub": "catppuccin-grub",
         "dank-greeter": "dank-greeter",
         "dankcalendar": "dankcalendar",
         "darwin": "darwin",
@@ -2252,6 +2254,7 @@
         "flake-aspects": "flake-aspects",
         "flake-file": "flake-file",
         "flake-parts": "flake-parts",
+        "grub2-themes": "grub2-themes",
         "herdr-plugin-browser": "herdr-plugin-browser",
         "home-manager": "home-manager",
         "hyprland": "hyprland",
@@ -2307,7 +2310,8 @@
         "nvim-vim-matchup": "nvim-vim-matchup",
         "nvim-which-key": "nvim-which-key",
         "sops-nix": "sops-nix",
-        "sqlit": "sqlit"
+        "sqlit": "sqlit",
+        "win98se-plymouth": "win98se-plymouth"
       }
     },
     "rust-overlay": {
@@ -2480,6 +2484,26 @@
       "original": {
         "owner": "mrcjkb",
         "repo": "vimcats",
+        "type": "github"
+      }
+    },
+    "win98se-plymouth": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786831690,
+        "narHash": "sha256-9ZGEWz06X7t0jv3MMyUdUJ+issyDuAd69ZphDJ94FPA=",
+        "owner": "nilp0inter",
+        "repo": "plymouth-theme-win98se-inspired-nixos-theme",
+        "rev": "7c64b9ec51282478661c07469d4dc28b53d0f6f2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nilp0inter",
+        "repo": "plymouth-theme-win98se-inspired-nixos-theme",
         "type": "github"
       }
     },

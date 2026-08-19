@@ -75,7 +75,7 @@ modules/
     macmini/macmini.nix     # Darwin host: nix-homebrew, Touch ID sudo, system.defaults, EurKEY-Next layout, 1Password, casks
 
   desktop/
-    boot.nix                # GRUB (Catppuccin theme), Plymouth, LUKS/TPM2
+    boot.nix                # GRUB, Plymouth, LUKS/TPM2
     hyprland.nix            # Hyprland Wayland compositor (see Desktop section)
     login-manager.nix       # Pulls in the DMS aspect
     dms.nix                 # DankMaterialShell — full desktop shell (see DMS section)
@@ -523,7 +523,7 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 
 The entire system uses **Catppuccin Mocha**:
 
-- GRUB, Plymouth, Hyprland, DMS, Ghostty, Neovim, Firefox, bat, delta, starship, skim, yazi, herdr
+- Hyprland, DMS, Ghostty, Neovim, Firefox, bat, delta, starship, skim, yazi, herdr
 - Cursors: catppuccin-mocha-blue-cursors
 - GTK/Qt: synced via DMS Matugen templates
 - Monospace font: MonaspiceNe Nerd Font (terminal), MonaspiceRn Nerd Font (italic)
