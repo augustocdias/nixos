@@ -14,13 +14,13 @@
   "onepassword-password-manager": {
     "slug": "1password-x-password-manager",
     "name": "1Password",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4925154/1password_x_password_manager-8.12.30.21.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4951729/1password_x_password_manager-8.12.32.33.xpi",
     "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}"
   },
   "translate-web-pages": {
     "slug": "traduzir-paginas-web",
     "name": "TWP - Translate Web Pages",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4455681/traduzir_paginas_web-10.1.1.1.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4962745/traduzir_paginas_web-10.2.1.0.xpi",
     "addonId": "{036a55b4-5e72-4d05-a06c-cba2dfcc134a}"
   },
   "json-lite": {
@@ -44,13 +44,13 @@
   "pwas-for-firefox": {
     "slug": "pwas-for-firefox",
     "name": "PWAs for Firefox",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4864693/pwas_for_firefox-2.18.4.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4961920/pwas_for_firefox-2.19.0.xpi",
     "addonId": "firefoxpwa@filips.si"
   },
   "open-in-notion-app": {
     "slug": "open-in-notion-app",
     "name": "Open in Notion app",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4947161/open_in_notion_app-1.4.0.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4967099/open_in_notion_app-1.4.1.xpi",
     "addonId": "{58023c2f-0bbe-4f8e-abc5-12f8abf98c7e}"
   }
 }

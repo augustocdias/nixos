@@ -9,6 +9,7 @@
           value = {
             installation_mode = "force_installed";
             install_url = extensionData.${name}.url;
+            updates_disabled = true;
           };
         })
         extensionNames);
