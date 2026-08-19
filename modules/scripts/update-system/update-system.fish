@@ -46,6 +46,7 @@ echo -e $BLUE"══════════════════════
 echo ""
 
 echo -e $YELLOW"[1/3] Updating flake inputs..."$NC
+run nix run ~/nixos#write-flake
 run nix flake update --flake ~/nixos
 echo ""
 

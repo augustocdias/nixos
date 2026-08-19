@@ -15,7 +15,7 @@
         v = "nvim";
         vim = "nvim";
 
-        nix-clean = "sudo nix-collect-garbage -d && nix-collect-garbage -d";
+        nix-clean = "sudo nix-collect-garbage --delete-older-than 14d && nix-collect-garbage --delete-older-than 14d";
         nix-flake-update = "nix flake update --flake ~/nixos";
         nix-check = "nix flake check ~/nixos";
 
