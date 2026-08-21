@@ -52,7 +52,6 @@
         font-family-italic = "MonaspiceRn Nerd Font Light Italic";
         gtk-single-instance = true;
         linux-cgroup = "single-instance";
-        linux-cgroup-memory-limit = 25769803776; # 24GB limit
         linux-cgroup-processes-limit = 4096;
         linux-cgroup-hard-fail = false;
       };

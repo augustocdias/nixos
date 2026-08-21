@@ -103,6 +103,26 @@
         }
         // pluginSkills;
 
+      systemd.user.services.herdr = {
+        Unit = {
+          Description = "herdr terminal workspace manager";
+          PartOf = ["graphical-session.target"];
+          After = ["graphical-session.target"];
+          X-SwitchMethod = "keep-old";
+        };
+
+        Service = {
+          Type = "simple";
+          ExecStart = "${lib.getExe pkgs.herdr} server";
+          ExecStop = "${lib.getExe pkgs.herdr} server stop";
+          Restart = "on-failure";
+          RestartSec = 2;
+          OOMPolicy = "continue";
+          TimeoutStopSec = 30;
+        };
+        Install.WantedBy = ["graphical-session.target"];
+      };
+
       programs.herdr = {
         enable = true;
 
@@ -114,8 +134,6 @@
 
           session.resume_agents_on_restore = true;
 
-          # Only used by repos that do not keep their worktrees as siblings
-          # inside a repo folder; `git wa` handles the ones that do.
           worktrees.directory = "~/dev/worktrees";
 
           experimental = {
