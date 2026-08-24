@@ -358,8 +358,6 @@ mkHerdrPlugin {
 - Registration: a one-line `home.activation` entry runs `herdr-plugins-sync`, which reads `~/.config/herdr/plugins.json` (herdr's file — we never write it) and converges through `herdr plugin link|unlink`. Entries whose root is not under `/nix/store` are left alone, so hand-installed plugins survive; a store-path change relinks automatically.
 - **Unproven paths**: only the source-only strategy is exercised today. The rust and node builds (including how built artifacts are linked back to the paths a manifest expects) are implemented but untested until a plugin needs them.
 
-Installed: `official.browser` (`ogulcancelik/herdr-browser`) — Linux only, drives a headless Chromium in a pane over CDP, needs `bun` + `ungoogled-chromium` on `PATH` and `experimental.kitty_graphics = true`.
-
 ## Neovim
 
 ### Architecture

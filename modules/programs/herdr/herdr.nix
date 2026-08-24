@@ -1,21 +1,10 @@
-{
-  den,
-  inputs,
-  ...
-}: {
-  flake-file.inputs.herdr-plugin-browser = {
-    url = "github:ogulcancelik/herdr-browser";
-    flake = false;
-  };
-
+{den, ...}: {
   den.aspects.herdr = {
     homeManager = {
       pkgs,
       lib,
       ...
     }: let
-      inherit (import ./_plugins.nix {inherit pkgs lib;}) mkHerdrPlugin;
-
       herdrSkill =
         pkgs.runCommand "herdr-skill.md" {
           nativeBuildInputs = [pkgs.herdr];
@@ -49,14 +38,7 @@
       };
       pluginsSync = mkFish "herdr-plugins-sync" ./plugins-sync.fish {};
 
-      plugins = lib.optionals (pkgs.stdenv.hostPlatform.isLinux && inputs ? herdr-plugin-browser) [
-        # Drives a headless Chromium in a pane over CDP. It resolves the
-        # browser by PATH name and renders through kitty graphics.
-        (mkHerdrPlugin {
-          src = inputs.herdr-plugin-browser;
-          runtimeDeps = [pkgs.bun pkgs.ungoogled-chromium];
-        })
-      ];
+      plugins = [];
 
       pluginSkills = lib.listToAttrs (lib.concatMap (
           plugin:
