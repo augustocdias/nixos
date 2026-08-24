@@ -114,7 +114,11 @@ in {
       ];
     };
 
-    homeManager = {pkgs, ...}: let
+    homeManager = {
+      pkgs,
+      lib,
+      ...
+    }: let
       isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
       pinentryPackage =
         if isDarwin
@@ -132,6 +136,10 @@ in {
             trust = "ultimate";
           }
         ];
+        scdaemonSettings = lib.mkIf isDarwin {
+          disable-ccid = true;
+          pcsc-driver = "/System/Library/Frameworks/PCSC.framework/PCSC";
+        };
       };
 
       services.gpg-agent = {
