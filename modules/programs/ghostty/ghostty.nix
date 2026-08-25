@@ -10,7 +10,6 @@
       commonSettings = {
         # Theme
         theme = "Catppuccin Mocha";
-        font-size = 12;
 
         # Cursor
         cursor-style = "block";
@@ -39,6 +38,7 @@
         macos-option-as-alt = "left";
         window-step-resize = true;
         auto-update = "off";
+        font-size = 12;
         font-family = "MonaspiceNe Nerd Font Mono";
         font-family-italic = "MonaspiceRn Nerd Font Mono";
 
@@ -48,6 +48,7 @@
       };
 
       linuxSettings = {
+        font-size = 9;
         font-family = "MonaspiceNe Nerd Font";
         font-family-italic = "MonaspiceRn Nerd Font Light Italic";
         gtk-single-instance = true;
