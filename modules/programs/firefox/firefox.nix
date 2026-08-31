@@ -168,6 +168,25 @@
               };
             };
           };
+          sites."01M0ZTWRAQ3S5NKZG9JMXF02JN" = {
+            name = "Apple Podcasts";
+            url = "https://podcasts.apple.com/";
+            manifestUrl = "https://podcasts.apple.com/manifest.json";
+            desktopEntry = {
+              icon = pkgs.fetchurl {
+                url = "https://podcasts.apple.com/assets/app-icons/pwa-manifest/podcasts-icon_1024.png";
+                hash = "sha256-zSMWciXoyU0RGiH36+U/e+a+Sbeq2Hj/WETeYlJ6EWI=";
+              };
+              categories = ["AudioVideo" "Audio"];
+            };
+            settings = {
+              config = {
+                icon_url = "https://podcasts.apple.com/assets/app-icons/pwa-manifest/podcasts-icon_1024.png";
+                categories = ["entertainment"];
+              };
+              manifest.scope = "https://podcasts.apple.com";
+            };
+          };
         };
 
         settings.config = {

@@ -151,9 +151,9 @@ return {
                 capabilities = lsp_utils.capabilities(),
             })
 
-            -- typescript (tsgo - native Go LSP)
-            vim.lsp.enable('tsgo')
-            vim.lsp.config('tsgo', {
+            -- typescript
+            vim.lsp.enable('tsc')
+            vim.lsp.config('tsc', {
                 on_attach = function(client, bufnr)
                     lsp_utils.on_attach(client, bufnr)
                     client.server_capabilities.documentFormattingProvider = false

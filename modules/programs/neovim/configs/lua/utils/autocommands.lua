@@ -47,7 +47,7 @@ return {
             desc = 'Highlight yanked text',
             pattern = '*',
             callback = function()
-                vim.hl.on_yank({ higroup = 'IncSearch', timeout = 1000 })
+                vim.hl.hl_op({ higroup = 'IncSearch', timeout = 1000 })
             end,
         })
 

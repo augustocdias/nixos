@@ -163,6 +163,8 @@ in {
 
             cursor.no_warps = true;
             misc.focus_on_activate = true;
+            misc.mouse_move_enables_dpms = true;
+            misc.key_press_enables_dpms = true;
 
             input = {
               kb_layout = "eu";
