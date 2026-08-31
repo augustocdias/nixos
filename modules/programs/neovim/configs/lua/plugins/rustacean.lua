@@ -133,9 +133,6 @@ return {
                                     workspace = false,
                                     allTargets = true,
                                 },
-                                rustfmt = {
-                                    extraArgs = { '+nightly' },
-                                },
                                 semanticHighlighting = {
                                     strings = {
                                         enable = false,

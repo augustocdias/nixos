@@ -170,9 +170,11 @@ in {
           shfmt
           alejandra
           sqlfluff
+          rustfmt
           (mdformat.withPlugins (ps: [ps.mdformat-frontmatter ps.mdformat-gfm]))
 
           harper
+          clippy
           eslint
           codespell
           selene
