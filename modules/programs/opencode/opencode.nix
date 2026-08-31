@@ -454,8 +454,8 @@ in {
                 url = "https://mcp.notion.com/mcp";
               };
               linear = {
-                type = "local";
-                command = ["npx" "-y" "mcp-remote" "https://mcp.linear.app/mcp"];
+                type = "remote";
+                url = "https://mcp.linear.app/mcp";
               };
               datadog = {
                 type = "remote";
