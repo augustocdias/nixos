@@ -28,7 +28,7 @@
         nix-preview = "nixos-rebuild build --flake ~/nixos#laptop -o /tmp/nixos-preview && nix store diff-closures /run/current-system /tmp/nixos-preview";
 
         afk = "dms ipc call lock lock";
-        lock-restore = "hyprctl --instance 0 'keyword misc:allow_session_lock_restore 1' && dms ipc call lock lock";
+        lock-restore = "hyprctl --instance 0 'hl.clear_crashed_lockscreen()' && dms ipc call lock lock";
       };
 
       darwinAliases = {

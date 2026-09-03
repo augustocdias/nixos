@@ -86,73 +86,73 @@ return {
             {
                 '[f',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_next_start('@function.outer')
+                    require('nvim-treesitter-textobjects.move').goto_previous_start('@function.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Function Outer',
+                desc = 'Move Treesitter Textobjects - Function Previous Start',
                 noremap = true,
             },
             {
                 ']f',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_next_end('@function.outer')
+                    require('nvim-treesitter-textobjects.move').goto_next_start('@function.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Function Outer',
+                desc = 'Move Treesitter Textobjects - Function Next Start',
                 noremap = true,
             },
             {
                 '[F',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_previous_start('@function.outer')
+                    require('nvim-treesitter-textobjects.move').goto_previous_end('@function.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Function Outer',
+                desc = 'Move Treesitter Textobjects - Function Previous End',
                 noremap = true,
             },
             {
                 ']F',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_previous_end('@function.outer')
+                    require('nvim-treesitter-textobjects.move').goto_next_end('@function.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Function Outer',
+                desc = 'Move Treesitter Textobjects - Function Next End',
                 noremap = true,
             },
             {
                 '[c',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_next_start('@class.outer')
+                    require('nvim-treesitter-textobjects.move').goto_previous_start('@class.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Class Outer',
+                desc = 'Move Treesitter Textobjects - Class Previous Start',
                 noremap = true,
             },
             {
                 ']c',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_next_end('@class.outer')
+                    require('nvim-treesitter-textobjects.move').goto_next_start('@class.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Class Outer',
+                desc = 'Move Treesitter Textobjects - Class Next Start',
                 noremap = true,
             },
             {
                 '[C',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_previous_start('@class.outer')
+                    require('nvim-treesitter-textobjects.move').goto_previous_end('@class.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Class Outer',
+                desc = 'Move Treesitter Textobjects - Class Previous End',
                 noremap = true,
             },
             {
                 ']C',
                 function()
-                    require('nvim-treesitter-textobjects.move').goto_previous_end('@class.outer')
+                    require('nvim-treesitter-textobjects.move').goto_next_end('@class.outer')
                 end,
                 mode = { 'n', 'x', 'o' },
-                desc = 'Move Treesitter Textobjects - Class Outer',
+                desc = 'Move Treesitter Textobjects - Class Next End',
                 noremap = true,
             },
         },
