@@ -41,7 +41,17 @@
 
       linuxFunctions = {
         nix-rebuild = ''
-          sudo nixos-rebuild switch --flake ~/nixos#laptop $argv
+          argparse --ignore-unknown 'r/remote=' 'H/host=' -- $argv
+          or return
+
+          set -l target laptop
+          set -q _flag_host; and set target $_flag_host
+
+          if set -q _flag_remote
+              nixos-rebuild switch --flake ~/nixos#$target --target-host $_flag_remote --sudo $argv
+          else
+              sudo nixos-rebuild switch --flake ~/nixos#$target $argv
+          end
         '';
       };
 

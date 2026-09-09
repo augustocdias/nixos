@@ -59,6 +59,13 @@
         };
       };
 
+      # Lets this machine build the aarch64 closure for the `raspi` host, so
+      # `nixos-rebuild --flake .#raspi --target-host` can be driven from here.
+      boot.binfmt = {
+        emulatedSystems = ["aarch64-linux"];
+        preferStaticEmulators = true;
+      };
+
       environment.sessionVariables.LIBVA_DRIVER_NAME = "iHD";
 
       hardware = {

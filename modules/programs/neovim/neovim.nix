@@ -161,7 +161,7 @@ in {
           taplo
           emmylua-ls
           rust-analyzer
-          typescript-go
+          typescript
           nixd
 
           black

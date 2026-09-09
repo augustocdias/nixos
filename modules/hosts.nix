@@ -10,4 +10,9 @@
     aspect = den.aspects.macmini;
     users.augusto.aspect = den.aspects.user-macos;
   };
+
+  den.hosts.aarch64-linux.raspi = {
+    hostName = "home";
+    aspect = den.aspects.raspi;
+  };
 }

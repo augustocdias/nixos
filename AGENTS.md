@@ -8,17 +8,18 @@ A fully declarative cross-platform configuration for a single user (`augusto`) s
 
 ### Core stack
 
-| Framework         | Repo                         | Purpose                                                                    |
-| ----------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| **Den**           | `vic/den`                    | Host/user/aspect composition framework                                     |
-| **flake-parts**   | `hercules-ci/flake-parts`    | Modular flake composition                                                  |
-| **import-tree**   | `vic/import-tree`            | Recursive auto-discovery of all `.nix` files under `modules/`              |
-| **flake-file**    | `vic/flake-file`             | Distributed flake input declarations — each module declares its own inputs |
-| **flake-aspects** | `vic/flake-aspects`          | Aspect schema support for Den                                              |
-| **home-manager**  | `nix-community/home-manager` | User-level config on both NixOS and Darwin                                 |
-| **nix-darwin**    | `nix-darwin/nix-darwin`      | macOS system management for the Mac mini                                   |
-| **nix-homebrew**  | `zhaofengli/nix-homebrew`    | Declarative Homebrew (casks) on Darwin                                     |
-| **sops-nix**      | `Mic92/sops-nix`             | Secrets management                                                         |
+| Framework             | Repo                         | Purpose                                                                     |
+| --------------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| **Den**               | `vic/den`                    | Host/user/aspect composition framework                                      |
+| **flake-parts**       | `hercules-ci/flake-parts`    | Modular flake composition                                                   |
+| **import-tree**       | `vic/import-tree`            | Recursive auto-discovery of all `.nix` files under `modules/`               |
+| **flake-file**        | `vic/flake-file`             | Distributed flake input declarations — each module declares its own inputs  |
+| **flake-aspects**     | `vic/flake-aspects`          | Aspect schema support for Den                                               |
+| **home-manager**      | `nix-community/home-manager` | User-level config on both NixOS and Darwin                                  |
+| **nix-darwin**        | `nix-darwin/nix-darwin`      | macOS system management for the Mac mini                                    |
+| **nix-homebrew**      | `zhaofengli/nix-homebrew`    | Declarative Homebrew (casks) on Darwin                                      |
+| **nixos-raspberrypi** | `nvmd/nixos-raspberrypi`     | Raspberry Pi 4 boot: firmware partition, config.txt, vendor kernel+firmware |
+| **sops-nix**          | `Mic92/sops-nix`             | Secrets management                                                          |
 
 ### How it works
 
@@ -71,8 +72,9 @@ modules/
   hardware/
     input-devices.nix       # Fingerprint reader (fprintd), touchpad
     networking.nix          # NetworkManager, systemd-resolved, Bluetooth
-    laptop/laptop.nix       # NixOS hardware profile: NVMe, Intel GPU, PipeWire, CUPS
+    laptop/laptop.nix       # NixOS hardware profile: NVMe, Intel GPU, PipeWire, CUPS, aarch64 binfmt
     macmini/macmini.nix     # Darwin host: nix-homebrew, Touch ID sudo, system.defaults, EurKEY-Next layout, 1Password, casks
+    raspi/raspi.nix         # Raspberry Pi 4: disko/GPT, direct kernel boot, vendor kernel, networkd, BLE, nixos-level sops
 
   desktop/
     boot.nix                # GRUB, Plymouth, LUKS/TPM2
@@ -109,6 +111,12 @@ modules/
 
   services/
     podman.nix              # Podman with Docker compatibility
+    home-assistant/
+      home-assistant.nix    # `home-assistant` aspect (raspi only): HA + matterjs-server
+      _components.nix       # enumerated extraComponents — also drives systemd hardening
+      _lovelace-modules.nix # 6 cards nixpkgs lacks (ex-HACS)
+      _themes.nix           # 3 themes nixpkgs lacks (ex-HACS)
+      _berlin-transport.nix # berlin_transport custom component (ex-HACS)
     work/
       work.nix              # `work` aspect: aggregates the below + just, awscli2
       datagrip.nix          # JetBrains DataGrip with plugins
@@ -138,6 +146,7 @@ modules/
 | --------- | -------------- | --------- | ------ | --------------------------------------------------------------------------------------------------- |
 | `laptop`  | x86_64-linux   | `nixos`   | Active | Intel laptop (Arrow Lake, NPU, Thunderbolt), dual monitor (eDP-1 + DP-1). NixOS + Hyprland + DMS.   |
 | `macmini` | aarch64-darwin | `macmini` | Active | Apple Silicon Mac mini. macOS via nix-darwin + nix-homebrew, yabai/skhd tiling, EurKEY-Next layout. |
+| `raspi`   | aarch64-linux  | `home`    | Active | Raspberry Pi 4B 8GB, headless Home Assistant. No home-manager user; boots from microSD, no u-boot.  |
 
 ### macOS (nix-darwin) host — `macmini`
 
@@ -149,6 +158,41 @@ Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.asp
 - **Keyboard**: CapsLock -> Control; **EurKEY-Next** layout bundle built from the `eurkey-next` flake input and installed to `/Library/Keyboard Layouts/` via a post-activation script.
 - **Window management**: `yabai-skhd` aspect (bsp layout, 8px gaps/padding, `alt`-based hjkl focus/swap/resize, `alt+1..9` spaces, `alt+return` Ghostty, `alt+b` 1Password). yabai scripting addition enabled.
 - **Other**: 1Password GUI, fish as login shell.
+
+### Raspberry Pi host — `raspi`
+
+Headless Home Assistant appliance. Defined by `modules/hardware/raspi/raspi.nix` (aspect `den.aspects.raspi`) plus `den.aspects.home-assistant`. `hostName = "home"`, so it is reachable as `home.local`.
+
+- **No home-manager user.** `den.hosts.aarch64-linux.raspi` declares no `users`, because the `user-*` aspects drag in nightly-overlay Neovim and 50+ plugins. `augusto` is a plain OS user (wheel, fish, SSH key only, passwordless sudo so `--target-host` runs unattended).
+- **Deliberately does not include the `networking`, `boot`, `locale` or `users` aspects** — all are laptop-shaped (BT audio profiles + `extraHosts`; GRUB/Plymouth/LUKS; hunspell + xkb; a `hashedPasswordFile` under `/etc/nixos/secrets`). Timezone/locale/console are set inline instead.
+- **Boot is `nixos-raspberrypi` with `boot.loader.raspberry-pi.bootloader = "kernel"`** — the GPU firmware loads the kernel directly. There is no u-boot and no `extlinux.conf`; `boot.loader.generic-extlinux-compatible` is off. The `"kernel"` bootloader (as opposed to the older `"kernelboot"`) keeps multiple generations, capped at `configurationLimit = 4`. `raspberry-pi-4.base` imports set `enable`, `arm_64bit`, `enable_uart`, `avoid_warnings` and `hardware.enableRedistributableFirmware` — don't re-declare them. Layout is disko GPT: 512M vfat `FIRMWARE` at `/boot/firmware`, ext4 `NIXOS` at `/`.
+- **Vendor kernel from nixos-raspberrypi's cachix.** `raspberry-pi-4.base` selects `linuxPackages_rpi4` from that flake's own `packages`, built against *its* pinned nixpkgs, so `nixos-raspberrypi.cachix.org` (declared in `modules/defaults.nix`, needed on the **laptop** because it builds the closure) serves it prebuilt. That kernel predates the `target`/`buildDTBs` passthru attrs 26.11 reads, so `vendorLinuxPackages` in `raspi.nix` adds them via `overrideAttrs`; `passthru` is stripped before derivation creation, so `drvPath` is unchanged and the cache still hits. `hardware.deviceTree.enable` is set explicitly because its default reads the missing `buildDTBs`, and the generation's `dtbs` symlink is what the bootloader's installer copies to the firmware partition.
+- **Bluetooth works via the vendor kernel plus `raspberry-pi-4.bluetooth`**, which sets `krnbt=on` so `hci0` binds without `btattach`. The generic `pkgs.linuxPackages` does *not* get BLE up on this board.
+- **`gpio`/`pwm0` are not provided by nixos-raspberrypi.** The gpio group, `iomem=relaxed` and the udev rules are inlined in `raspi.nix`. `pwm0` is not configured; it needs a `dtoverlay` through `hardware.raspberry-pi.config`, not `hardware.deviceTree.overlays`.
+- **`installDisk` in `raspi.nix` is a placeholder** and must be set to the real `/dev/disk/by-id/mmc-*` before running disko. It only affects the format step: runtime `fileSystems` resolve via `/dev/disk/by-partlabel/disk-main-*`.
+- **Networking**: systemd-networkd + DHCP on `en*`/`eth*` with `ClientIdentifier = "mac"`, resolved, and avahi publishing addresses for `home.local`. The router holds a static reservation keyed on the MAC — the HomeKit bridge (port 21064) is IP-sensitive. Firewall opens 8123, 21064 and 5353/udp. The board has no RTC, so the clock is wrong until timesyncd syncs a few seconds into boot.
+- **sops at NixOS level** (`sops.age.keyFile = /var/lib/sops-nix/key.txt`) — the first place in this repo to use it; the `secrets` aspect is home-manager only. No secrets declared yet. The host's age key is a recipient of `env.yaml`, so it never needs the YubiKey; the YubiKey is only needed to re-key, on the laptop.
+- **Deployment**: built on the laptop (`boot.binfmt.emulatedSystems = ["aarch64-linux"]`) and pushed with `nixos-rebuild --flake .#raspi --target-host`. The Pi needs no build scratch space and no repo checkout.
+- **journald** is capped at 200M; the default is 10% of the filesystem, i.e. ~12G of needless flash wear.
+
+## Home Assistant
+
+Runs as native `services.home-assistant` on `raspi`. **There is no Supervisor and there are no add-ons** — HAOS/Supervised cannot be expressed declaratively. Everything HACS used to manage is now Nix-declared.
+
+`extraComponents` in `_components.nix` **must name every integration in use**. It is not just about python dependencies: the NixOS module derives the unit's systemd hardening from it. Drop `zha` and the service loses `SupplementaryGroups=dialout` + `DeviceAllow=char-ttyUSB` (133 entities die); drop `bthome`/`default_config` and it loses `AF_BLUETOOTH` + `CAP_NET_ADMIN`/`CAP_NET_RAW`, killing the BLE thermometers. HA's config entries live in `.storage`, which Nix cannot see, so nothing infers them — **adding an integration is two steps: add it to `_components.nix` and rebuild, _then_ add it in the HA UI.**
+
+`homekit_controller` and `switchbot` are listed but unconfigured: zeroconf/BLE discovery starts their config flows, and without the integration present the flow cannot load, so it cannot be dismissed either and retries forever. `ibeacon` is deliberately absent and still logs that error on each start — it auto-creates a device for every passing beacon, which is not worth a clean log.
+
+`extraPackages = ps: [zlib-ng isal]` supplies the optional aiohttp compression backends; without them HA logs that websocket compression is degraded.
+
+- **`configuration.yaml` is Nix-owned** (`configWritable = false`) and mirrors the previous file: `default_config`, `bluetooth`, `tts` google_translate, and `!include` lines for `groups/automations/scripts/scenes/templates.yaml`. Those five stay **mutable** under `/var/lib/hass` so the HA UI editors keep working. (Note `template: !include templates.yaml` — not the older `sensor: !include sensors.yaml`, which nested a `template:` block under `sensor:`.) The module unquotes leading bangs when rendering YAML (`sed` on the generated file), which is what makes `!include` work from a Nix string.
+- **Do not set `frontend.themes` or `lovelace.resources`/`resource_mode` in `config`** — setting `themes` and `customLovelaceModules` makes the module take authoritative control of both.
+- **Cards**: 18 total — 12 from `pkgs.home-assistant-custom-lovelace-modules`, 6 packaged in `_lovelace-modules.nix` (`hui-element`, `more-info-card`, `slider-entity-row`, `berlin-transport-card`, `birthday-reminder-card`, `status-card`). Every one ships a prebuilt `.js`, so these are copies, not npm builds. The module loads `${entrypoint or "${pname}.js"}`, so `birthday-reminder-card` needs `passthru.entrypoint = "birthday-card.js"`.
+- **Themes**: catppuccin from nixpkgs (same v2.1.3 that was installed) + 3 packaged in `_themes.nix`. Theme derivations need `passthru.isHomeAssistantTheme` and install into `$out/themes`. Use `find -exec cp` rather than a glob — the frosted-glass files contain spaces.
+- **Custom components**: only `berlin_transport`. Its python deps must come from `home-assistant.python3Packages`, not the top-level set, or a conflicting version lands in HA's environment.
+- **`go2rtc` is deliberately not in `_components.nix`, and that is correct.** It is a hard dependency of `default_config`, is `integration_type: system` with `config_flow: false`, and re-creates its own config entry through `SOURCE_SYSTEM` — deleting that entry in the UI achieves nothing. Its python dependency (`go2rtc-client`) still reaches the environment through `default_config`; verified via `systemd.services.home-assistant.environment.PYTHONPATH`, **not** `services.home-assistant.package`, which is the un-overridden option and always looks empty. On a non-docker install with no configured URL, `go2rtc` removes its own entry and returns `True`, so it self-disables cleanly.
+- **Matter is `services.matterjs-server`, not `services.matter-server`.** HA's `matter` integration requires `matter-python-client`, which speaks the OHF protocol that matterjs-server implements; `python-matter-server` behind the `matter-server` option is its archived predecessor and cannot serve this client. Module defaults (`127.0.0.1:5580`) already match HA's `DEFAULT_URL` of `ws://localhost:5580/ws`. `bluetoothSupport` is off so nothing contends with bthome for `hci0`; enable it to commission a device. Currently 0 Matter entities; kept for the Apple TV Thread border routers.
+- **Alejandra drops comments placed directly before an empty attrset** (`secrets = {};`) — put such comments above the enclosing binding instead.
 
 ## Desktop Environment
 
@@ -379,21 +423,21 @@ To update all neovim plugins: `nix flake update nvim-*` or run the `update-nvim`
 
 ### LSP servers
 
-| Server        | Language      | Notes                                                                                  |
-| ------------- | ------------- | -------------------------------------------------------------------------------------- |
-| rust-analyzer | Rust          | Via rustaceanvim, clippy on save, nightly rustfmt                                      |
-| tsgo          | TypeScript/JS | Go-based native LSP (typescript-go package), formatting disabled (prettier handles it) |
-| nixd          | Nix           |                                                                                        |
-| emmylua_ls    | Lua           | Workspace includes all plugin paths                                                    |
-| bashls        | Bash          |                                                                                        |
-| yamlls        | YAML          | SchemaStore integration                                                                |
-| jsonls        | JSON          | SchemaStore integration                                                                |
-| eslint        | JS/TS         | Also used as linter                                                                    |
-| taplo         | TOML          |                                                                                        |
-| harper_ls     | Grammar       | Checks prose in comments                                                               |
-| docker LSPs   | Docker        | dockerfile + compose                                                                   |
-| qmlls         | QML           | For Quickshell/DMS development                                                         |
-| gdscript      | GDScript      | Godot engine                                                                           |
+| Server        | Language      | Notes                                                                                                       |
+| ------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| rust-analyzer | Rust          | Via rustaceanvim, clippy on save, nightly rustfmt                                                           |
+| tsc           | TypeScript/JS | Go-based native LSP (`typescript` 7.x, formerly `typescript-go`), formatting disabled (prettier handles it) |
+| nixd          | Nix           |                                                                                                             |
+| emmylua_ls    | Lua           | Workspace includes all plugin paths                                                                         |
+| bashls        | Bash          |                                                                                                             |
+| yamlls        | YAML          | SchemaStore integration                                                                                     |
+| jsonls        | JSON          | SchemaStore integration                                                                                     |
+| eslint        | JS/TS         | Also used as linter                                                                                         |
+| taplo         | TOML          |                                                                                                             |
+| harper_ls     | Grammar       | Checks prose in comments                                                                                    |
+| docker LSPs   | Docker        | dockerfile + compose                                                                                        |
+| qmlls         | QML           | For Quickshell/DMS development                                                                              |
+| gdscript      | GDScript      | Godot engine                                                                                                |
 
 ### Formatters (conform.nvim)
 
@@ -535,6 +579,15 @@ sudo nixos-rebuild switch --flake .
 
 # Rebuild macOS (macmini)
 darwin-rebuild switch --flake .
+
+# Deploy the Pi (built here via aarch64 binfmt, closure pushed over SSH)
+nixos-rebuild switch --flake .#raspi --target-host augusto@home.local --sudo
+
+# Partition + install the Pi's card (card in the laptop's reader; set
+# `installDisk` in raspi.nix first)
+sudo nix run github:nix-community/disko -- --mode destroy,format,mount \
+  --flake .#raspi
+sudo nixos-install --root /mnt --flake .#raspi --no-root-password
 
 # Regenerate flake.nix after changing module inputs
 nix run .#write-flake
