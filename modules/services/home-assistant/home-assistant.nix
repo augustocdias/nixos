@@ -18,17 +18,24 @@
 
         customLovelaceModules =
           (with pkgs.home-assistant-custom-lovelace-modules; [
+            apexcharts-card
             atomic-calendar-revive
             auto-entities
+            battery-state-card
+            bubble-card
             button-card
             card-mod
             clock-weather-card
+            decluttering-card
             fold-entity-row
+            mini-graph-card
             multiple-entity-row
             mushroom
             navbar-card
+            sankey-chart
             swipe-navigation
             template-entity-row
+            vacuum-card
             weather-card
           ])
           ++ (with cards; [
