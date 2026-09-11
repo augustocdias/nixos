@@ -32,16 +32,48 @@
         '';
       };
 
-      voiceDaemon = {
+      ollamaHome = "/var/lib/ollama";
+      ollamaPort = 11434;
+
+      ollamaModels = [
+        "qwen3:4b"
+        "lfm2.5:8b"
+        "granite4.2:3b"
+      ];
+
+      voiceDaemon = name: {
         command,
         environment ? {},
+        keepAlive ? true,
+        home ? null,
       }: {
-        inherit command environment;
+        inherit command;
+        environment = lib.optionalAttrs (home != null) {HOME = home;} // environment;
         serviceConfig = {
-          KeepAlive = true;
+          KeepAlive = keepAlive;
           RunAtLoad = true;
+          StandardOutPath = "/var/log/${name}.log";
+          StandardErrorPath = "/var/log/${name}.log";
         };
       };
+
+      # launchd has no ordering, so poll the server instead of racing it.
+      ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
+        set -u
+        until ${lib.getExe pkgs.curl} -fsS --max-time 5 \
+          "http://127.0.0.1:${toString ollamaPort}/api/version" >/dev/null; do
+          echo "waiting for ollama on port ${toString ollamaPort}..."
+          sleep 2
+        done
+
+        status=0
+        ${lib.concatMapStringsSep "\n" (model: ''
+            echo "pulling ${model}"
+            ${lib.getExe pkgs.ollama} pull ${lib.escapeShellArg model} || status=1
+          '')
+          ollamaModels}
+        exit "$status"
+      '';
     in {
       imports = lib.optionals (inputs ? nix-homebrew) [
         inputs.nix-homebrew.darwinModules.nix-homebrew
@@ -52,6 +84,13 @@
       time.timeZone = "Europe/Berlin";
 
       services.openssh.enable = true;
+
+      # YubiKey-backed key (cardno:15_851_450), same one the raspi accepts.
+      # nix-darwin renders this to /etc/ssh/nix_authorized_keys.d/augusto and
+      # wires sshd's AuthorizedKeysCommand at it.
+      users.users.augusto.openssh.authorizedKeys.keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE8G/L1OaaDxw1pFQ8vYKVBSMnPZbty8AiUECQaHwNmW"
+      ];
 
       power = {
         sleep.computer = "never";
@@ -187,7 +226,7 @@
         cp -R "${eurkey-next-bundle}/EurKEY-Next.bundle" "/Library/Keyboard Layouts/EurKEY-Next.bundle"
         chmod -R u+w,go+rX "/Library/Keyboard Layouts/EurKEY-Next.bundle"
 
-        mkdir -p /var/lib/ollama/models
+        mkdir -p ${ollamaHome}/models
         mkdir -p /var/lib/wyoming/faster-whisper
         mkdir -p /var/lib/wyoming/piper
       '';
@@ -219,6 +258,7 @@
           "blender"
           "orcaslicer"
           "snapmaker-orca"
+          "mos"
           "freecad"
         ];
 
@@ -226,15 +266,34 @@
       };
 
       launchd.daemons = {
-        ollama = voiceDaemon {
+        ollama = voiceDaemon "ollama" {
           command = "${lib.getExe pkgs.ollama} serve";
+          home = ollamaHome;
           environment = {
-            OLLAMA_HOST = "[::]:11434";
-            OLLAMA_MODELS = "/var/lib/ollama/models";
+            OLLAMA_HOST = "[::]:${toString ollamaPort}";
+            OLLAMA_MODELS = "${ollamaHome}/models";
+            # Default is 4096, which HA's entity list + tool schemas overflow
+            # (the prompt is then silently truncated).
+            OLLAMA_CONTEXT_LENGTH = "16384";
+            # Keep the model resident; voice usage is bursty and the default
+            # 5m unload means the next request pays a full load.
+            OLLAMA_KEEP_ALIVE = "-1";
+            OLLAMA_FLASH_ATTENTION = "1";
           };
         };
 
-        wyoming-faster-whisper = voiceDaemon {
+        ollama-model-loader = voiceDaemon "ollama-model-loader" {
+          command = "${ollamaModelLoader}";
+          home = ollamaHome;
+          environment = {
+            OLLAMA_HOST = "127.0.0.1:${toString ollamaPort}";
+            OLLAMA_MODELS = "${ollamaHome}/models";
+          };
+          # One-shot: retry on failure, don't respawn after a clean pull.
+          keepAlive = {SuccessfulExit = false;};
+        };
+
+        wyoming-faster-whisper = voiceDaemon "wyoming-faster-whisper" {
           command = lib.concatStringsSep " " [
             (lib.getExe pkgs.wyoming-faster-whisper)
             "--data-dir /var/lib/wyoming/faster-whisper"
@@ -246,7 +305,7 @@
           environment.HF_HOME = "/tmp";
         };
 
-        wyoming-piper = voiceDaemon {
+        wyoming-piper = voiceDaemon "wyoming-piper" {
           command = lib.concatStringsSep " " [
             (lib.getExe pkgs.wyoming-piper)
             "--data-dir /var/lib/wyoming/piper"
