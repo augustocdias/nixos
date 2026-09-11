@@ -25,12 +25,8 @@ GRANT_ROOT = None
 GRANT_JAIL_PREFIX = "~/granted"
 MOUNTS = {}
 
-# Must be the setuid wrapper: the store's fusermount3 lacks the privilege to
-# unmount and fails with EPERM, leaving the mount and its grant dir behind.
 FUSERMOUNT = "/run/wrappers/bin/fusermount3"
 
-# Leading character must be alphanumeric — a dotted name would hide the grant
-# from the session-exit cleanup glob and leak the mount past the jail.
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 JOURNAL_PRIORITIES = {
@@ -65,8 +61,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if body is None:
             return self._json(400, {"error": "Invalid JSON body"})
         handler(body)
-
-    # -- endpoints ---------------------------------------------------------
 
     def _exec(self, body):
         command = body.get("command", "").strip()
@@ -242,8 +236,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         MOUNTS[name] = (src, write)
         self._json(200, self._mount_result(src, name, write, remounted))
-
-    # -- helpers -----------------------------------------------------------
 
     @staticmethod
     def _mount_result(src, name, write, remounted):

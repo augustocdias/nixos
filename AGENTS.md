@@ -20,6 +20,7 @@ A fully declarative cross-platform configuration for a single user (`augusto`) s
 | **nix-homebrew**      | `zhaofengli/nix-homebrew`    | Declarative Homebrew (casks) on Darwin                                      |
 | **nixos-raspberrypi** | `nvmd/nixos-raspberrypi`     | Raspberry Pi 4 boot: firmware partition, config.txt, vendor kernel+firmware |
 | **sops-nix**          | `Mic92/sops-nix`             | Secrets management                                                          |
+| **jail-nix**          | `~alexdavid/jail.nix`        | Bubblewrap combinator library (sourcehut) — backs the opencode sandbox      |
 
 ### How it works
 
@@ -484,22 +485,57 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 ## OpenCode
 
-### Configuration (`modules/programs/opencode/opencode.nix`)
+### Module layout (`modules/programs/opencode/`)
 
-- **Model**: `anthropic/claude-opus-4-8` (Opus everywhere, including subagents)
+| File                   | Contents                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `opencode.nix`         | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation`                                      |
+| `_permissions.nix`     | `readOnlyBash` (the allowlist), `unrestrictedBash`, the gh/datadog/ticket fragments, `sharedBase`. Takes `{jailed}` |
+| `_agents.nix`          | per-agent permission sets                                                                                           |
+| `_mcp.nix`             | the MCP server set + the `nvim-mcp` wrapper                                                                         |
+| `_sync.nix`            | hash coupling the jail package to its deployed config (see Sandbox)                                                 |
+| `jail/jail.nix`        | the `opencode-jail` aspect — the bubblewrap sandbox                                                                 |
+| `jail/jail-context.md` | instructions loaded **only** inside the sandbox                                                                     |
+| `jail/_host-query/`    | host-side service backing the `host_*` tools                                                                        |
+
+`_`-prefixed files are skipped by import-tree and imported by hand.
+
+### Configuration
+
+- **Model**: `anthropic/claude-opus-5` (Opus everywhere, including subagents)
 - **Default agent**: `plan`
 - **TUI theme**: `catppuccin-macchiato`
 - **Other settings**: `autoupdate = false`, `lsp = false`; anthropic + openai providers keyed from env (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+- **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. The option is declared `nullable`, `home.packages` is guarded on it, and everything else it generates still applies. Darwin keeps the default package.
+
+### Sandbox (Linux only)
+
+On Linux `opencode` **is** the jail: `jail/jail.nix` wraps `pkgs.opencode` with bubblewrap via the `jail-nix` combinator library and installs it as `bin/opencode`. Darwin has no sandbox and relies on the allowlist alone.
+
+Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, and the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, opencode's own state). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing.
+
+Things that cost real time to discover:
+
+- **bwrap sets `PR_SET_NO_NEW_PRIVS` unconditionally** (`bubblewrap.c` `main()`, dies if it fails), so setuid is inert and `sudo nixos-rebuild` is structurally impossible. A kernel property, not a permission rule.
+- **`NIX_REMOTE=daemon` is mandatory.** bwrap's uid map makes the store look user-owned and tricks nix into single-user mode. `trusted-users = root` means a client cannot disable the build sandbox — which is *why* `nix build` is safe to allow in here.
+- **No enumerated toolbelt.** `/nix/store` is bound read-only and `/run/current-system/sw` + `/etc/profiles/per-user/<user>` supply PATH, so the host toolchain works as-is. Curating a toolbelt would be tidiness, not a boundary: every store binary is reachable by absolute path regardless.
+- **The whole host environment is inherited.** jail-nix's `base` ends with `--clearenv`, so we `reset` and rebuild its pieces without it — that is how sops-derived keys, `HERDR_*` and direnv's exports arrive. Consequence: `add-path` seeds from `state.env.PATH`, now empty, so PATH must be set with `set-env "PATH" "…:$PATH"` or it collapses to that one entry.
+- **No gpg-agent socket.** The agent is a signing *and* decryption oracle: it would let the jail sign as the user and decrypt every sops secret (`env.yaml` lives in the repo). With `signByDefault = true` in the read-only git config, `git commit` fails for want of a signer — that failure **is** the approval gate, and committing goes through `host_exec`.
+- **No herdr socket.** `herdr pane run`/`split` spawns from the herdr *server*, which is unjailed, so it is a clean escape rather than mere input injection. Grantable via `host_mount` if ever needed.
+- **`SSH_AUTH_SOCK` is unset** and `core.sshCommand` points at a deny script, so pushing is impossible from inside.
+- **`rm`/`rmdir` are rmtrash, and trash is per-mount.** Every writable path is its own bind mount, so the freedesktop spec picks that mount's own `.Trash-1000` — a rename into the home trash would be `EXDEV`. Deletions in the working directory therefore land in `<workdir>/.Trash-1000/`, which is why `programs.git.ignores = [".Trash-*/"]` exists (git reads `$XDG_CONFIG_HOME/git/ignore` by default; no `core.excludesFile` needed). `~/.local/share/Trash` is deliberately **not** bound — nothing could ever land there, and binding it only exposed real deleted files.
+- **`.sync-id` couples the two halves.** The sandbox ships as a package while the config it describes ships through `home.activation`/`xdg.configFile`. Deploy one without the other and `jail-context.md`, the allowlist and the `host_*` tools silently disagree. `_sync.nix` hashes both sides into one id and the jail refuses to start on mismatch (`OPENCODE_JAIL_SKIP_SYNC_CHECK=1` overrides). **Never test the jail by building the package alone** — that leaves the config half stale, and it cost two full smoke-test rounds before the guard existed.
+- **Known gap, accepted deliberately.** Neovim and herdr run *outside* the sandbox. The nvim MCP can write any path the user can (`nvim_write_full_buf` creates missing files) and run shell commands (`nvim_send_command` → `:!`, `lua vim.fn.system`). That is a complete bypass of the filesystem boundary, mitigated **only** by the absolute prohibition in `context.md` — there is no enforcement.
 
 ### Agents (`modules/programs/opencode/agents/*.md` → `~/.config/opencode/agent/`)
 
-Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `opencode.nix` (`settings.agent.<name>.permission`). Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments (`readOnlyBash`, `ghCustomTools`, `denyDatadog`, `denyTicketWrites`, `primaryBase`) explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
+Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments (`readOnlyBash`, `ghCustomTools`, `denyDatadog`, `denyTicketWrites`, `primaryBase`) explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
 
 **Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`), so denying an MCP's tools on the primaries strips those definitions from every session; they reappear only inside the subagent that needs them.
 
 | Agent          | Mode              | Role                                                                                                                                                   | Notable permissions                                                                                                                                                           |
 | -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build`        | primary           | Full development (unchanged)                                                                                                                           | `edit: allow`; `datadog_*` + ticket writes denied                                                                                                                             |
+| `build`        | primary           | Full development (unchanged)                                                                                                                           | `edit: allow`; `bash: allow` **inside the jail** (`unrestrictedBash`), the allowlist on Darwin; `host_exec: ask`; `datadog_*` + ticket writes denied                          |
 | `plan`         | primary (default) | Read-only analysis/planning                                                                                                                            | `edit: deny`; gh/ticket writes + `datadog_*` denied                                                                                                                           |
 | `pair`         | primary           | Read-only pairing companion — annotates the editor (highlights/virtual text) but never edits                                                           | `edit: deny`; mutating nvim tools (`nvim_find_and_replace_buf`, `nvim_write_full_buf`, `nvim_send_keys`) denied, `nvim_send_command: ask`; read/annotation nvim tools allowed |
 | `reviewer`     | subagent          | Pre-commit/PR code review                                                                                                                              | `edit: deny`; read-only git bash + `gh_*_read`                                                                                                                                |
@@ -541,11 +577,14 @@ Linux-only (gated via `lib.optionalAttrs (!isDarwin)` — not present on the Mac
 
 Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell commands via `Bun.$`. Deployed via `home.activation` (cp, not symlink) due to Bun module resolution issue with Nix store symlinks (tracked: <https://github.com/anomalyco/opencode/issues/5914>).
 
-| Tool file            | Exports                     | Purpose                                                                 |
-| -------------------- | --------------------------- | ----------------------------------------------------------------------- |
-| `date.ts`            | `date`                      | Date arithmetic via Unix `date` command                                 |
-| `gh.ts`              | 12 tools (read/write split) | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos |
-| `google_calendar.ts` | `google_calendar`           | Read-only Google Calendar via `gcalcli`                                 |
+| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                                   |
+| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                                   |
+| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                                   |
+| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                                   |
+| `host.ts`            | `host_exec`, `host_mount`, `host_journal` | The jail's only route to the host, over loopback to `jail/_host-query`. `host_exec` runs one command unsandboxed (`ask`, `build` only); `host_mount` bindfs-grants a host dir at `~/granted/<name>` (`ask`); `host_journal` reads the journal with a fixed argv (`allow`) |
+
+`host_journal` is auto-approved because its arguments land in argv positions, never a shell string — and it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.
 
 ### Bash permission philosophy
 
@@ -553,6 +592,9 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 
 - `"*" = "ask"` — global default, all unknown commands require approval
 - Read-only commands auto-allowed: git inspection, file reading (`cat`, `ls`, `bat`), search (`rg`, `fd`, `grep`, `find`), text processing (`jq`, `yq`, `cut`, `tr`), system info, network inspection (`curl`, `dig`), language toolchains (cargo, node, nix), gh CLI reads, herdr inspection
+- **Every allow is exact-plus-args (`"ls"` + `"ls *"`), never a bare prefix glob.** `"cmd*"` silently captures every binary whose name starts with `cmd`, and on this machine that was not theoretical: `"uname*"` matched **`uname26`** (runs any command under a faked uname — a total bypass), `"ps*"` matched **`psql`**, `"tr*"` matched **`truncate`**, `"id*"` matched **`idle3`** (`idle3 -r` runs arbitrary Python), plus `tree-sitter`, `typeprof`, `wcurl`, `hostnamectl` and `fdisk`. Audit new entries with: for each bare-prefix allow, list every binary on `PATH` it matches.
+- **The jailed and unjailed sets diverge**, both generated from `_permissions.nix {jailed = …}`. Inside the jail `nix build`/`nix-build`/`nix flake check`/`nix-store -r` are `allow` (daemon-sandboxed builds, and `trusted-users = root` means a client cannot turn that off) while `nix run`/`shell`/`develop` are `ask` (they execute fetched code). Darwin denies all of them. `nixos-rebuild`, `darwin-rebuild`, `home-manager`, `nix profile` and `nix-collect-garbage` are denied everywhere. The `"*<cmd>*"` wildcard variants are omitted when jailed, so a prefixed form (`sudo nix build`) falls through to `"*" = "ask"` instead of being blanket-allowed.
+- **`build` gets `bash: allow` inside the jail** (`unrestrictedBash`). For an agent already permitted to edit, the allowlist is friction rather than protection — the kernel is the boundary there. Read-only agents (`plan`, `pair`, `reviewer`, `troubleshoot`, `tickets`) keep `readOnlyBash`, where it enforces a role contract rather than a safety boundary. The global `permission.bash` also stays strict, so a future agent without an explicit override fails safe.
 - **Commands that can execute or write are deliberately absent from the allowlist**, because they defeat every deny rule below: `env` (runs whatever follows it), `awk` (`system()`, `print | "sh"`), `sed` (`e` runs shell commands, `w` writes files, and `-i` still matches a `sed -n*` pattern — all three verified), `sort` (`--compress-program`). They fall through to `"*" = "ask"`. `find` stays allowed, with `-exec`/`-ok`/`-delete`/`-fprintf` pulled back to `ask`.
 - All mutations require approval: file writes, git commits/push, package installs, gh writes
 - Custom tools: `*_read` tools are `"allow"`, `*_write` tools are `"ask"`
@@ -560,7 +602,7 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 - **Matching semantics** (verified empirically against opencode 1.18.4): each pattern is a glob matched against a whole command segment, anchored `^…$`, with `*`→`.*` and `?`→`.`; a pattern ending in `" *"` also matches the bare command. So `"cat*"` covers `cat`, `cat x`, `cat -n x`. Rules are evaluated with `findLast` over **JSON key order**, and nix emits attrset keys in byte order, so the **lexicographically last matching pattern wins**. This is not the same as "most specific wins", and it has two consequences worth internalising:
   - A `"*"`-prefixed pattern sorts before everything (`*` is 0x2A) and is therefore the **weakest** rule, not the strongest. `"*nixos-rebuild*" = "deny"` loses to any letter-prefixed allow that matches the same segment.
   - To beat an allow with a narrower rule, the narrower pattern must **share the allow's prefix and be longer** — `"find*-exec*"` beats `"find*"`, while `"find -exec*"` would lose, because space (0x20) sorts before `*`.
-  - Probe it after any change: `nix build --version` must be denied and `env nix build --version` must not print a version.
+  - Probe it after any change by evaluating the rendered set rather than trusting the source, e.g. `nix eval .#nixosConfigurations.laptop.config.home-manager.users.augusto.programs.opencode.settings.permission.bash --json | jq`. Two invariants: **no bare-prefix allow globs survive** (`jq -r 'to_entries[]|select(.value=="allow")|.key|select(test("^[a-z0-9_-]+\\*$"))'` must print nothing), and a prefixed form such as `env nix build --version` must not be auto-allowed.
 - **Pipelines are all-or-nothing**: a piped/`&&`-chained command needs approval if *any* single segment resolves to `ask`. Env-assignment or `timeout`/`git -C` prefixes defeat a plain whitelist entry (they change the segment), so `readOnlyBash` includes transparent-prefix patterns (`"*=* cargo *"`, `"timeout * cargo *"`, `"git -C * log*"`, …). These require a real prefix (`=` or literal `timeout`/`git -C`), so `sudo cargo …` still asks.
 
 ## Security Model
@@ -570,6 +612,7 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 - **Secrets**: sops-nix with age (per-machine key) + GPG (YubiKey master key)
 - **GPG**: YubiKey-backed key for git signing, SSH auth (gpg-agent), password store, sops decryption
 - **Immutable users**: `users.mutableUsers = false`
+- **Agent sandbox (Linux)**: `opencode` runs inside bubblewrap — deny-by-default writes, no setuid, no gpg/ssh agent, no herdr socket. See the OpenCode Sandbox section, including its one accepted bypass (the nvim MCP).
 
 ## Theming
 
@@ -637,5 +680,6 @@ herdr-workspace ~/dev/some-repo my-name            # explicit workspace name
 - **DMS greeter compositor config**: `programs.dms-greeter.compositor.customConfig` must also be Lua. dms-greeter picks its own appended launch snippet via `launcher.isHyprlandLuaConfig`, which sniffs the custom config for `hl.` (or a `.lua` suffix); without a match it appends a hyprlang `exec-once` line and the greeter dies before quickshell starts.
 - **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. OmniWM bindings use hjkl with `Option` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
 - **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).
+- **OpenCode jail**: the sandbox package and the config it describes are two halves of one change and must deploy together — `_sync.nix` hashes both and the jail refuses to start on mismatch. Never smoke-test it by building the package alone; use `nixos-rebuild switch`. After touching `_permissions.nix`, verify the rendered ruleset rather than the source (see Bash permission philosophy).
 - **Secrets**: Never commit plaintext secrets. All secrets go through sops-nix. API keys are in `modules/security/secrets/env.yaml`.
 - **Flake inputs**: Declare per-module using `flake-file.inputs`, not in `flake.nix` directly.

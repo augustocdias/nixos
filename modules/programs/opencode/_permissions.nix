@@ -430,26 +430,22 @@ in rec {
     "Notion_notion-duplicate-page" = "deny";
   };
 
-  # Applied to every agent (primaries + subagents). Allows reading built
-  # derivations without hitting the external-directory boundary, and lets any
-  # agent ask the user questions.
   sharedBase = {
     external_directory = {
       "/nix/store/**" = "allow";
-      # Where host_mount lands its grants inside the jail; without this the
-      # file tools would prompt on every granted path.
       "~/granted/**" = "allow";
     };
     question = "allow";
 
-    # Deny-by-default on the escape hatch: host_exec runs unsandboxed, so only
-    # agents that are meant to change things get it (see build, below).
     host_exec = "deny";
     host_mount = "ask";
-    # Structured argv, never a shell string, and the only way to read the
-    # journal at all from inside the sandbox.
     host_journal = "allow";
   };
+
+  unrestrictedBash =
+    if jailed
+    then "allow"
+    else readOnlyBash;
 
   primaryBase =
     sharedBase

@@ -1,8 +1,5 @@
 import { tool } from "@opencode-ai/plugin";
 
-// These tools are the jail's only route to the host. HOST_QUERY_PORT is set by
-// the jail launcher; outside the jail it is unset and every tool short-circuits
-// with an explanation rather than silently doing nothing.
 const PORT = process.env.HOST_QUERY_PORT;
 const BASE = PORT ? `http://127.0.0.1:${PORT}` : null;
 

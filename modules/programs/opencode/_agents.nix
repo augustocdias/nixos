@@ -2,6 +2,7 @@
   sharedBase,
   primaryBase,
   readOnlyBash,
+  unrestrictedBash,
   ghCustomToolsReadOnly,
   denyDatadog,
   denyTicketWrites,
@@ -11,8 +12,7 @@
     primaryBase
     // {
       edit = "allow";
-      # The one agent allowed to request work on the host — signing a commit
-      # is the expected case. Still prompts every time.
+      bash = unrestrictedBash;
       host_exec = "ask";
     };
 
@@ -35,9 +35,6 @@
         nvim_write_full_buf = "deny";
         nvim_send_keys = "deny";
         nvim_send_command = "ask";
-        # Only delegate to read-only investigators. Denied subagents
-        # are stripped from the Task tool description, so this also
-        # trims context. (`general`/`test-writer` would edit.)
         task = {
           "*" = "deny";
           explore = "allow";
