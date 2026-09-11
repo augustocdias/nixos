@@ -2,6 +2,42 @@
   perSystem = {pkgs, ...}: let
     neovimPkg = inputs.self.nixosConfigurations.laptop.config.home-manager.users.augusto.programs.neovim.finalPackage;
   in {
+    formatter = pkgs.alejandra;
+
+    devShells.default = pkgs.mkShell {
+      packages = with pkgs; [
+        # nix language tooling
+        alejandra
+        deadnix
+        statix
+        nixd
+        nix-tree
+
+        # rebuild/diff helpers
+        nix-output-monitor
+        nvd
+
+        # secrets (sops-nix)
+        sops
+        age
+        ssh-to-age
+
+        # the non-nix files this repo carries
+        stylua
+        selene
+        yamllint
+        actionlint
+      ];
+
+      shellHook = ''
+        echo "nixos config dev shell"
+        echo "  nix flake check          -- evaluate every host"
+        echo "  nix fmt                  -- alejandra"
+        echo "  statix check . && deadnix -- lint"
+        echo "  nix run .#write-flake    -- regenerate flake.nix"
+      '';
+    };
+
     devShells.nvim-dev = pkgs.mkShell {
       packages = [
         (pkgs.writeShellScriptBin "nvim" ''

@@ -62,7 +62,7 @@ modules/
   dendritic.nix             # Bootstraps den + flake-file
   hosts.nix                 # Host definitions (laptop / macmini)
   inputs.nix                # Core flake inputs (nixpkgs, den, home-manager, sops-nix, darwin, nix-homebrew)
-  dev-shells.nix            # devShells.nvim-dev for plugin development
+  dev-shells.nix            # devShells.default (nix tooling) + devShells.nvim-dev; formatter = alejandra
   installer.nix             # Custom NixOS installer ISO
 
   core/
@@ -98,7 +98,7 @@ modules/
     git/                    # Git: GPG signing, delta pager, extensive aliases
     herdr/                  # Herdr agent multiplexer (see Herdr section)
     mpv.nix                 # MPV with hardware decoding
-    neovide/                # Neovide (Neovim GUI)
+    neovide.nix             # Neovide (Neovim GUI) via home-manager's programs.neovide
     neovim/                 # Neovim — extensive config (see Neovim section)
     opencode/               # OpenCode AI assistant (see OpenCode section)
     skim.nix                # Skim fuzzy finder with rg/fd/bat
@@ -656,6 +656,11 @@ update-system
 # Update Firefox/Thunderbird extensions
 update-firefox
 update-thunderbird
+
+# Dev shell for working on this config (nix lang tooling, sops, linters).
+# `.envrc` is `use flake`, so direnv enters it automatically on cd.
+nix develop
+nix fmt                          # alejandra, via perSystem.formatter
 
 # Dev shell for neovim plugin development
 nix develop .#nvim-dev
