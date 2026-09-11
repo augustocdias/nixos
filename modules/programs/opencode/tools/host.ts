@@ -46,7 +46,7 @@ system state, or touching paths outside the working directory.
 
 The user approves every call, so state plainly in your message why the command
 has to run on the host. Prefer plain bash inside the sandbox whenever it can do
-the job. For reading logs use host_journal, which needs no approval.`,
+the job. For reading logs use host_journal, which is narrower.`,
   args: {
     command: tool.schema
       .string()
@@ -104,10 +104,14 @@ a grant from read-only to writable is just another call with write: true.`,
 export const journal = tool({
   description: `Read the systemd journal from the host.
 
-Needs no approval: the arguments land in fixed argv positions, never a shell
-string. Reading the journal from inside the sandbox is impossible because the
-sandbox's user namespace drops the group membership its ACL relies on, so use
-this rather than trying journalctl in bash.`,
+The user approves each call, like the other host tools. Prefer it over
+host_exec for log reading: the arguments land in fixed argv positions rather
+than a shell string, so it is much narrower.
+
+Reading the journal from inside the sandbox is impossible — the sandbox's user
+namespace drops the group membership its ACL relies on, and bash journalctl
+there exits 0 with no entries, which looks like an empty journal. Always use
+this instead.`,
   args: {
     unit: tool.schema
       .string()

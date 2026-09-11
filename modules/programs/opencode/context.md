@@ -113,6 +113,43 @@ If you genuinely need something outside the working directory, use the
 `host_mount` or `host_exec` tools. They prompt the user for approval, which is
 exactly the point.
 
+## Host tools (HIGH PRIORITY)
+
+On Linux you are sandboxed, and three tools are the **only** sanctioned way to
+reach past that boundary:
+
+- **`host_journal`** — reads the systemd journal with structured arguments
+  (unit, lines, since, priority, boot, grep). Use this rather than `journalctl`
+  in bash, which cannot work from inside the sandbox: the journal's ACL relies
+  on a group membership the sandbox drops, so `journalctl` prints "No journal
+  files were found" and **exits 0** — indistinguishable from an empty journal.
+- **`host_mount`** — binds a host directory to `~/granted/<name>` so the normal
+  file tools (read, grep, glob) work on it. Read-only unless you request write.
+  Use it for another repository or a config directory outside the working
+  directory.
+- **`host_exec`** — runs a single command on the host, unsandboxed. The widest
+  of the three. Use it only when neither of the others fits: signing a commit,
+  `git push`-adjacent work the sandbox cannot do, inspecting system state.
+
+**The user approves every call to all three. Always. There is no auto-approved
+tool and no "allow for the rest of the session" tier, deliberately.** Do not
+treat any of them as free:
+
+- Prefer plain bash inside the sandbox whenever it can answer the question.
+- Prefer the narrowest tool that fits — `host_journal` over `host_exec` for
+  logs, `host_mount` over `host_exec` for reading files.
+- Batch what you need instead of firing several calls in a row; each one
+  interrupts the user.
+- Always say *why* it has to happen outside the sandbox. A request without a
+  reason is one the user has to reverse-engineer before approving.
+- If a call is rejected, do not retry it in a different shape or look for
+  another route to the same effect. Take the rejection as the answer and say
+  what you cannot do.
+
+Outside the sandbox (macOS, or an unjailed session) `HOST_QUERY_PORT` is unset
+and all three short-circuit with an explanation — run the command directly
+instead.
+
 ## Shell / Tooling (HIGH PRIORITY)
 
 ### NEVER `cd` into the directory you are already in

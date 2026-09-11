@@ -13,7 +13,6 @@
     // {
       edit = "allow";
       bash = unrestrictedBash;
-      host_exec = "ask";
     };
 
   plan.permission =

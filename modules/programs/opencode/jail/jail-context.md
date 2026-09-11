@@ -39,10 +39,15 @@ pointing at a socket that is not bound.
 
 ## Reaching outside
 
-Three tools, in order of preference:
+Three tools. **The user approves every single call to all three** — there is no
+auto-approved one, and no "allow for the session" tier. So batch what you need,
+and say in your message why it has to happen outside the sandbox. Reach for
+plain bash inside the sandbox first whenever it can do the job.
 
-- **`host_journal`** — reads the systemd journal. No approval needed. Always use
-  this rather than `journalctl` in bash.
+In order of preference, narrowest first:
+
+- **`host_journal`** — reads the systemd journal. Always use this rather than
+  `journalctl` in bash.
 
   `journalctl` in here is a trap, not an error: `/var/log/journal` is not bound,
   so it prints "No journal files were found" and **exits 0**. Anything checking
@@ -56,25 +61,38 @@ Three tools, in order of preference:
   immediately. Use it for another repository or a config directory you need to
   read properly.
 
-- **`host_exec`** — runs one command on the host, unsandboxed.
+- **`host_exec`** — runs one command on the host, unsandboxed. The widest of the
+  three; use it only when neither of the others fits.
 
-The user approves every `host_mount` and `host_exec` call, so say why it has to
-happen outside the sandbox. Reach for plain bash first whenever it can do the
-job.
+## SSH
+
+**SSH works.** `SSH_AUTH_SOCK` points at gpg-agent's ssh socket, so `ssh`,
+`git push`, `scp` and a `--target-host` deploy all authenticate with the user's
+YubiKey exactly as they do on the host. The key material never leaves the token;
+the socket only asks it to sign challenges.
+
+`~/.ssh/known_hosts` is bound read-only, so hosts the user already trusts verify
+silently. A genuinely unknown host cannot be added from in here — that is worth
+mentioning to the user rather than working around with
+`StrictHostKeyChecking=no`.
+
+Treat this as the user's own credential, because it is. Pushing to a shared
+branch, force-pushing, or deleting a remote ref is indistinguishable from the
+user doing it. Ask first for anything you would not want attributed to them.
 
 ## Committing
 
-`git commit` **fails** in here, and that is deliberate: the gpg agent is not
-reachable, and commits are signed by default. This is the approval gate for
-writing to history.
+`git commit` **fails** in here, and that is deliberate: signing uses a different
+gpg-agent socket which is *not* bound. This is the approval gate for writing to
+history.
 
 Stage your work normally (`git add`), then either leave the commit to the user
 or request it explicitly with `host_exec`, e.g.
 `git commit -S -m "fix: …"`. Never try to route around it by disabling signing,
 rewriting git config, or committing through Neovim.
 
-Pushing does not work and should not be attempted — there is no SSH agent and
-`core.sshCommand` is disabled. Leave pushing to the user.
+So the two capabilities are deliberately asymmetric: you can **push** but cannot
+**author**. A push therefore only ever publishes commits the user signed.
 
 ## Deletion
 

@@ -437,9 +437,13 @@ in rec {
     };
     question = "allow";
 
-    host_exec = "deny";
+    # Every one of these crosses the sandbox boundary, so every one of them
+    # asks — for every agent, with no exceptions and no auto-approve tier.
+    # `always: []` is set in host.ts too, so "allow for the rest of the
+    # session" cannot silently promote them either.
+    host_exec = "ask";
     host_mount = "ask";
-    host_journal = "allow";
+    host_journal = "ask";
   };
 
   unrestrictedBash =

@@ -32,12 +32,6 @@
         ];
       };
 
-      gitSshDeny = pkgs.writeShellScript "opencode-jail-git-ssh-denied" ''
-        echo "opencode-jail: git over SSH is disabled inside the sandbox." >&2
-        echo "  Stage your work and let the user push from the host." >&2
-        exit 1
-      '';
-
       jailConfig = pkgs.writeTextDir "opencode.json" (builtins.toJSON {
         "$schema" = "https://opencode.ai/config.json";
         instructions = ["${./jail-context.md}"];
@@ -52,7 +46,6 @@
           (unsafe-add-raw-args "--tmpfs ~")
           (ro-bind "${pkgs.bash}/bin/sh" "/bin/sh")
           fake-passwd
-          (unsafe-add-raw-args "--unsetenv SSH_AUTH_SOCK")
 
           network
           no-new-session
@@ -177,9 +170,20 @@
 
           (try-readonly (noescape "\"$HOME/.config/git\""))
           (try-readonly (noescape "\"$HOME/.config/gh\""))
-          (set-env "GIT_CONFIG_COUNT" "1")
-          (set-env "GIT_CONFIG_KEY_0" "core.sshCommand")
-          (set-env "GIT_CONFIG_VALUE_0" "${gitSshDeny}")
+
+          (add-runtime ''
+            gpg_ssh_sock="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/gnupg/S.gpg-agent.ssh"
+            if [ -S "$gpg_ssh_sock" ]; then
+              RUNTIME_ARGS+=(
+                --bind "$gpg_ssh_sock" "$gpg_ssh_sock"
+                --setenv SSH_AUTH_SOCK "$gpg_ssh_sock"
+              )
+            else
+              echo "opencode-jail: warning: no gpg-agent ssh socket at $gpg_ssh_sock" >&2
+              echo "  ssh will have no identity; is gpg-agent running with enableSshSupport?" >&2
+            fi
+          '')
+          (try-ro-bind (noescape "\"$HOME/.ssh/known_hosts\"") (noescape "~/.ssh/known_hosts"))
 
           (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:$PATH\"")))
 
