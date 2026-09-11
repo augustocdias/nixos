@@ -7,6 +7,7 @@
   "bthome"
   "cloud"
   "default_config"
+  "esphome"
   "google_drive"
   "group"
   "history"
@@ -19,6 +20,7 @@
   "matter"
   "met"
   "mobile_app"
+  "ollama"
   "playstation_network"
   "recorder"
   "remote_calendar"
@@ -36,5 +38,6 @@
   "time_date"
   "tts"
   "workday"
+  "wyoming"
   "zha"
 ]

@@ -2,6 +2,7 @@
   den.aspects.user-macos = {
     includes = with den.aspects; [
       user-base
+      omniwm
     ];
 
     homeManager = {pkgs, ...}: {

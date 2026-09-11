@@ -10,10 +10,6 @@
   };
 
   den.aspects.macmini = {
-    includes = with den.aspects; [
-      yabai-skhd
-    ];
-
     darwin = {pkgs, ...}: let
       eurkey-next-bundle = pkgs.stdenvNoCC.mkDerivation {
         pname = "eurkey-next-bundle";
@@ -35,6 +31,17 @@
           runHook postInstall
         '';
       };
+
+      voiceDaemon = {
+        command,
+        environment ? {},
+      }: {
+        inherit command environment;
+        serviceConfig = {
+          KeepAlive = true;
+          RunAtLoad = true;
+        };
+      };
     in {
       imports = lib.optionals (inputs ? nix-homebrew) [
         inputs.nix-homebrew.darwinModules.nix-homebrew
@@ -43,6 +50,13 @@
       networking.computerName = "macmini";
 
       time.timeZone = "Europe/Berlin";
+
+      services.openssh.enable = true;
+
+      power = {
+        sleep.computer = "never";
+        restartAfterPowerFailure = true;
+      };
 
       # Touch ID for sudo
       security.pam.services.sudo_local.touchIdAuth = true;
@@ -172,6 +186,10 @@
         rm -rf "/Library/Keyboard Layouts/EurKEY-Next.bundle"
         cp -R "${eurkey-next-bundle}/EurKEY-Next.bundle" "/Library/Keyboard Layouts/EurKEY-Next.bundle"
         chmod -R u+w,go+rX "/Library/Keyboard Layouts/EurKEY-Next.bundle"
+
+        mkdir -p /var/lib/ollama/models
+        mkdir -p /var/lib/wyoming/faster-whisper
+        mkdir -p /var/lib/wyoming/piper
       '';
 
       nix-homebrew = lib.mkIf (inputs ? nix-homebrew) {
@@ -206,6 +224,38 @@
         ];
 
         masApps = {};
+      };
+
+      launchd.daemons = {
+        ollama = voiceDaemon {
+          command = "${lib.getExe pkgs.ollama} serve";
+          environment = {
+            OLLAMA_HOST = "[::]:11434";
+            OLLAMA_MODELS = "/var/lib/ollama/models";
+          };
+        };
+
+        wyoming-faster-whisper = voiceDaemon {
+          command = lib.concatStringsSep " " [
+            (lib.getExe pkgs.wyoming-faster-whisper)
+            "--data-dir /var/lib/wyoming/faster-whisper"
+            "--uri tcp://0.0.0.0:10300"
+            "--model small-int8"
+            "--language auto"
+          ];
+          # https://github.com/rhasspy/wyoming-faster-whisper/issues/27
+          environment.HF_HOME = "/tmp";
+        };
+
+        wyoming-piper = voiceDaemon {
+          command = lib.concatStringsSep " " [
+            (lib.getExe pkgs.wyoming-piper)
+            "--data-dir /var/lib/wyoming/piper"
+            "--uri tcp://0.0.0.0:10200"
+            "--voice en_US-libritts-high"
+            "--speaker 0"
+          ];
+        };
       };
 
       programs.fish.enable = true;

@@ -81,7 +81,7 @@ modules/
     hyprland.nix            # Hyprland Wayland compositor (see Desktop section)
     login-manager.nix       # Pulls in the DMS aspect
     dms.nix                 # DankMaterialShell — full desktop shell (see DMS section)
-    yabai-skhd.nix          # macOS tiling WM (yabai) + hotkey daemon (skhd), alt-based hjkl bindings
+    omniwm.nix              # macOS tiling WM, built-in hotkeys, alt-based hjkl bindings
 
   packages/
     applications.nix        # GUI apps: Cider, Zed, imv, PeaZip, DrawIO
@@ -142,11 +142,11 @@ modules/
 
 ## Host Configuration
 
-| Host      | Platform       | hostName  | Status | Description                                                                                         |
-| --------- | -------------- | --------- | ------ | --------------------------------------------------------------------------------------------------- |
-| `laptop`  | x86_64-linux   | `nixos`   | Active | Intel laptop (Arrow Lake, NPU, Thunderbolt), dual monitor (eDP-1 + DP-1). NixOS + Hyprland + DMS.   |
-| `macmini` | aarch64-darwin | `macmini` | Active | Apple Silicon Mac mini. macOS via nix-darwin + nix-homebrew, yabai/skhd tiling, EurKEY-Next layout. |
-| `raspi`   | aarch64-linux  | `home`    | Active | Raspberry Pi 4B 8GB, headless Home Assistant. No home-manager user; boots from microSD, no u-boot.  |
+| Host      | Platform       | hostName  | Status | Description                                                                                                                 |
+| --------- | -------------- | --------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `laptop`  | x86_64-linux   | `nixos`   | Active | Intel laptop (Arrow Lake, NPU, Thunderbolt), dual monitor (eDP-1 + DP-1). NixOS + Hyprland + DMS.                           |
+| `macmini` | aarch64-darwin | `macmini` | Active | Apple Silicon Mac mini. macOS via nix-darwin + nix-homebrew, OmniWM tiling, EurKEY-Next layout. Also hosts the voice stack. |
+| `raspi`   | aarch64-linux  | `home`    | Active | Raspberry Pi 4B 8GB, headless Home Assistant. No home-manager user; boots from microSD, no u-boot.                          |
 
 ### macOS (nix-darwin) host — `macmini`
 
@@ -156,8 +156,23 @@ Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.asp
 - **Auth**: Touch ID for `sudo` (`security.pam.services.sudo_local.touchIdAuth`).
 - **system.defaults**: dark mode, show-all-extensions/files, fast key repeat, disabled autocorrect/substitutions, dock autohide, Finder list view + path/status bar, screenshots to `~/pictures/screenshots`, trackpad tap-to-click + three-finger drag, Spotlight hotkeys disabled.
 - **Keyboard**: CapsLock -> Control; **EurKEY-Next** layout bundle built from the `eurkey-next` flake input and installed to `/Library/Keyboard Layouts/` via a post-activation script.
-- **Window management**: `yabai-skhd` aspect (bsp layout, 8px gaps/padding, `alt`-based hjkl focus/swap/resize, `alt+1..9` spaces, `alt+return` Ghostty, `alt+b` 1Password). yabai scripting addition enabled.
+- **Window management**: `omniwm` aspect (see below).
+- **Remote access**: `services.openssh.enable = true` — bootstraps `com.openssh.sshd` via `launchctl`, avoiding `systemsetup -setremotelogin` and its Full Disk Access requirement.
+- **Power**: `sleep.computer = "never"` + `restartAfterPowerFailure` — the voice stack depends on this host staying up.
+- **Voice stack**: `launchd.daemons` for `ollama` (`OLLAMA_HOST=[::]:11434` — the Pi resolves `macmini.local` to an IPv6 ULA first), `wyoming-faster-whisper` (port 10300, `--language auto` for EN+pt-BR; needs `HF_HOME=/tmp`, an upstream bug) and `wyoming-piper` (port 10200). `services.wyoming.*` and `services.ollama` are NixOS-only, hence hand-rolled. State dirs are created in `postActivation`; models are **not** Nix-pinned.
 - **Other**: 1Password GUI, fish as login shell.
+
+### Window management — `omniwm`
+
+`modules/desktop/omniwm.nix` (aspect `omniwm`, included by `user-macos` since `programs.omniwm` is home-manager). Replaced yabai+skhd, which needed the scripting addition and therefore SIP disabled.
+
+- **SIP stays enabled**; OmniWM is Developer ID signed and notarized, and nixpkgs unpacks the release artifact with `bsdtar` to keep that signature valid.
+- **Hotkeys are built in**, so there is no skhd. Each hotkey id holds exactly **one** binding, so setting `focus.left = "Option+H"` *moves* it rather than adding an alias.
+- `general.defaultLayoutType = "dwindle"` (closest to Hyprland), 8px gaps.
+- Float rules use `appNameSubstring`/`titleRegex` rather than bundle IDs; `bundleId` may be `""` as long as another matcher is set. Each rule needs an explicit `id` UUID.
+- **`settings.toml` is Nix-owned and the GUI fights it**: OmniWM rewrites the file from its Settings window and on version migration, replacing the symlink; `force = true` relinks ours on every switch. Any GUI change worth keeping must be mirrored into Nix, and new hotkey ids added by an upgrade need adding by hand.
+- Requires macOS 26+, Accessibility + Input Monitoring, and `Displays have separate Spaces` **ON** (the default; OmniWM pauses until it is).
+- No exec/launch command exists, so `alt+return` is `toggleQuakeTerminal` (Ghostty via libghostty) and 1Password moved to a Raycast hotkey. There is also no close-window command — `Cmd+W` covers it.
 
 ### Raspberry Pi host — `raspi`
 
@@ -620,7 +635,7 @@ herdr-workspace ~/dev/some-repo my-name            # explicit workspace name
 - **Herdr plugins**: add a `flake = false` input plus one `mkHerdrPlugin` entry in `herdr.nix`; never `herdr plugin install`/`link` by hand, and never write `~/.config/herdr/plugins.json`.
 - **Hyprland config**: Lua (`configType = "lua"`), never hyprlang — 0.56 removed that parser. All directional bindings use hjkl, no arrow keys; the modifier is `SUPER`, interpolated in Nix rather than a `$mainMod` variable. Verify new `hl.*` calls against `<hyprland>/share/hypr/stubs/hl.meta.lua`.
 - **DMS greeter compositor config**: `programs.dms-greeter.compositor.customConfig` must also be Lua. dms-greeter picks its own appended launch snippet via `launcher.isHyprlandLuaConfig`, which sniffs the custom config for `hl.` (or a `.lua` suffix); without a match it appends a hyprlang `exec-once` line and the greeter dies before quickshell starts.
-- **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. yabai/skhd bindings use hjkl with `alt` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
+- **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. OmniWM bindings use hjkl with `Option` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
 - **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).
 - **Secrets**: Never commit plaintext secrets. All secrets go through sops-nix. API keys are in `modules/security/secrets/env.yaml`.
 - **Flake inputs**: Declare per-module using `flake-file.inputs`, not in `flake.nix` directly.
