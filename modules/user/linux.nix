@@ -11,6 +11,7 @@
       mpv
       udiskie
       xdg
+      opencode-jail
       work
     ];
   };

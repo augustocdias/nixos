@@ -12,10 +12,6 @@
   "history"
   "holiday"
   "homekit"
-  # Not configured, but zeroconf/BLE discovery keeps starting their config
-  # flows. Without the integration present the flow cannot load, so it also
-  # cannot be dismissed, and it retries forever. Installed so each discovery
-  # can be ignored once in the UI.
   "homekit_controller"
   "ipp"
   "liebherr"

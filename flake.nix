@@ -51,6 +51,7 @@
     };
     hyprland.url = "github:hyprwm/Hyprland";
     import-tree.url = "github:vic/import-tree";
+    jail-nix.url = "sourcehut:~alexdavid/jail.nix";
     jetbrains-plugins = {
       url = "github:Janrupf/nix-jetbrains-plugin-repository";
       inputs.nixpkgs.follows = "nixpkgs";
