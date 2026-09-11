@@ -219,7 +219,6 @@
           "blender"
           "orcaslicer"
           "snapmaker-orca"
-          "mac-mouse-fix"
           "freecad"
         ];
 
