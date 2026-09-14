@@ -6,6 +6,9 @@
       berlin-transport = pkgs.callPackage ./_berlin-transport.nix {
         inherit (pkgs.home-assistant.python3Packages) async-timeout;
       };
+      ha-mcp = pkgs.callPackage ./_ha-mcp.nix {
+        python3Packages = pkgs.home-assistant.python3Packages;
+      };
     in {
       services.home-assistant = {
         enable = true;
@@ -14,7 +17,10 @@
 
         extraPackages = ps: with ps; [zlib-ng isal];
 
-        customComponents = [berlin-transport];
+        customComponents = [
+          berlin-transport
+          ha-mcp.ha-mcp-tools
+        ];
 
         customLovelaceModules =
           (with pkgs.home-assistant-custom-lovelace-modules; [

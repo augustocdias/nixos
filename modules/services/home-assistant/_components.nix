@@ -37,6 +37,7 @@
   "thread"
   "time_date"
   "tts"
+  "webhook"
   "workday"
   "wyoming"
   "zha"

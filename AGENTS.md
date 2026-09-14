@@ -118,6 +118,7 @@ modules/
       _lovelace-modules.nix # 6 cards nixpkgs lacks (ex-HACS)
       _themes.nix           # 3 themes nixpkgs lacks (ex-HACS)
       _berlin-transport.nix # berlin_transport custom component (ex-HACS)
+      _ha-mcp.nix           # ha_mcp_tools custom component + the ha-mcp PyPI dist it hosts
     work/
       work.nix              # `work` aspect: aggregates the below + just, awscli2
       datagrip.nix          # JetBrains DataGrip with plugins
@@ -209,6 +210,28 @@ Runs as native `services.home-assistant` on `raspi`. **There is no Supervisor an
 - **`configuration.yaml` is Nix-owned** (`configWritable = false`) and mirrors the previous file: `default_config`, `bluetooth`, `tts` google_translate, and `!include` lines for `groups/automations/scripts/scenes/templates.yaml`. Those five stay **mutable** under `/var/lib/hass` so the HA UI editors keep working. (Note `template: !include templates.yaml` — not the older `sensor: !include sensors.yaml`, which nested a `template:` block under `sensor:`.) The module unquotes leading bangs when rendering YAML (`sed` on the generated file), which is what makes `!include` work from a Nix string.
 - **Do not set `frontend.themes` or `lovelace.resources`/`resource_mode` in `config`** — setting `themes` and `customLovelaceModules` makes the module take authoritative control of both.
 - **`go2rtc` is deliberately not in `_components.nix`, and that is correct.** It is a hard dependency of `default_config`, is `integration_type: system` with `config_flow: false`, and re-creates its own config entry through `SOURCE_SYSTEM` — deleting that entry in the UI achieves nothing. Its python dependency (`go2rtc-client`) still reaches the environment through `default_config`; verified via `systemd.services.home-assistant.environment.PYTHONPATH`, **not** `services.home-assistant.package`, which is the un-overridden option and always looks empty. On a non-docker install with no configured URL, `go2rtc` removes its own entry and returns `True`, so it self-disables cleanly.
+
+### ha-mcp (`_ha-mcp.nix`)
+
+An MCP server that exposes HA as an *administration* API — ~87 tools covering automations (incl. traces and blueprint take-control), scripts, scenes, helpers, dashboards, the entity/device registries, history and templates. Distinct from core's `mcp_server` integration, which only re-exports the Assist intent API (device control, scoped to exposed entities) and is not installed.
+
+Two derivations, because upstream ships it as two halves:
+
+- **`ha-mcp-tools`** — the `ha_mcp_tools` custom component from `homeassistant-ai/ha-mcp-integration` (the HACS mirror repo; the main `ha-mcp` repo vendors the same tree, but installing from there confuses HACS's version display, which is moot here). Its `manifest.json` requirements (`ruamel.yaml`, `voluptuous-openapi`) are checked at build time by nixpkgs' `manifestRequirementsCheckHook`.
+- **`ha-mcp`** — the server itself, the `ha-mcp` PyPI distribution, run **in process** inside HA's interpreter by the component's "HA-MCP Server" config entry. So it has to be in HA's python environment, which it reaches through the component's `dependencies` → `propagatedBuildInputs` → the module's `extraPackages` (home-assistant.nix line 134 upstream).
+
+**`skip_pip` is what makes this declarative.** Upstream normally pip-installs the server and auto-updates it every 6h. `embedded_server.py`'s `_async_ensure_package` checks `hass.config.skip_pip` first — which the NixOS module always sets — and switches to `_async_externally_managed_package_version`, which only reads `importlib.metadata.version("ha-mcp")` and mutates nothing. The `update` entity correspondingly drops `UpdateEntityFeature.INSTALL` and tells you to update through the system package manager. The channel / auto-update / pip-spec options in the integration's UI are inert; **bump the version in `_ha-mcp.nix` instead.**
+
+Version coupling worth knowing:
+
+- The component and the server are released together and the component gates on `MIN_EMBEDDED_HOME_ASSISTANT_VERSION` (2026.8.0 at 2.1.3). Bump both halves at once.
+- Upstream hard-pins its dependency versions; nixpkgs happens to match `fastmcp==3.4.7`, `httpx==0.28.1`, `pydantic==2.13.4` and `truststore==0.10.4` exactly, and is one patch off on `python-dotenv` and `pydantic-monty` — hence `pythonRelaxDeps`. If a bump moves a hard pin away from nixpkgs, that is the thing to check first.
+- `websockets` is deliberately **not** a dependency: ha-mcp vendors its own copy under `ha_mcp/_vendor/websockets` precisely because the shared one is contested inside HA. Do not "fix" that by adding it.
+- The HACS-related modules (`install_source_check.py`, `hacs_nudge.py`) both read `hass.data["hacs"]` and no-op when it is absent, so a Nix install files no repair issues.
+
+**Networking**: the in-process server's primary route is a Home Assistant webhook on port **8123**, which is already open. It *also* binds a direct listener on `0.0.0.0:9584` (`DEFAULT_SERVER_PORT`), gated behind a random secret path — that port is **not** opened in `raspi.nix`, so the direct URL shown on the entry's Configure screen is unreachable from the LAN by design. Prefer the webhook URL with `ha_auth`; open 9584 only if the direct listener is actually wanted.
+
+`webhook` is in `_components.nix` because the manifest hard-depends on it (it also arrives transitively via `mobile_app`, but per the rule above every integration in use is named).
 
 ## Desktop Environment
 
