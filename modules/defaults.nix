@@ -25,7 +25,7 @@
         automatic = true;
         options = "--delete-older-than 30d";
       };
-      optimise.automatic = true;
+      optimise.automatic = pkgs.stdenv.hostPlatform.isLinux;
     };
 
     environment.systemPackages = with pkgs; [
@@ -63,7 +63,6 @@ in {
     nixos = {...}: {
       imports = [sharedNixModule];
 
-      # NixOS-only schedule fields
       nix.gc.dates = "weekly";
       nix.optimise.dates = ["weekly"];
 
@@ -77,11 +76,6 @@ in {
         Weekday = 0;
         Hour = 3;
       };
-      nix.optimise.interval = {
-        Weekday = 0;
-        Hour = 4;
-      };
-
       system.stateVersion = 6;
     };
 
