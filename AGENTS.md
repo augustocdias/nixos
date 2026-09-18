@@ -112,13 +112,15 @@ modules/
 
   services/
     podman.nix              # Podman with Docker compatibility
+    mosquitto.nix           # `mosquitto` aspect (raspi only): MQTT broker, auth required
     home-assistant/
       home-assistant.nix    # `home-assistant` aspect (raspi only): HA + matterjs-server
       _components.nix       # enumerated extraComponents — also drives systemd hardening
       _lovelace-modules.nix # 6 cards nixpkgs lacks (ex-HACS)
       _themes.nix           # 3 themes nixpkgs lacks (ex-HACS)
       _berlin-transport.nix # berlin_transport custom component (ex-HACS)
-      _ha-mcp.nix           # ha_mcp_tools custom component + the ha-mcp PyPI dist it hosts
+      _ha-mcp.nix           # ha_mcp_tools custom component (server = nixpkgs' python3Packages.ha-mcp)
+      pins.nix              # the 12 hand-pinned sources as packages.hass-*, for nix-update
     work/
       work.nix              # `work` aspect: aggregates the below + just, awscli2
       datagrip.nix          # JetBrains DataGrip with plugins
@@ -161,7 +163,7 @@ Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.asp
 - **Window management**: `omniwm` aspect (see below).
 - **Remote access**: `services.openssh.enable = true` — bootstraps `com.openssh.sshd` via `launchctl`, avoiding `systemsetup -setremotelogin` and its Full Disk Access requirement. `users.users.augusto.openssh.authorizedKeys.keys` holds the YubiKey-backed ed25519 key (the same one `raspi.nix` accepts); nix-darwin renders it to `/etc/ssh/nix_authorized_keys.d/augusto` and points sshd's `AuthorizedKeysCommand` at it rather than writing `~/.ssh/authorized_keys`.
 - **Power**: `sleep.computer = "never"` + `restartAfterPowerFailure` — the voice stack depends on this host staying up.
-- **Voice stack**: `launchd.daemons` for `ollama` (`OLLAMA_HOST=[::]:11434` — the Pi resolves `macmini.local` to an IPv6 ULA first), `wyoming-faster-whisper` (port 10300, `--language auto` for EN+pt-BR; needs `HF_HOME=/tmp`, an upstream bug) and `wyoming-piper` (port 10200). `services.wyoming.*` and `services.ollama` are NixOS-only, hence hand-rolled by the `voiceDaemon` helper. State dirs are created in `postActivation`.
+- **Voice stack**: `launchd.daemons` for `ollama` (`OLLAMA_HOST=[::]:11434`), `wyoming-faster-whisper` (port 10300, `--language auto` for EN+pt-BR; needs `HF_HOME=/tmp`, an upstream bug) and `wyoming-piper` (port 10200). `services.wyoming.*` and `services.ollama` are NixOS-only, hence hand-rolled by the `voiceDaemon` helper. State dirs are created in `postActivation`.
   - **launchd system daemons inherit only `PATH`** — no `HOME`. `ollama serve` aborts with `Error: $HOME is not defined` while creating `~/.ollama/id_ed25519`, so it gets `HOME=/var/lib/ollama` (mirroring the NixOS module's `HOME = cfg.home`). This crash-looped invisibly for a long time; `voiceDaemon` now also sets `StandardOutPath`/`StandardErrorPath` to `/var/log/<name>.log`, because a launchd daemon without them sends stderr nowhere and `log show` has nothing.
   - **Two ollama env vars matter more than the model.** `OLLAMA_CONTEXT_LENGTH=16384` because the default is 4096 and HA's entity list + tool schemas silently truncate past it; `OLLAMA_KEEP_ALIVE=-1` because voice usage is bursty and the default 5m unload makes every cold request pay a model load. Also `OLLAMA_FLASH_ATTENTION=1`.
   - **Models are declared in Nix but not hash-pinned.** The `ollamaModels` list drives an `ollama-model-loader` daemon (`KeepAlive.SuccessfulExit = false`, i.e. retry-on-failure only) that polls `127.0.0.1:11434/api/version` — launchd has no ordering — then `ollama pull`s each entry. Re-pulling an existing model is a no-op, so running it every boot is free. True pinning would mean `fetchurl` a GGUF plus `ollama create`, which still needs a live server, doubles disk, and loses the model's curated chat/tool-call template — not worth it.
@@ -191,8 +193,9 @@ Headless Home Assistant appliance. Defined by `modules/hardware/raspi/raspi.nix`
 - **Bluetooth works via the vendor kernel plus `raspberry-pi-4.bluetooth`**, which sets `krnbt=on` so `hci0` binds without `btattach`. The generic `pkgs.linuxPackages` does *not* get BLE up on this board.
 - **`gpio`/`pwm0` are not provided by nixos-raspberrypi.** The gpio group, `iomem=relaxed` and the udev rules are inlined in `raspi.nix`. `pwm0` is not configured; it needs a `dtoverlay` through `hardware.raspberry-pi.config`, not `hardware.deviceTree.overlays`.
 - **`installDisk` in `raspi.nix` is a placeholder** and must be set to the real `/dev/disk/by-id/mmc-*` before running disko. It only affects the format step: runtime `fileSystems` resolve via `/dev/disk/by-partlabel/disk-main-*`.
-- **Networking**: systemd-networkd + DHCP on `en*`/`eth*` with `ClientIdentifier = "mac"`, resolved, and avahi publishing addresses for `home.local`. The router holds a static reservation keyed on the MAC — the HomeKit bridge (port 21064) is IP-sensitive. Firewall opens 8123, 21064 and 5353/udp. The board has no RTC, so the clock is wrong until timesyncd syncs a few seconds into boot.
-- **sops at NixOS level** (`sops.age.keyFile = /var/lib/sops-nix/key.txt`) — the first place in this repo to use it; the `secrets` aspect is home-manager only. No secrets declared yet. The host's age key is a recipient of `env.yaml`, so it never needs the YubiKey; the YubiKey is only needed to re-key, on the laptop.
+- **Networking**: systemd-networkd + DHCP on `en*`/`eth*` with `ClientIdentifier = "mac"`, resolved, and avahi publishing addresses for `home.local`. The router holds a static reservation keyed on the MAC — the HomeKit bridge (port 21064) is IP-sensitive. Firewall opens 8123, 21064, 1883 and 5353/udp. The board has no RTC, so the clock is wrong until timesyncd syncs a few seconds into boot.
+- **sops at NixOS level** (`sops.age.keyFile = /var/lib/sops-nix/key.txt`) — the first place in this repo to use it; the `secrets` aspect is home-manager only. The host's age key is a recipient of `env.yaml`, so it never needs the YubiKey; the YubiKey is only needed to re-key, on the laptop. `sops-install-secrets` validates every declared secret against `env.yaml` at **build** time, so a missing key fails on the laptop rather than during activation on the Pi.
+- **MQTT broker** (`mosquitto` aspect): mosquitto on 1883, reachable on the LAN. There is no anonymous access — `omitPasswordAuth` defaults false, so the password-file plugin is always loaded. One user per consumer, each with its own sops-backed password (`mqtt_<name>_password` in `env.yaml`) and its own ACL; adding a consumer is one line in the `consumers` attrset plus the matching secret. `passwordFile` takes the *plaintext* and is hashed at activation by `mosquitto_passwd -U`; both it and the ACL are handed over via systemd `LoadCredential`, read as root before privileges drop, so a default root-owned `0400` secret needs no `owner`/`mode`. Changing the consumer set **restarts** the broker (`preStart` regenerates passwd/acl and the module sets no `reloadTriggers`); `persistence` keeps subscriptions and retained messages. No TLS — plaintext on the LAN, not port-forwarded.
 - **Deployment**: built on the laptop (`boot.binfmt.emulatedSystems = ["aarch64-linux"]`) and pushed with `nixos-rebuild --flake .#raspi --target-host`. The Pi needs no build scratch space and no repo checkout.
 - **journald** is capped at 200M; the default is 10% of the filesystem, i.e. ~12G of needless flash wear.
 
@@ -214,23 +217,49 @@ Runs as native `services.home-assistant` on `raspi`. **There is no Supervisor an
 
 An MCP server that exposes HA as an *administration* API — ~87 tools covering automations (incl. traces and blueprint take-control), scripts, scenes, helpers, dashboards, the entity/device registries, history and templates. Distinct from core's `mcp_server` integration, which only re-exports the Assist intent API (device control, scoped to exposed entities) and is not installed.
 
-Two derivations, because upstream ships it as two halves:
+Upstream ships it as two halves, and **the two halves are owned by different parties**:
 
-- **`ha-mcp-tools`** — the `ha_mcp_tools` custom component from `homeassistant-ai/ha-mcp-integration` (the HACS mirror repo; the main `ha-mcp` repo vendors the same tree, but installing from there confuses HACS's version display, which is moot here). Its `manifest.json` requirements (`ruamel.yaml`, `voluptuous-openapi`) are checked at build time by nixpkgs' `manifestRequirementsCheckHook`.
-- **`ha-mcp`** — the server itself, the `ha-mcp` PyPI distribution, run **in process** inside HA's interpreter by the component's "HA-MCP Server" config entry. So it has to be in HA's python environment, which it reaches through the component's `dependencies` → `propagatedBuildInputs` → the module's `extraPackages` (home-assistant.nix line 134 upstream).
+- **`ha-mcp-tools`** — the `ha_mcp_tools` custom component from `homeassistant-ai/ha-mcp-integration` (the HACS mirror repo; the main `ha-mcp` repo vendors the same tree, but installing from there confuses HACS's version display, which is moot here). The only thing `_ha-mcp.nix` still packages. Every name in its `dependencies` is a `manifest.json` requirement, checked at build time by nixpkgs' `manifestRequirementsCheckHook` — `ruamel.yaml`, `voluptuous-openapi`, and since **2.2.0** also `mcp>=1.24.0`. That `mcp` is the *shared* copy; the server vendors its own under `ha_mcp/_vendor/mcp`, so do not "simplify" it away.
+- **`ha-mcp`** — the server itself, the `ha-mcp` PyPI distribution, run **in process** inside HA's interpreter by the component's "HA-MCP Server" config entry. So it has to be in HA's python environment, which it reaches through the component's `dependencies` → `propagatedBuildInputs` → the module's `extraPackages` (home-assistant.nix line 134 upstream). **This is nixpkgs' `python3Packages.ha-mcp`** (maintainer `jamiemagee`), not ours — we had a duplicate derivation until nixpkgs picked the package up. Verify it landed via `systemd.services.home-assistant.environment.PYTHONPATH`, not `services.home-assistant.package`.
 
-**`skip_pip` is what makes this declarative.** Upstream normally pip-installs the server and auto-updates it every 6h. `embedded_server.py`'s `_async_ensure_package` checks `hass.config.skip_pip` first — which the NixOS module always sets — and switches to `_async_externally_managed_package_version`, which only reads `importlib.metadata.version("ha-mcp")` and mutates nothing. The `update` entity correspondingly drops `UpdateEntityFeature.INSTALL` and tells you to update through the system package manager. The channel / auto-update / pip-spec options in the integration's UI are inert; **bump the version in `_ha-mcp.nix` instead.**
+**`skip_pip` is what makes this declarative.** Upstream normally pip-installs the server and auto-updates it every 6h. `embedded_server.py`'s `_async_ensure_package` checks `hass.config.skip_pip` first — which the NixOS module always sets — and switches to `_async_externally_managed_package_version`, which only reads `importlib.metadata.version("ha-mcp")` and mutates nothing. The `update` entity correspondingly drops `UpdateEntityFeature.INSTALL` and tells you to update through the system package manager. The channel / auto-update / pip-spec options in the integration's UI are inert; **the server version is whatever nixpkgs ships.**
 
 Version coupling worth knowing:
 
-- The component and the server are released together and the component gates on `MIN_EMBEDDED_HOME_ASSISTANT_VERSION` (2026.8.0 at 2.1.3). Bump both halves at once.
-- Upstream hard-pins its dependency versions; nixpkgs happens to match `fastmcp==3.4.7`, `httpx==0.28.1`, `pydantic==2.13.4` and `truststore==0.10.4` exactly, and is one patch off on `python-dotenv` and `pydantic-monty` — hence `pythonRelaxDeps`. If a bump moves a hard pin away from nixpkgs, that is the thing to check first.
-- `websockets` is deliberately **not** a dependency: ha-mcp vendors its own copy under `ha_mcp/_vendor/websockets` precisely because the shared one is contested inside HA. Do not "fix" that by adding it.
+- **The component gates forward but not backward, and nothing warns about the backward case.** The server declares `MIN_COMPONENT_VERSION` (`tools/tools_filesystem.py`, `"1.2.0"` at both 8.4.3 and 8.5.0) and the component raises the `component_outdated` / `server_update_held` repair issues when *it* is the older half. There is **no** signal for the reverse — a component that outruns nixpkgs' server just fails at server start with an `ImportError` from `embedded_server.py`. Since `update-system` bumps the component while nixpkgs bumps the server, **check the component's `from ha_mcp …` imports against the server nixpkgs currently ships on every component bump**; most but not all are wrapped in `try/except ImportError`. (Verified for 2.2.0 ⇄ 8.4.3: all resolve.)
+- The component also gates on `MIN_EMBEDDED_HOME_ASSISTANT_VERSION` (2026.8.0 at 2.2.0).
+- **As of server 8.5.0 upstream vendors `fastmcp`, `mcp`, `mcp_types` and `websockets`** (`_vendor/`, `fastmcp-slim==4.0.3`) so HA Core's own pins cannot conflict, and its `Requires-Dist` swapped `fastmcp` for that library's ~27 runtime deps — including `httpx2`, which is a *separate* dist from `httpx` (module `httpx2`, no collision). nixpkgs' 8.4.3 predates this and still depends on `fastmcp` 3.4.7. When nixpkgs bumps to 8.5.0 its dependency list has to be rewritten wholesale; that is a nixpkgs problem now, not ours.
+- The shared `websockets` is in HA's environment regardless (via `mcp`/`fastmcp` and ~20 integration libraries) — ha-mcp's vendoring only keeps *it* off that contested copy. Do not read the vendoring as a claim that the shared one is absent.
 - The HACS-related modules (`install_source_check.py`, `hacs_nudge.py`) both read `hass.data["hacs"]` and no-op when it is absent, so a Nix install files no repair issues.
 
 **Networking**: the in-process server's primary route is a Home Assistant webhook on port **8123**, which is already open. It *also* binds a direct listener on `0.0.0.0:9584` (`DEFAULT_SERVER_PORT`), gated behind a random secret path — that port is **not** opened in `raspi.nix`, so the direct URL shown on the entry's Configure screen is unreachable from the LAN by design. Prefer the webhook URL with `ha_auth`; open 9584 only if the direct listener is actually wanted.
 
 `webhook` is in `_components.nix` because the manifest hard-depends on it (it also arrives transitively via `mobile_app`, but per the rule above every integration in use is named).
+
+### Keeping the pins current (`pins.nix`)
+
+Dropping HACS also dropped its update notifications. Only two things still self-report: the **ha-mcp server**, whose coordinator polls PyPI every `UPDATE_CHECK_INTERVAL` (6h) and is *not* gated on `skip_pip`, so its `update` entity still shows installed-vs-latest (just with no Install button) — which now tells you **nixpkgs** is behind, since the server is no longer a pin of ours; and `component_outdated`, a repair issue raised when the installed server needs a newer `ha_mcp_tools` than is running. Nothing watches the other 10 pins.
+
+`pins.nix` therefore re-exports all 11 as `packages.hass-*` **solely so `nix-update` can reach them** — nothing consumes these outputs, the HA module callPackages the same files itself. `update-system` stage [2/4] drives the whole set; `--skip-pins` opts out (it builds each one).
+
+Three optional `passthru` knobs, read by that stage:
+
+| knob                 | why                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `updatePolicy`       | `"stable"` (default) follows releases; `"branch"` follows default-branch HEAD, for the 3 cards upstream never tags |
+| `updateFile`         | repo-relative path, forced via `--override-filename`                                                               |
+| `updateVersionRegex` | rejects tags upstream publishes but we don't want                                                                  |
+
+**`buildHomeAssistantComponent` needs `updateFile`.** It goes through `lib.extendMkDerivation`, which relocates the derivation's position info into nixpkgs' own `build-custom-component/default.nix`; nix-update then throws `… is not in /nix/store/…-source` (`eval.nix:77`) rather than edit a path outside the flake. Both `_ha-mcp.nix` and `_berlin-transport.nix` set it.
+
+**`ha_mcp_tools` needs `updateVersionRegex`.** Upstream tags a continuous stream of `v2.1.4-dev.NNN` prereleases beside its stable tags and nix-update takes the newest parseable tag — without the regex it lands on a dev build. Note the regex runs against the **raw tag**, before the `v` is stripped, so it must be `^v?(…)$`.
+
+**How nix-update edits these, and the two rules that follow.** It anchors the target file on `unsafeGetAttrPos "src"`. Measured across all 11: the *file* is right everywhere, the *line* is wrong for 10 — `mkCard`/`mkTheme` report their own `inherit` line for every package they build, and `extendMkDerivation` points into nixpkgs. `update.py:36-58` handles that by checking whether the recorded line actually contains the old version and, when it doesn't, falling back to a **whole-file** string replace. Rev replacement is whole-file *unconditionally, and runs first*. So:
+
+- **Every version and tag string must stay unique within its file.** Verified clean today; `_themes.nix` is closest to the edge with `"1.4"` and `"1.3"`. Prefer one pin per file for anything new rather than growing `_lovelace-modules.nix` (6) or `_themes.nix` (3).
+- **Never embed the rev in the version string.** A `"branch"` pin must be `0-unstable-<date>` with the **full** rev. With `0-unstable-1a80547` the global rev replacement rewrites the short rev inside the version first, the version substitution then no longer matches, and you get `version = "0-unstable-1a805470152c86d9351abc7b0b56ef3ecb7e3a39"`. This is why the three commit-pinned cards are date-versioned.
+
+`update-firefox` and `update-thunderbird` are **not** replaceable by this: Firefox extensions are `ExtensionSettings` policies with an `install_url` that Firefox fetches at runtime (no Nix fetch, no hash at all), and Thunderbird's come from the AMO API, which nix-update has no version source for.
 
 ## Desktop Environment
 
@@ -421,7 +450,7 @@ Line one is the only undimmed row, and the rest carry explicit muted foregrounds
 - `~/.config/opencode/skills/herdr/SKILL.md` ← **`herdr --skill`** (a `runCommand` that pipes the flag's output to `$out`). Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`. Do **not** read this from `${pkgs.herdr.src}`: 0.8 moved the file from the repo root to `skills/herdr/SKILL.md` and the old path broke silently. The CLI flag is a stable contract and guarantees the skill matches the installed binary.
 - Skills shipped by plugins, picked up from `mkHerdrPlugin`'s `passthru.skills`.
 
-`opencode.nix` allows herdr inspection and topology in `readOnlyBash` (`pane list/get/read/split/focus/resize`, `tab create`, `agent wait`, …). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.
+`opencode.nix` allows herdr inspection and topology (`pane list/get/read/split/focus/resize`, `tab create`, `agent wait`, …). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.
 
 ### Plugins (`mkHerdrPlugin`)
 
@@ -514,16 +543,16 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 ### Module layout (`modules/programs/opencode/`)
 
-| File                   | Contents                                                                                                            |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `opencode.nix`         | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation`                                      |
-| `_permissions.nix`     | `readOnlyBash` (the allowlist), `unrestrictedBash`, the gh/datadog/ticket fragments, `sharedBase`. Takes `{jailed}` |
-| `_agents.nix`          | per-agent permission sets                                                                                           |
-| `_mcp.nix`             | the MCP server set + the `nvim-mcp` wrapper                                                                         |
-| `_sync.nix`            | hash coupling the jail package to its deployed config (see Sandbox)                                                 |
-| `jail/jail.nix`        | the `opencode-jail` aspect — the bubblewrap sandbox                                                                 |
-| `jail/jail-context.md` | instructions loaded **only** inside the sandbox                                                                     |
-| `jail/_host-query/`    | host-side service backing the `host_*` tools                                                                        |
+| File                   | Contents                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| `opencode.nix`         | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation` |
+| `_permissions.nix`     | defines the permissioning for both jailed and non jailed agents                |
+| `_agents.nix`          | per-agent permission sets                                                      |
+| `_mcp.nix`             | the MCP server set + the `nvim-mcp` wrapper                                    |
+| `_sync.nix`            | hash coupling the jail package to its deployed config (see Sandbox)            |
+| `jail/jail.nix`        | the `opencode-jail` aspect — the bubblewrap sandbox                            |
+| `jail/jail-context.md` | instructions loaded **only** inside the sandbox                                |
+| `jail/_host-query/`    | host-side service backing the `host_*` tools                                   |
 
 `_`-prefixed files are skipped by import-tree and imported by hand.
 
@@ -556,7 +585,7 @@ Things that cost real time to discover:
 
 ### Agents (`modules/programs/opencode/agents/*.md` → `~/.config/opencode/agent/`)
 
-Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments (`readOnlyBash`, `ghCustomTools`, `denyDatadog`, `denyTicketWrites`, `primaryBase`) explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
+Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
 
 **Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`), so denying an MCP's tools on the primaries strips those definitions from every session; they reappear only inside the subagent that needs them.
 
@@ -613,25 +642,6 @@ Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell comm
 
 `host_journal` is auto-approved because its arguments land in argv positions, never a shell string — and it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.
 
-### Bash permission philosophy
-
-**Default-deny, explicit-allow with read/write split:**
-
-- `"*" = "ask"` — global default, all unknown commands require approval
-- Read-only commands auto-allowed: git inspection, file reading (`cat`, `ls`, `bat`), search (`rg`, `fd`, `grep`, `find`), text processing (`jq`, `yq`, `cut`, `tr`), system info, network inspection (`curl`, `dig`), language toolchains (cargo, node, nix), gh CLI reads, herdr inspection
-- **Every allow is exact-plus-args (`"ls"` + `"ls *"`), never a bare prefix glob.** `"cmd*"` silently captures every binary whose name starts with `cmd`, and on this machine that was not theoretical: `"uname*"` matched **`uname26`** (runs any command under a faked uname — a total bypass), `"ps*"` matched **`psql`**, `"tr*"` matched **`truncate`**, `"id*"` matched **`idle3`** (`idle3 -r` runs arbitrary Python), plus `tree-sitter`, `typeprof`, `wcurl`, `hostnamectl` and `fdisk`. Audit new entries with: for each bare-prefix allow, list every binary on `PATH` it matches.
-- **The jailed and unjailed sets diverge**, both generated from `_permissions.nix {jailed = …}`. Inside the jail `nix build`/`nix-build`/`nix flake check`/`nix-store -r` are `allow` (daemon-sandboxed builds, and `trusted-users = root` means a client cannot turn that off) while `nix run`/`shell`/`develop` are `ask` (they execute fetched code). Darwin denies all of them. `nixos-rebuild`, `darwin-rebuild`, `home-manager`, `nix profile` and `nix-collect-garbage` are denied everywhere. The `"*<cmd>*"` wildcard variants are omitted when jailed, so a prefixed form (`sudo nix build`) falls through to `"*" = "ask"` instead of being blanket-allowed.
-- **`build` gets `bash: allow` inside the jail** (`unrestrictedBash`). For an agent already permitted to edit, the allowlist is friction rather than protection — the kernel is the boundary there. Read-only agents (`plan`, `pair`, `reviewer`, `troubleshoot`, `tickets`) keep `readOnlyBash`, where it enforces a role contract rather than a safety boundary. The global `permission.bash` also stays strict, so a future agent without an explicit override fails safe.
-- **Commands that can execute or write are deliberately absent from the allowlist**, because they defeat every deny rule below: `env` (runs whatever follows it), `awk` (`system()`, `print | "sh"`), `sed` (`e` runs shell commands, `w` writes files, and `-i` still matches a `sed -n*` pattern — all three verified), `sort` (`--compress-program`). They fall through to `"*" = "ask"`. `find` stays allowed, with `-exec`/`-ok`/`-delete`/`-fprintf` pulled back to `ask`.
-- All mutations require approval: file writes, git commits/push, package installs, gh writes
-- Custom tools: `*_read` tools are `"allow"`, `*_write` tools are `"ask"`
-- **The whitelist is factored into a `readOnlyBash` `let` binding and applied per-agent.** Agent permissions override the global block, so a built-in agent (e.g. `plan`) would otherwise reset `bash` to `ask` and ignore the global allows — every agent that should run read-only bash re-applies `readOnlyBash` explicitly.
-- **Matching semantics** (verified empirically against opencode 1.18.4): each pattern is a glob matched against a whole command segment, anchored `^…$`, with `*`→`.*` and `?`→`.`; a pattern ending in `" *"` also matches the bare command. So `"cat*"` covers `cat`, `cat x`, `cat -n x`. Rules are evaluated with `findLast` over **JSON key order**, and nix emits attrset keys in byte order, so the **lexicographically last matching pattern wins**. This is not the same as "most specific wins", and it has two consequences worth internalising:
-  - A `"*"`-prefixed pattern sorts before everything (`*` is 0x2A) and is therefore the **weakest** rule, not the strongest. `"*nixos-rebuild*" = "deny"` loses to any letter-prefixed allow that matches the same segment.
-  - To beat an allow with a narrower rule, the narrower pattern must **share the allow's prefix and be longer** — `"find*-exec*"` beats `"find*"`, while `"find -exec*"` would lose, because space (0x20) sorts before `*`.
-  - Probe it after any change by evaluating the rendered set rather than trusting the source, e.g. `nix eval .#nixosConfigurations.laptop.config.home-manager.users.augusto.programs.opencode.settings.permission.bash --json | jq`. Two invariants: **no bare-prefix allow globs survive** (`jq -r 'to_entries[]|select(.value=="allow")|.key|select(test("^[a-z0-9_-]+\\*$"))'` must print nothing), and a prefixed form such as `env nix build --version` must not be auto-allowed.
-- **Pipelines are all-or-nothing**: a piped/`&&`-chained command needs approval if *any* single segment resolves to `ask`. Env-assignment or `timeout`/`git -C` prefixes defeat a plain whitelist entry (they change the segment), so `readOnlyBash` includes transparent-prefix patterns (`"*=* cargo *"`, `"timeout * cargo *"`, `"git -C * log*"`, …). These require a real prefix (`=` or literal `timeout`/`git -C`), so `sudo cargo …` still asks.
-
 ## Security Model
 
 - **Disk encryption**: LUKS with TPM2 auto-unlock + FIDO2 backup
@@ -677,8 +687,12 @@ nix flake update nvim-*
 # or use the wrapper script:
 update-nvim
 
-# Update system packages
+# Update system packages (flake inputs, HA pins, Firefox, Thunderbird)
 update-system
+update-system --skip-pins        # skip the HA pins; each one is built
+
+# Bump a single hand-pinned Home Assistant source (needs the dev shell)
+nix-update -f ~/nixos -F --build --version=stable hass-status-card
 
 # Update Firefox/Thunderbird extensions
 update-firefox

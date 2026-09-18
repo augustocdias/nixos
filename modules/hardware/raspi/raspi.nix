@@ -10,6 +10,7 @@
     includes = with den.aspects; [
       disko
       home-assistant
+      mosquitto
     ];
 
     # To install this directly on a SD card run:

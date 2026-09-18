@@ -9,9 +9,9 @@
   "gmail-conversation-view": {
     "slug": "gmail-conversation-view",
     "name": "Thunderbird Conversations",
-    "url": "https://addons.thunderbird.net/thunderbird/downloads/file/1047928/thunderbird_conversations-4.3.10-tb.xpi?src=",
+    "url": "https://addons.thunderbird.net/thunderbird/downloads/file/1051295/thunderbird_conversations-4.3.12-tb.xpi?src=",
     "addonId": "gconversation@xulforum.org",
-    "sha256": "0pzqqrfk3s3swrmwa9rf7zx4f313ygkjnhrq7ifmzynfwb14sx9v"
+    "sha256": "07ig2r23ws661ad2x89brqq3gxr827mc7mq1blkqy8vcjzpn9nsx"
   },
   "ai-grammar": {
     "slug": "ai-grammar",

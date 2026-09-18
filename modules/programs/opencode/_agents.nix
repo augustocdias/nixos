@@ -1,26 +1,13 @@
 {
   sharedBase,
   primaryBase,
-  readOnlyBash,
-  unrestrictedBash,
+  baseBash,
   ghCustomToolsReadOnly,
   denyDatadog,
   denyTicketWrites,
   ...
 }: {
-  build.permission =
-    primaryBase
-    // {
-      edit = "allow";
-      bash = unrestrictedBash;
-    };
-
-  plan.permission =
-    primaryBase
-    // {
-      edit = "deny";
-    }
-    // ghCustomToolsReadOnly;
+  plan.permission = primaryBase // ghCustomToolsReadOnly;
 
   pair = {
     mode = "primary";
@@ -48,7 +35,7 @@
     sharedBase
     // {
       edit = "deny";
-      bash = readOnlyBash;
+      bash = baseBash;
       "datadog_*" = "allow";
     }
     // ghCustomToolsReadOnly;
@@ -57,7 +44,7 @@
     sharedBase
     // {
       edit = "deny";
-      bash = readOnlyBash;
+      bash = baseBash;
       "linear_*" = "ask";
       "Notion_*" = "ask";
     }
@@ -67,7 +54,7 @@
     sharedBase
     // {
       edit = "deny";
-      bash = readOnlyBash;
+      bash = baseBash;
     }
     // ghCustomToolsReadOnly
     // denyDatadog

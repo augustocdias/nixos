@@ -36,9 +36,8 @@
       ollamaPort = 11434;
 
       ollamaModels = [
-        "qwen3:4b"
-        "lfm2.5:8b"
-        "granite4.2:3b"
+        "qwen3:30b-a3b-instruct-2507-q4_K_M"
+        "gpt-oss:20b"
       ];
 
       voiceDaemon = name: {
@@ -272,13 +271,10 @@
           environment = {
             OLLAMA_HOST = "[::]:${toString ollamaPort}";
             OLLAMA_MODELS = "${ollamaHome}/models";
-            # Default is 4096, which HA's entity list + tool schemas overflow
-            # (the prompt is then silently truncated).
             OLLAMA_CONTEXT_LENGTH = "16384";
-            # Keep the model resident; voice usage is bursty and the default
-            # 5m unload means the next request pays a full load.
             OLLAMA_KEEP_ALIVE = "-1";
             OLLAMA_FLASH_ATTENTION = "1";
+            OLLAMA_NO_CLOUD = "1";
           };
         };
 

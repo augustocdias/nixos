@@ -18,6 +18,13 @@ buildHomeAssistantComponent (finalAttrs: {
 
   dependencies = [async-timeout];
 
+  passthru = {
+    # See the same note in _ha-mcp.nix: buildHomeAssistantComponent's
+    # extendMkDerivation moves the position info into nixpkgs, so nix-update
+    # needs --override-filename. Relative to the repo root.
+    updateFile = "modules/services/home-assistant/_berlin-transport.nix";
+  };
+
   meta = {
     description = "Berlin (BVG/VBB) public transport departure times for Home Assistant";
     homepage = "https://github.com/vas3k/home-assistant-berlin-transport";

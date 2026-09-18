@@ -6,7 +6,7 @@
       berlin-transport = pkgs.callPackage ./_berlin-transport.nix {
         inherit (pkgs.home-assistant.python3Packages) async-timeout;
       };
-      ha-mcp = pkgs.callPackage ./_ha-mcp.nix {
+      ha-mcp-tools = pkgs.callPackage ./_ha-mcp.nix {
         python3Packages = pkgs.home-assistant.python3Packages;
       };
     in {
@@ -19,7 +19,7 @@
 
         customComponents = [
           berlin-transport
-          ha-mcp.ha-mcp-tools
+          ha-mcp-tools
         ];
 
         customLovelaceModules =
@@ -98,7 +98,10 @@
         };
       };
 
-      services.matterjs-server.enable = true;
+      services.matterjs-server = {
+        enable = true;
+        extraArgs = ["--ble-proxy"];
+      };
     };
   };
 }

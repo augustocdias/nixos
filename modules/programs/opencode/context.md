@@ -74,7 +74,9 @@ Paths must be relative to the workspace root (same path used in
 - Run vim commands, send keystrokes
 - Highlight regions to visually communicate what you are about to do
 
-Use these to pair with the user, not to bypass them.
+Use these to pair with the user, not to bypass them. Remember that the user might
+edit your work. If you're unsure as to why something was changed, don't blindly
+assume it was the formatter doing weird stuff, ask the user before undoing their work.
 
 ### Never use Neovim to escape the sandbox (ABSOLUTE)
 
@@ -112,6 +114,9 @@ the intended path, and it costs them one command.
 If you genuinely need something outside the working directory, use the
 `host_mount` or `host_exec` tools. They prompt the user for approval, which is
 exactly the point.
+
+THAT BEING SAD: USING NEOVIM FOR EDITING FILES IN THE WORKSPACE IS NOT CONSIDERED
+ESCAPING THE SANDBOX.
 
 ## Host tools (HIGH PRIORITY)
 
@@ -183,7 +188,7 @@ directory you are already in.
 - If a request is ambiguous, ask for clarification rather than guessing
 - Don't generate placeholder implementations as final answers — mark scaffolding clearly
 
-## Code Comments
+## Code Comments (ALSO VERY IMPORTANT)
 
 - Comment sparingly. Only add a comment when it explains non-obvious *why* —
   a gotcha, a workaround, a subtle constraint. Never narrate *what* the code

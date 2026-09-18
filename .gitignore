@@ -1,3 +1,5 @@
 result
 *.iso
 .direnv/
+.opencode
+.Trash-1000

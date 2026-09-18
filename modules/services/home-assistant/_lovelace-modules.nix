@@ -12,52 +12,64 @@
     homepage,
     file ? "${pname}.js",
     entrypoint ? null,
+    # nix-update's --version, read by update-system. "stable" follows releases;
+    # "branch" follows the default branch HEAD, for cards upstream never tags.
+    #
+    # A "branch" card must version as 0-unstable-<date> and pin the FULL rev.
+    # nix-update rewrites the old rev across the whole file BEFORE it touches
+    # the version, so a short rev embedded in the version string gets replaced
+    # by the new sha and the version substitution then no longer matches —
+    # leaving version = "0-unstable-<40 hex chars>".
+    updatePolicy ? "stable",
   }:
-    stdenvNoCC.mkDerivation ({
-        inherit pname version src;
+    stdenvNoCC.mkDerivation {
+      inherit pname version src;
 
-        dontConfigure = true;
-        dontBuild = true;
+      dontConfigure = true;
+      dontBuild = true;
 
-        installPhase = ''
-          runHook preInstall
-          install -Dm444 ${file} -t $out
-          runHook postInstall
-        '';
+      installPhase = ''
+        runHook preInstall
+        install -Dm444 ${file} -t $out
+        runHook postInstall
+      '';
 
-        meta = {
-          inherit description homepage;
-          platforms = lib.platforms.all;
-        };
-      }
-      // lib.optionalAttrs (entrypoint != null) {
-        passthru = {inherit entrypoint;};
-      });
+      passthru =
+        {inherit updatePolicy;}
+        // lib.optionalAttrs (entrypoint != null) {inherit entrypoint;};
+
+      meta = {
+        inherit description homepage;
+        platforms = lib.platforms.all;
+      };
+    };
 in {
   hui-element = mkCard {
     pname = "hui-element";
-    version = "0-unstable-1a80547";
+    version = "0-unstable-2022-05-29";
     src = fetchFromGitHub {
       owner = "thomasloven";
       repo = "lovelace-hui-element";
-      rev = "1a80547";
+      rev = "1a805470152c86d9351abc7b0b56ef3ecb7e3a39";
       hash = "sha256-9/xdja3bkFOVbVvlQrtAl8kzPZ0jSMh2ur++k1NMqQY=";
     };
     description = "Use built-in Lovelace elements in places they aren't supported";
     homepage = "https://github.com/thomasloven/lovelace-hui-element";
+    updatePolicy = "branch";
   };
 
   more-info-card = mkCard {
     pname = "more-info-card";
-    version = "0-unstable-c0a9c94";
+    version = "0-unstable-2021-06-29";
     src = fetchFromGitHub {
       owner = "thomasloven";
       repo = "lovelace-more-info-card";
-      rev = "c0a9c94";
+      rev = "c0a9c942851c1c5370e8de102eb96597fb845d85";
       hash = "sha256-MlUGcW4J0cp8uHHKZVO8BRfdnAARVuEnY+izfuyGmWU=";
     };
     description = "Display the more-info dialog of any entity as a Lovelace card";
     homepage = "https://github.com/thomasloven/lovelace-more-info-card";
+    updatePolicy = "branch";
   };
 
   slider-entity-row = mkCard {
@@ -75,16 +87,17 @@ in {
 
   berlin-transport-card = mkCard {
     pname = "berlin-transport-card";
-    version = "0-unstable-78379a6";
+    version = "0-unstable-2026-08-28";
     src = fetchFromGitHub {
       owner = "vas3k";
       repo = "lovelace-berlin-transport-card";
-      rev = "78379a6";
+      rev = "78379a612f71d432a5a3bf2107c09d5cd961fea9";
       hash = "sha256-+Al2Pzw0uo+he8acGjf9Ux1p4NnRnlVDdLhsSbq3GXc=";
     };
     file = "dist/berlin-transport-card.js";
     description = "Timetable card for the berlin_transport integration";
     homepage = "https://github.com/vas3k/lovelace-berlin-transport-card";
+    updatePolicy = "branch";
   };
 
   birthday-reminder-card = mkCard {

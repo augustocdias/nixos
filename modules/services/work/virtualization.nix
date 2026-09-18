@@ -11,6 +11,14 @@
         };
       };
 
+      virtualisation.containers.registries.settings = {
+        unqualified-search-registries = ["docker.io"];
+        registry = [
+          {location = "docker.io";}
+          {location = "quay.io";}
+        ];
+      };
+
       environment.systemPackages = [
         pkgs.quickemu
       ];

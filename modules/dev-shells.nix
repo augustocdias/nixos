@@ -17,6 +17,9 @@
         nix-output-monitor
         nvd
 
+        # bumps the hand-pinned sources (packages.hass-*); see update-system
+        nix-update
+
         # secrets (sops-nix)
         sops
         age
@@ -35,6 +38,7 @@
         echo "  nix fmt                  -- alejandra"
         echo "  statix check . && deadnix -- lint"
         echo "  nix run .#write-flake    -- regenerate flake.nix"
+        echo "  nix-update -f . -F <pkg> -- bump a hand-pinned source (packages.hass-*)"
       '';
     };
 

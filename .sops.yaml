@@ -1,11 +1,12 @@
 ---
 keys:
-  # Per-machine age keys
-  - &nixos age1auxycyhq85dvlpf5jds4zdyyc36m5qg6afk8xh8dr59ue97p5p0qsce7ld
   # Master key (YubiKey) - can decrypt on any machine
   - &yubikey 7D8396F74725A208D835CE3730E62A1E4F078650
+  # Per-machine age keys
+  - &nixos age1auxycyhq85dvlpf5jds4zdyyc36m5qg6afk8xh8dr59ue97p5p0qsce7ld
   - &macmini age1vaevu0nh0njp06aylzgn8fgx6nfltk469dtvn7xkq0rdtmfp2gkqprgpxz
+  - &raspi age19mg5etl3u38x4udzkhu7euqs27aqv2wfcmk6sxkwztuq4xc3d5psgyz8ty
 creation_rules:
   - path_regex: modules/security/secrets/.*\.ya?ml$
-    age: [*nixos, *macmini]
+    age: [*nixos, *macmini, *raspi]
     pgp: [*yubikey]

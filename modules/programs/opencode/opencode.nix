@@ -86,7 +86,7 @@
           permission =
             perms.sharedBase
             // {
-              bash = perms.readOnlyBash;
+              bash = perms.baseBash;
             }
             // perms.ghCustomTools;
 
