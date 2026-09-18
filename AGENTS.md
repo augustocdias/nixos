@@ -121,6 +121,8 @@ modules/
       _berlin-transport.nix # berlin_transport custom component (ex-HACS)
       _ha-mcp.nix           # ha_mcp_tools custom component (server = nixpkgs' python3Packages.ha-mcp)
       pins.nix              # the 12 hand-pinned sources as packages.hass-*, for nix-update
+    open-webui/
+      open-webui.nix        # `open-webui` aspect (macmini only): launchd daemon, local-only
     work/
       work.nix              # `work` aspect: aggregates the below + just, awscli2
       datagrip.nix          # JetBrains DataGrip with plugins
@@ -165,9 +167,10 @@ Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.asp
 - **Power**: `sleep.computer = "never"` + `restartAfterPowerFailure` — the voice stack depends on this host staying up.
 - **Voice stack**: `launchd.daemons` for `ollama` (`OLLAMA_HOST=[::]:11434`), `wyoming-faster-whisper` (port 10300, `--language auto` for EN+pt-BR; needs `HF_HOME=/tmp`, an upstream bug) and `wyoming-piper` (port 10200). `services.wyoming.*` and `services.ollama` are NixOS-only, hence hand-rolled by the `voiceDaemon` helper. State dirs are created in `postActivation`.
   - **launchd system daemons inherit only `PATH`** — no `HOME`. `ollama serve` aborts with `Error: $HOME is not defined` while creating `~/.ollama/id_ed25519`, so it gets `HOME=/var/lib/ollama` (mirroring the NixOS module's `HOME = cfg.home`). This crash-looped invisibly for a long time; `voiceDaemon` now also sets `StandardOutPath`/`StandardErrorPath` to `/var/log/<name>.log`, because a launchd daemon without them sends stderr nowhere and `log show` has nothing.
-  - **Two ollama env vars matter more than the model.** `OLLAMA_CONTEXT_LENGTH=16384` because the default is 4096 and HA's entity list + tool schemas silently truncate past it; `OLLAMA_KEEP_ALIVE=-1` because voice usage is bursty and the default 5m unload makes every cold request pay a model load. Also `OLLAMA_FLASH_ATTENTION=1`.
+  - **Two ollama env vars matter more than the model.** `OLLAMA_CONTEXT_LENGTH=16384` because the default is 4096 and HA's entity list + tool schemas silently truncate past it; `OLLAMA_KEEP_ALIVE=-1` because voice usage is bursty and the default 5m unload makes every cold request pay a model load. Also `OLLAMA_FLASH_ATTENTION=1`, and `OLLAMA_NUM_PARALLEL=2` — it defaults to 1 under a memory-tight load, which would make an HA voice command queue behind a long Open WebUI turn; each extra slot costs one more KV cache of `OLLAMA_CONTEXT_LENGTH`.
   - **Models are declared in Nix but not hash-pinned.** The `ollamaModels` list drives an `ollama-model-loader` daemon (`KeepAlive.SuccessfulExit = false`, i.e. retry-on-failure only) that polls `127.0.0.1:11434/api/version` — launchd has no ordering — then `ollama pull`s each entry. Re-pulling an existing model is a no-op, so running it every boot is free. True pinning would mean `fetchurl` a GGUF plus `ollama create`, which still needs a live server, doubles disk, and loses the model's curated chat/tool-call template — not worth it.
   - Metal works fine from a root daemon (`library=Metal name=MTL0 description="Apple M4"`). A one-off `llama-server GPU discovery watchdog timed out` on a cold start is not a real CPU fallback.
+- **Open WebUI**: shares that same ollama instance; loopback-only on port 8080. See the Open WebUI section.
 - **Other**: 1Password GUI, fish as login shell.
 
 ### Window management — `omniwm`
@@ -260,6 +263,18 @@ Three optional `passthru` knobs, read by that stage:
 - **Never embed the rev in the version string.** A `"branch"` pin must be `0-unstable-<date>` with the **full** rev. With `0-unstable-1a80547` the global rev replacement rewrites the short rev inside the version first, the version substitution then no longer matches, and you get `version = "0-unstable-1a805470152c86d9351abc7b0b56ef3ecb7e3a39"`. This is why the three commit-pinned cards are date-versioned.
 
 `update-firefox` and `update-thunderbird` are **not** replaceable by this: Firefox extensions are `ExtensionSettings` policies with an `install_url` that Firefox fetches at runtime (no Nix fetch, no hash at all), and Thunderbird's come from the AMO API, which nix-update has no version source for.
+
+## Open WebUI
+
+Self-hosted AI workspace on `macmini`, reusing the ollama instance the voice stack already runs. Aspect `open-webui`, included by `den.aspects.macmini`. **Local-only**: bound to `127.0.0.1:8080`, reached with `ssh -L 8080:127.0.0.1:8080 macmini`. Nothing is exposed to the LAN or the internet.
+
+- **`STATIC_DIR` must be redirected.** It defaults to a directory inside the package's own store path, and open-webui `shutil.copyfile`s the favicon, splash and loader into it on every start (`config.py:111,125,133,141`). Left alone it writes to a read-only store path. Same reasoning for `DATA_DIR`, `HF_HOME` and `SENTENCE_TRANSFORMERS_HOME`; all four live under `/var/lib/open-webui` and are created in `postActivation`.
+- **`HOST`/`PORT` are not environment variables.** `serve` is a typer command whose `host`/`port` are CLI options defaulting to `0.0.0.0:8080`. Setting `env.HOST` is silently ignored and the app listens on every interface — so the bind address is passed as `--host`, not as env.
+- **`ENABLE_PERSISTENT_CONFIG = "False"` is what makes this declarative.** At its default (`True`) the first boot seeds env-derived values into the `config` table and every later read comes from the database, so editing the Nix would silently do nothing. False makes the environment authoritative on every boot. The trade is the same one OmniWM's `settings.toml` makes: **settings changed in the admin UI no longer persist** — declare them in Nix instead.
+- **`WEBUI_AUTH = "False"`** — no login, no signup, single implicit admin. Only safe because the bind is loopback-only; it must flip to `True` before the port is ever exposed. `WEBUI_SECRET_KEY` is supplied regardless (it is only a hard requirement when auth is on, but it also keys OAuth token encryption and keeps sessions stable across restarts).
+- **The secret is fetched by a wrapper, not by launchd.** launchd has no ordering and sops-nix's own `sops-install-secrets` is itself a `RunAtLoad` daemon, so the start script polls for `/run/secrets/open_webui_secret` before exec'ing — the same trick `ollama-model-loader` uses on the ollama socket. Without `WorkingDirectory` the missing-secret fallback would write `.webui_secret_key` into `/`.
+- **First system-level sops on macmini.** The repo's `secrets` aspect is home-manager-only, so this imports `sops-nix.darwinModules.sops` and points `age.keyFile` at `/Users/augusto/.config/sops/age/keys.txt` — the key the HM aspect already provisions, readable by root. No second key to manage, but activation now depends on a path inside the user's home.
+- **No companion services.** `VECTOR_DB` and `RAG_EMBEDDING_ENGINE` stay at their defaults: embedded ChromaDB and local sentence-transformers (`all-MiniLM-L6-v2`) **on CPU**, so embeddings never touch the GPU the voice stack needs. Web search is `duckduckgo` via `ddgs`, already in the closure — no API key, no SearXNG. The embedding model is fetched into `HF_HOME` on first run, so `OFFLINE_MODE` must stay false.
 
 ## Desktop Environment
 

@@ -10,6 +10,10 @@
   };
 
   den.aspects.macmini = {
+    includes = with den.aspects; [
+      open-webui
+    ];
+
     darwin = {pkgs, ...}: let
       eurkey-next-bundle = pkgs.stdenvNoCC.mkDerivation {
         pname = "eurkey-next-bundle";
@@ -36,7 +40,7 @@
       ollamaPort = 11434;
 
       ollamaModels = [
-        "qwen3:30b-a3b-instruct-2507-q4_K_M"
+        "qwen3:4b-instruct-2507-q4_K_M"
         "gpt-oss:20b"
       ];
 
@@ -273,6 +277,10 @@
             OLLAMA_MODELS = "${ollamaHome}/models";
             OLLAMA_CONTEXT_LENGTH = "16384";
             OLLAMA_KEEP_ALIVE = "-1";
+            # Defaults to 1 under a memory-tight load, which makes an HA voice
+            # command queue behind a long Open WebUI turn. Each extra slot
+            # costs one more KV cache of OLLAMA_CONTEXT_LENGTH.
+            OLLAMA_NUM_PARALLEL = "2";
             OLLAMA_FLASH_ATTENTION = "1";
             OLLAMA_NO_CLOUD = "1";
           };
