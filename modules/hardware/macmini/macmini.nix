@@ -276,11 +276,8 @@
             OLLAMA_HOST = "[::]:${toString ollamaPort}";
             OLLAMA_MODELS = "${ollamaHome}/models";
             OLLAMA_CONTEXT_LENGTH = "16384";
-            OLLAMA_KEEP_ALIVE = "-1";
-            # Defaults to 1 under a memory-tight load, which makes an HA voice
-            # command queue behind a long Open WebUI turn. Each extra slot
-            # costs one more KV cache of OLLAMA_CONTEXT_LENGTH.
-            OLLAMA_NUM_PARALLEL = "2";
+            OLLAMA_KEEP_ALIVE = "5m";
+            OLLAMA_NUM_PARALLEL = "1";
             OLLAMA_FLASH_ATTENTION = "1";
             OLLAMA_NO_CLOUD = "1";
           };
