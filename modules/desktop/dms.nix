@@ -691,7 +691,6 @@
 
         plugins = {
           commandRunner.enable = true;
-          dankBatteryAlerts.enable = true;
           calculator.enable = true;
 
           worldClock = {

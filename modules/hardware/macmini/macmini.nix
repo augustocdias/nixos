@@ -40,7 +40,7 @@
       ollamaPort = 11434;
 
       ollamaModels = [
-        "qwen3:4b-instruct-2507-q4_K_M"
+        "hermes3:8b"
         "gpt-oss:20b"
       ];
 

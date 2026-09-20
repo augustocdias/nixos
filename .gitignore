@@ -3,3 +3,4 @@ result
 .direnv/
 .opencode
 .Trash-1000
+__pycache__

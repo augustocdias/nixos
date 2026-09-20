@@ -15,6 +15,28 @@
 
       secretPath = config.sops.secrets.open_webui_secret.path;
 
+      package = pkgs.open-webui.overridePythonAttrs (old: {
+        dependencies =
+          (old.dependencies or [])
+          ++ [
+            # osm deps
+            pkgs.python3Packages.openrouteservice
+            pkgs.python3Packages.pygments
+          ];
+      });
+
+      tools = import ./_tools.nix {inherit (pkgs) fetchurl;};
+
+      toolManifest = pkgs.writeText "open-webui-tools.json" (
+        builtins.toJSON (
+          lib.mapAttrs (_: tool: {
+            inherit (tool) name;
+            path = toString tool.src;
+          })
+          tools
+        )
+      );
+
       start = pkgs.writeShellScript "open-webui-start" ''
         set -eu
         for _ in $(seq 1 60); do
@@ -23,7 +45,7 @@
           sleep 2
         done
         export WEBUI_SECRET_KEY="$(cat ${secretPath})"
-        exec ${lib.getExe pkgs.open-webui} serve \
+        exec ${lib.getExe package} serve \
           --host 0.0.0.0 \
           --port ${toString port}
       '';
@@ -64,6 +86,9 @@
 
           ENABLE_PERSISTENT_CONFIG = "False";
 
+          # Frontmatter requirements would be pip-installed into the store.
+          ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS = "False";
+
           ENABLE_VERSION_UPDATE_CHECK = "False";
           ANONYMIZED_TELEMETRY = "False";
           DO_NOT_TRACK = "1";
@@ -76,6 +101,25 @@
           WorkingDirectory = stateDir;
           StandardOutPath = "/var/log/open-webui.log";
           StandardErrorPath = "/var/log/open-webui.log";
+        };
+      };
+
+      launchd.daemons.open-webui-tools = {
+        command = "${pkgs.python3}/bin/python3 ${./import-tools.py}";
+
+        environment = {
+          OWUI_BASE_URL = "http://127.0.0.1:${toString port}";
+          OWUI_DB = "${stateDir}/data/webui.db";
+          OWUI_SECRET_FILE = secretPath;
+          OWUI_TOOL_MANIFEST = "${toolManifest}";
+        };
+
+        serviceConfig = {
+          KeepAlive = {SuccessfulExit = false;};
+          RunAtLoad = true;
+          WorkingDirectory = stateDir;
+          StandardOutPath = "/var/log/open-webui-tools.log";
+          StandardErrorPath = "/var/log/open-webui-tools.log";
         };
       };
 

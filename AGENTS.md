@@ -276,6 +276,15 @@ Self-hosted AI workspace on `macmini`, reusing the ollama instance the voice sta
 - **First system-level sops on macmini.** The repo's `secrets` aspect is home-manager-only, so this imports `sops-nix.darwinModules.sops` and points `age.keyFile` at `/Users/augusto/.config/sops/age/keys.txt` — the key the HM aspect already provisions, readable by root. No second key to manage, but activation now depends on a path inside the user's home.
 - **No companion services.** `VECTOR_DB` and `RAG_EMBEDDING_ENGINE` stay at their defaults: embedded ChromaDB and local sentence-transformers (`all-MiniLM-L6-v2`) **on CPU**, so embeddings never touch the GPU the voice stack needs. Web search is `duckduckgo` via `ddgs`, already in the closure — no API key, no SearXNG. The embedding model is fetched into `HF_HOME` on first run, so `OFFLINE_MODE` must stay false.
 
+### Tools
+
+Tools are **rows in the `tool` table, not files** — `TOOLS_DIR` does not exist in 0.11.3, so `mkOutOfStoreSymlink` is impossible. `_tools.nix` pins five of them by commit (`fetchurl`), and `import-tools.py` runs as the `open-webui-tools` launchd daemon to push them in over the HTTP API.
+
+- **The attr name in `_tools.nix` is the Open WebUI id**, which is the table's primary key and is caller-supplied — not generated. It must equal the id of the row already installed or a second, functionally-duplicate tool appears. This is why `wiki.py` is declared as `wikipedia_tool`. The id is also lowercased and `.isidentifier()`-checked upstream, so `ask-user` has to be `ask_user`.
+- **Upsert is enforced by the API, not by the script.** `create` refuses an id that exists (400 `ID_TAKEN`) and `update` refuses one that does not (401 `NOT_FOUND`), so listing the ids first and picking the matching call is idempotent. `valves` is a separate column that `update` never writes, so tool configuration survives. `specs` and `meta.manifest` are re-derived from the source on every write, which is why a bare `.py` is a complete representation.
+- **The importer mints its own session token.** The API always demands one — there is no `WEBUI_AUTH = "False"` bypass in `get_current_user`. `create_token` is a plain HS256 JWT over `WEBUI_SECRET_KEY`, and `is_valid_token` only consults Redis for revocation, which is not configured, so the script signs `{id, jti, iat}` itself using the sops secret and the admin id read read-only out of `webui.db`. No API key to provision.
+- **`ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS = "False"`** — a tool's frontmatter `requirements` are otherwise pip-installed at create time into the read-only store, which is what made `osm` fail to install. Its two requirements are supplied through the package's python env instead: `pygments` is already a dependency, `openrouteservice` is added by `overridePythonAttrs`. Both are top-level imports in `osm.py`, so neither is optional.
+
 ## Desktop Environment
 
 ### Hyprland
