@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin"
+import { tool, type ToolContext } from "@opencode-ai/plugin"
 
 async function runGh(args: string[]): Promise<string> {
   try {
@@ -8,6 +8,39 @@ async function runGh(args: string[]): Promise<string> {
     const msg = error instanceof Error ? error.message : String(error)
     throw new Error(`gh command failed: ${msg}`)
   }
+}
+
+// Ask the user before any gh call that mutates something.
+//
+// opencode only asks on its own behalf for built-in tools and for MCP tools; a
+// tool loaded from ~/.config/opencode/tools/*.ts is executed directly, so the
+// `gh_*_write = "ask"` entries in _permissions.nix are inert unless the tool
+// asks for itself. (A `deny` there does still work — it drops the tool from the
+// model's schema entirely — which is why the read-only agents never see these.)
+//
+// The pattern is the shape of the operation rather than the full argv, so that
+// a long `--body` does not make an "always" approval unmatchable next time.
+//
+// `repeatable` is false for operations that name no specific object: approving
+// `gh issue create` forever would authorise arbitrary future issues, whereas
+// `gh pr merge 7` is one identifiable act. `always` is also withheld when the
+// pattern contains * or ?, since Wildcard.match compiles those to regex
+// wildcards with no way to escape them. An empty list makes "always" mean
+// "once".
+const globby = (pattern: string) => pattern.includes("*") || pattern.includes("?")
+
+function gate(
+  ctx: ToolContext,
+  permission: string,
+  pattern: string,
+  repeatable: boolean,
+): Promise<void> {
+  return ctx.ask({
+    permission,
+    patterns: [pattern],
+    always: repeatable && !globby(pattern) ? [pattern] : [],
+    metadata: { command: pattern },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +115,7 @@ export const issue_write = tool({
       .optional()
       .describe("Label (for create)"),
   },
-  async execute(args) {
+  async execute(args, ctx) {
     const cmd = ["issue", args.action]
     if (args.action === "create") {
       if (args.title) cmd.push("--title", args.title)
@@ -92,6 +125,14 @@ export const issue_write = tool({
     } else {
       if (args.number) cmd.push(args.number)
     }
+    const target =
+      args.action === "create" ? "" : args.number ? ` ${args.number}` : ""
+    await gate(
+      ctx,
+      "gh_issue_write",
+      `gh issue ${args.action}${target}`,
+      args.action !== "create",
+    )
     return runGh(cmd)
   },
 })
@@ -186,7 +227,7 @@ export const pr_write = tool({
       .optional()
       .describe("Merge method: merge, squash, rebase (for merge)"),
   },
-  async execute(args) {
+  async execute(args, ctx) {
     const cmd = ["pr", args.action]
     if (args.action === "create") {
       if (args.title) cmd.push("--title", args.title)
@@ -202,6 +243,14 @@ export const pr_write = tool({
         cmd.push(`--${args.merge_method}`)
       }
     }
+    const target =
+      args.action === "create" ? "" : args.number ? ` ${args.number}` : ""
+    await gate(
+      ctx,
+      "gh_pr_write",
+      `gh pr ${args.action}${target}`,
+      args.action !== "create",
+    )
     return runGh(cmd)
   },
 })
@@ -244,10 +293,19 @@ export const workflow_write = tool({
       .optional()
       .describe("Workflow inputs as JSON string"),
   },
-  async execute(args) {
+  async execute(args, ctx) {
     const cmd = ["workflow", "run", args.workflow]
     if (args.ref) cmd.push("--ref", args.ref)
     if (args.inputs) cmd.push("--json", args.inputs)
+    // The ref is part of the pattern: the same workflow on a different branch
+    // runs different code, so an approval for one should not cover the other.
+    const ref = args.ref ? ` --ref ${args.ref}` : ""
+    await gate(
+      ctx,
+      "gh_workflow_write",
+      `gh workflow run ${args.workflow}${ref}`,
+      true,
+    )
     return runGh(cmd)
   },
 })
@@ -302,7 +360,13 @@ export const run_write = tool({
       .describe("Run action"),
     run_id: tool.schema.string().describe("Run ID"),
   },
-  async execute(args) {
+  async execute(args, ctx) {
+    await gate(
+      ctx,
+      "gh_run_write",
+      `gh run ${args.action} ${args.run_id}`,
+      true,
+    )
     return runGh(["run", args.action, args.run_id])
   },
 })
@@ -427,7 +491,7 @@ export const repo_write = tool({
       .optional()
       .describe("Directory to clone into (for clone)"),
   },
-  async execute(args) {
+  async execute(args, ctx) {
     const cmd = ["repo", args.action]
     if (args.action === "create") {
       if (args.name) cmd.push(args.name)
@@ -439,6 +503,22 @@ export const repo_write = tool({
         cmd.push(args.clone_dir)
       }
     }
+    // `create` names the repo it makes, so it is as identifiable as clone or
+    // fork — unlike issue/pr create, whose only distinguishing arg is free text.
+    const target =
+      args.action === "create"
+        ? args.name
+          ? ` ${args.name}`
+          : ""
+        : args.repository
+          ? ` ${args.repository}`
+          : ""
+    await gate(
+      ctx,
+      "gh_repo_write",
+      `gh repo ${args.action}${target}`,
+      target !== "",
+    )
     return runGh(cmd)
   },
 })

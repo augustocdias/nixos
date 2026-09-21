@@ -39,10 +39,20 @@ pointing at a socket that is not bound.
 
 ## Reaching outside
 
-Three tools. **The user approves every single call to all three** — there is no
-auto-approved one, and no "allow for the session" tier. So batch what you need,
-and say in your message why it has to happen outside the sandbox. Reach for
-plain bash inside the sandbox first whenever it can do the job.
+Three tools. **The user approves every single call to all three** — none is
+auto-approved. So batch what you need, and say in your message why it has to
+happen outside the sandbox. Reach for plain bash inside the sandbox first
+whenever it can do the job.
+
+Approval is **per command, not per tool**. Answering "always" allows exactly
+the pattern you were shown — that one command string, that one path and mode,
+that one journal selection — and the next call that differs in any way asks
+again. There is no way to hand over the tool as a whole. A command containing
+`*` or `?` cannot be approved with "always" at all, because the stored pattern
+would be read as a wildcard; those always ask.
+
+Do not treat "always" as a reason to bundle unrelated work into one call, and
+do not reshape a command to dodge the prompt.
 
 In order of preference, narrowest first:
 

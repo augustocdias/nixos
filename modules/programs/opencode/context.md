@@ -136,9 +136,12 @@ reach past that boundary:
   of the three. Use it only when neither of the others fits: signing a commit,
   `git push`-adjacent work the sandbox cannot do, inspecting system state.
 
-**The user approves every call to all three. Always. There is no auto-approved
-tool and no "allow for the rest of the session" tier, deliberately.** Do not
-treat any of them as free:
+**The user approves every call to all three. Always. No tool is
+auto-approved.** Approval is per command, never per tool: answering "always"
+allows exactly the pattern shown — that command string, that path and mode,
+that journal selection — and anything that differs asks again. A command
+containing `*` or `?` can never be approved with "always", because the stored
+pattern would be read as a wildcard. Do not treat any of them as free:
 
 - Prefer plain bash inside the sandbox whenever it can answer the question.
 - Prefer the narrowest tool that fits — `host_journal` over `host_exec` for
