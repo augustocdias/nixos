@@ -23,9 +23,9 @@
   "signature-switch": {
     "slug": "signature-switch",
     "name": "Signature Switch",
-    "url": "https://addons.thunderbird.net/thunderbird/downloads/file/1042180/signature_switch-2.20.1-tb.xpi?src=",
+    "url": "https://addons.thunderbird.net/thunderbird/downloads/file/1051948/signature_switch-2.20.2-tb.xpi?src=",
     "addonId": "{2ab1b709-ba03-4361-abf9-c50b964ff75d}",
-    "sha256": "12ls24dbha2xlxkrpzzxypcs6qwra0dc8s3nhpb0siyqd0r7nfvy"
+    "sha256": "1mg1jvm8njmjhwff8kgzgpkwwgzxch82zgm5035g6mi4cga519ac"
   },
   "web-translate": {
     "slug": "web_translate",

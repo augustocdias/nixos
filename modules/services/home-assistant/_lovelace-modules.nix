@@ -12,14 +12,6 @@
     homepage,
     file ? "${pname}.js",
     entrypoint ? null,
-    # nix-update's --version, read by update-system. "stable" follows releases;
-    # "branch" follows the default branch HEAD, for cards upstream never tags.
-    #
-    # A "branch" card must version as 0-unstable-<date> and pin the FULL rev.
-    # nix-update rewrites the old rev across the whole file BEFORE it touches
-    # the version, so a short rev embedded in the version string gets replaced
-    # by the new sha and the version substitution then no longer matches —
-    # leaving version = "0-unstable-<40 hex chars>".
     updatePolicy ? "stable",
   }:
     stdenvNoCC.mkDerivation {
