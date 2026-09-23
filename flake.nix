@@ -10,6 +10,10 @@
       url = "github:AvengeMedia/dank-greeter";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    dank-pinentry = {
+      url = "github:augustocdias/dank-pinentry";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     dankcalendar = {
       url = "github:AvengeMedia/dankcalendar";
       inputs.nixpkgs.follows = "nixpkgs";

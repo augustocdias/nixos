@@ -1,4 +1,8 @@
-{den, ...}: let
+{
+  den,
+  inputs,
+  ...
+}: let
   u2fKeysFile = ./_u2f_keys;
   u2fKeysExist = builtins.pathExists u2fKeysFile;
 
@@ -64,7 +68,6 @@ in {
         tpm2-tools
         libfido2
         gnupg
-        pinentry-bemenu
         bemenu
       ];
 
@@ -123,7 +126,7 @@ in {
       pinentryPackage =
         if isDarwin
         then pkgs.pinentry_mac
-        else pkgs.pinentry-bemenu;
+        else inputs.dank-pinentry.packages.${pkgs.stdenv.hostPlatform.system}.dank-pinentry;
     in {
       programs.gpg = {
         enable = true;

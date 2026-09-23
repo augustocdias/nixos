@@ -16,6 +16,10 @@
     url = lib.mkDefault "github:AvengeMedia/dankcalendar";
     inputs.nixpkgs.follows = "nixpkgs";
   };
+  flake-file.inputs.dank-pinentry = {
+    url = lib.mkDefault "github:augustocdias/dank-pinentry";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
   flake-file.inputs.dank-greeter = {
     url = lib.mkDefault "github:AvengeMedia/dank-greeter";
     inputs.nixpkgs.follows = "nixpkgs";
@@ -74,7 +78,10 @@
       imports =
         lib.optionals (inputs ? dms) [inputs.dms.homeModules.dank-material-shell]
         ++ lib.optionals (inputs ? dms-plugins) [inputs.dms-plugins.homeModules.default]
-        ++ lib.optionals (inputs ? dankcalendar) [inputs.dankcalendar.homeModules.default];
+        ++ lib.optionals (inputs ? dankcalendar) [inputs.dankcalendar.homeModules.default]
+        ++ lib.optionals (inputs ? dank-pinentry) [inputs.dank-pinentry.homeModules.default];
+
+      programs.dank-pinentry.enable = true;
 
       xsession.preferStatusNotifierItems = true;
 
@@ -448,6 +455,10 @@
                   id = "runningApps";
                   enabled = true;
                 }
+                {
+                  id = "dankbarPinentry";
+                  enabled = true;
+                }
               ];
               centerWidgets = [
                 "weather"
@@ -690,6 +701,17 @@
         };
 
         plugins = {
+          dankbarPinentry.settings = {
+            placement = "bar";
+            barText = false;
+            focusMode = "take";
+            autoOpen = false;
+            notify = true;
+            notifyIcon = "dialog-password";
+            showOwner = true;
+            timeoutRing = true;
+          };
+
           commandRunner.enable = true;
           calculator.enable = true;
 

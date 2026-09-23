@@ -432,6 +432,7 @@ in rec {
     external_directory = {
       "/nix/store/**" = "allow";
       "~/granted/**" = "allow";
+      "/tmp/**" = "allow";
     };
     question = "allow";
 

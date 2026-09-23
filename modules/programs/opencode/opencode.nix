@@ -69,7 +69,7 @@
         context = builtins.readFile ./context.md;
 
         settings = {
-          model = "anthropic/claude-opus-5";
+          model = "anthropic/claude-opus-5.5";
           autoupdate = false;
           default_agent = "plan";
           lsp = false;

@@ -134,7 +134,7 @@ modules/
       sqlit.nix             # sqlit with PostgreSQL support
 
   security/
-    security.nix            # PAM (fingerprint + U2F), TPM2, GPG agent, polkit
+    security.nix            # PAM (fingerprint + U2F), TPM2, GPG agent (default pinentry), polkit
     secrets/                # SOPS-nix secrets (API keys, tokens, encrypted env.yaml)
 
   scripts/
@@ -353,7 +353,7 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - **Wallpaper**: cycling every 300s from `~/media/wallpapers/`
 - **Power management**: AC: 10min screen off, 3min lock, 30min suspend. Battery: power-saver profile, 20min suspend.
 - **Dynamic theming**: not enabled. only active to make dank set colors for gtk and qt apps.
-- **Plugins**: dankBatteryAlerts, dankKDEConnect, dankHyprlandWindows, dankDesktopWeather, displaySettings, developerUtilities, wallpaperCarousel, sessionPower, aiAssistant (Anthropic Claude)
+- **Plugins**: dankbarPinentry, dankBatteryAlerts, dankKDEConnect, dankHyprlandWindows, dankDesktopWeather, displaySettings, developerUtilities, wallpaperCarousel, sessionPower, aiAssistant (Anthropic Claude)
 - **AI assistant**: built-in, uses Anthropic Claude Opus 4
 
 #### DMS Nix structure
@@ -361,6 +361,7 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - Greeter (`dank-greeter` flake input, `nixosModules.default` → `programs.dms-greeter`): greetd-based greeter with Hyprland as compositor, cache dir `/var/lib/dms-greeter`. Lives in its own repo now, not the DMS flake.
 - Home Manager module (`homeModules.dank-material-shell`): 700+ lines of declarative config
 - Plugin registry: separate flake input (`dms-plugins`)
+- Pinentry (`dank-pinentry` flake input, `homeModules.default` → `programs.dank-pinentry`): the gpg-agent pinentry. Prompts in the terminal when one is usable, otherwise inside DankBar via the `dankbarPinentry` plugin (widget first in the right section, hidden when idle). The DMS aspect sets `services.gpg-agent.pinentry.package` to it; `security.nix` keeps pinentry-bemenu (Linux) / pinentry_mac as the `mkDefault`.
 - SOPS secrets injected via systemd environment file at `%t/dms-env`
 
 ## Herdr
