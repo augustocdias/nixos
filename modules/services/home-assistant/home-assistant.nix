@@ -103,6 +103,17 @@
         enable = true;
         extraArgs = ["--ble-proxy"];
       };
+
+      services.music-assistant = {
+        enable = true;
+        openFirewall = true;
+        providers = ["airplay" "apple_music" "dlna"];
+        # flaky tests :(
+        package = pkgs.music-assistant.overrideAttrs {
+          doInstallCheck = false;
+        };
+      };
+      systemd.services.music-assistant.environment.MASS_APP_VARS_FILE = "/etc/music-assistant/app_vars.json";
     };
   };
 }

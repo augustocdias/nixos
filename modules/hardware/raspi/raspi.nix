@@ -109,7 +109,7 @@
         useNetworkd = true;
         firewall = {
           enable = true;
-          allowedTCPPorts = [8123 21064];
+          allowedTCPPorts = [8123 8095 21064];
           allowedUDPPorts = [5353];
         };
       };
