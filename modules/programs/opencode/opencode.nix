@@ -3,6 +3,7 @@
     homeManager = {
       pkgs,
       lib,
+      config,
       ...
     }: let
       # The bwrap jail is Linux-only, so Darwin keeps the strict allowlist as
@@ -25,6 +26,12 @@
       '';
 
       xdg.configFile = {
+        # herdr's integration check reads tui.jsonc (hardcoded, no fallback
+        # to tui.json). Symlink the HM-generated file under both names so
+        # opencode reads it and herdr's `tui_plugin_is_configured` finds it.
+        "opencode/tui.jsonc".source =
+          config.xdg.configFile."opencode/tui.json".source;
+
         "opencode/agent/pair.md".source = ./agents/pair.md;
         "opencode/agent/reviewer.md".source = ./agents/reviewer.md;
         "opencode/agent/troubleshoot.md".source = ./agents/troubleshoot.md;
@@ -63,6 +70,7 @@
                 vim_system_clipboard_register = true;
               }
             ]
+            "./herdr-tui-session.js"
           ];
         };
 

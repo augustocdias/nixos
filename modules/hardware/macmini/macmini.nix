@@ -40,7 +40,6 @@
       ollamaPort = 11434;
 
       ollamaModels = [
-        "hermes3:8b"
         "gpt-oss:20b"
       ];
 

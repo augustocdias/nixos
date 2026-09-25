@@ -168,6 +168,12 @@
             fi
           '')
 
+          (add-runtime ''
+            if [ -S "''${HERDR_SOCKET_PATH:-}" ]; then
+              RUNTIME_ARGS+=(--bind "$HERDR_SOCKET_PATH" "$HERDR_SOCKET_PATH")
+            fi
+          '')
+
           (try-readonly (noescape "\"$HOME/.config/git\""))
           (try-readonly (noescape "\"$HOME/.config/gh\""))
 

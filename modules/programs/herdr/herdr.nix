@@ -80,6 +80,11 @@
           "opencode/plugins/herdr-agent-state.js".source = "${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js";
           "opencode/skills/herdr/SKILL.md".source = herdrSkill;
 
+          # TUI session plugin: reports agent session identity for resume.
+          # Installed at the config-dir root (not plugins/) because herdr's
+          # integration check reads it from there (registry.rs:420).
+          "opencode/herdr-tui-session.js".source = "${pkgs.herdr.src}/src/integration/assets/opencode/herdr-tui-session.js";
+
           # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
           "opencode/plugins/herdr-activity.js".source = ./opencode-activity.js;
         }

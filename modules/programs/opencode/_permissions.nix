@@ -23,6 +23,7 @@
       "*nixos-rebuild*" = "deny";
       "*darwin-rebuild*" = "deny";
       "herdr*" = "ask";
+      "*/herdr*" = "ask";
     }
     else {
       "*" = "ask";
@@ -349,42 +350,10 @@
       "gh status*" = "allow";
       "gh auth status*" = "allow";
 
-      # -- Herdr: inspection + topology
-      "herdr status*" = "allow";
-      "herdr --version*" = "allow";
-      "herdr session list*" = "allow";
-      "herdr workspace list*" = "allow";
-      "herdr workspace get*" = "allow";
-      "herdr workspace create*" = "allow";
-      "herdr workspace focus*" = "allow";
-      "herdr tab list*" = "allow";
-      "herdr tab create*" = "allow";
-      "herdr tab focus*" = "allow";
-      "herdr pane list*" = "allow";
-      "herdr pane get*" = "allow";
-      "herdr pane current*" = "allow";
-      "herdr pane layout*" = "allow";
-      "herdr pane process-info*" = "allow";
-      "herdr pane neighbor*" = "allow";
-      "herdr pane edges*" = "allow";
-      "herdr pane read*" = "allow";
-      "herdr pane wait-output*" = "allow";
-      "herdr pane split*" = "allow";
-      "herdr pane focus*" = "allow";
-      "herdr pane zoom*" = "allow";
-      "herdr pane rename*" = "allow";
-      "herdr pane resize*" = "allow";
-      "herdr agent list*" = "allow";
-      "herdr agent get*" = "allow";
-      "herdr agent read*" = "allow";
-      "herdr agent wait*" = "allow";
-      "herdr agent focus*" = "allow";
-      "herdr agent rename*" = "allow";
-      "herdr agent start*" = "ask";
-      "herdr agent prompt*" = "ask";
-      "herdr integration status*" = "allow";
-      "herdr plugin list*" = "allow";
-      "herdr notification show*" = "allow";
+      # -- Herdr: every command asks (falls through to the default
+      # "* = ask" on Darwin; explicit entries for self-documentation).
+      "herdr*" = "ask";
+      "*/herdr*" = "ask";
     };
 in rec {
   inherit baseBash;
