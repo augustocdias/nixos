@@ -76,6 +76,46 @@
           ollamaModels}
         exit "$status"
       '';
+
+      # Custom piper voices from OpenVoiceOS, deployed into --data-dir on
+      # activation so wyoming-piper auto-discovers them alongside the catalog.
+      # Each entry is { name, onnx, config } — name must match the .onnx stem
+      # that find_voice() looks up.
+      piperVoices = [
+        {
+          name = "miro_en-US";
+          onnx = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_en-US_miro/resolve/main/miro_en-US.onnx";
+            hash = "sha256-oWYKayisX6E84MVZF+ks/gdbaddDVbb/aTNEEivS6Hk=";
+          };
+          config = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_en-US_miro/resolve/main/miro_en-US.onnx.json";
+            hash = "sha256-y90mjrULSxMF1wE89kOHGs/bkMw8rirKTgUbbK0peBQ=";
+          };
+        }
+        {
+          name = "miro_pt-BR";
+          onnx = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_miro/resolve/main/miro_pt-BR.onnx";
+            hash = "sha256-k4VZOf7GbJE0L2Rhs5igl1lpgkze+yg3jfa/2SZSxaE=";
+          };
+          config = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_miro/resolve/main/miro_pt-BR.onnx.json";
+            hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
+          };
+        }
+        {
+          name = "dii_pt-BR";
+          onnx = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx";
+            hash = "sha256-+xWkR7p0grki4dL+/qccEDH3YOcr4kzOd5Tib+EdCGs=";
+          };
+          config = pkgs.fetchurl {
+            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx.json";
+            hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
+          };
+        }
+      ];
     in {
       imports = lib.optionals (inputs ? nix-homebrew) [
         inputs.nix-homebrew.darwinModules.nix-homebrew
@@ -231,6 +271,14 @@
         mkdir -p ${ollamaHome}/models
         mkdir -p /var/lib/wyoming/faster-whisper
         mkdir -p /var/lib/wyoming/piper
+
+        ${lib.concatMapStringsSep "\n" (voice: ''
+            cmp -s "${voice.onnx}" "/var/lib/wyoming/piper/${voice.name}.onnx" \
+              || cp --no-preserve=mode "${voice.onnx}" "/var/lib/wyoming/piper/${voice.name}.onnx"
+            cmp -s "${voice.config}" "/var/lib/wyoming/piper/${voice.name}.onnx.json" \
+              || cp --no-preserve=mode "${voice.config}" "/var/lib/wyoming/piper/${voice.name}.onnx.json"
+          '')
+          piperVoices}
       '';
 
       nix-homebrew = lib.mkIf (inputs ? nix-homebrew) {
