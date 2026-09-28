@@ -80,39 +80,35 @@
       # Custom piper voices from OpenVoiceOS, deployed into --data-dir on
       # activation so wyoming-piper auto-discovers them alongside the catalog.
       # Each entry is { name, onnx, config } — name must match the .onnx stem
-      # that find_voice() looks up.
-      piperVoices = [
-        {
-          name = "miro_en-US";
-          onnx = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_en-US_miro/resolve/main/miro_en-US.onnx";
-            hash = "sha256-oWYKayisX6E84MVZF+ks/gdbaddDVbb/aTNEEivS6Hk=";
-          };
-          config = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_en-US_miro/resolve/main/miro_en-US.onnx.json";
-            hash = "sha256-y90mjrULSxMF1wE89kOHGs/bkMw8rirKTgUbbK0peBQ=";
-          };
-        }
-        {
-          name = "miro_pt-BR";
-          onnx = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_miro/resolve/main/miro_pt-BR.onnx";
-            hash = "sha256-k4VZOf7GbJE0L2Rhs5igl1lpgkze+yg3jfa/2SZSxaE=";
-          };
-          config = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_miro/resolve/main/miro_pt-BR.onnx.json";
-            hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
-          };
-        }
+      # that find_voice() looks up.  The config is patched to set dataset and
+      # audio.quality so HA shows a readable name instead of "working (training)".
+      piperVoices = let
+        patchConfig = {
+          src,
+          dataset,
+          quality,
+        }:
+          pkgs.runCommand "piper-config-patched.json" {
+            nativeBuildInputs = [pkgs.jq];
+          } ''
+            jq '.dataset = $d | .audio.quality = $q' \
+              --arg d "${dataset}" --arg q "${quality}" \
+              < ${src} > $out
+          '';
+      in [
         {
           name = "dii_pt-BR";
           onnx = pkgs.fetchurl {
             url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx";
             hash = "sha256-+xWkR7p0grki4dL+/qccEDH3YOcr4kzOd5Tib+EdCGs=";
           };
-          config = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx.json";
-            hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
+          config = patchConfig {
+            src = pkgs.fetchurl {
+              url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx.json";
+              hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
+            };
+            dataset = "Dii pt-BR";
+            quality = "medium";
           };
         }
       ];
