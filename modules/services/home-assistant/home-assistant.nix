@@ -9,6 +9,7 @@
       ha-mcp-tools = pkgs.callPackage ./_ha-mcp.nix {
         python3Packages = pkgs.home-assistant.python3Packages;
       };
+      gruenbeck-softliq = pkgs.callPackage ./_gruenbeck-softliq.nix {};
     in {
       services.home-assistant = {
         enable = true;
@@ -19,6 +20,7 @@
 
         customComponents = [
           berlin-transport
+          gruenbeck-softliq
           ha-mcp-tools
         ];
 

@@ -15,10 +15,12 @@
         berlin-transport = pkgs.callPackage ./_berlin-transport.nix {
           inherit (hassPython) async-timeout;
         };
+
+        gruenbeck-softliq = pkgs.callPackage ./_gruenbeck-softliq.nix {};
       in
         lib.mapAttrs' (name: lib.nameValuePair "hass-${name}")
         (lib.filterAttrs (_: lib.isDerivation) (
-          {inherit berlin-transport ha-mcp-tools;}
+          {inherit berlin-transport gruenbeck-softliq ha-mcp-tools;}
           // (pkgs.callPackage ./_lovelace-modules.nix {})
           // (pkgs.callPackage ./_themes.nix {})
         ))
