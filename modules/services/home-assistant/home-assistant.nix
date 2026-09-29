@@ -106,6 +106,17 @@
         extraArgs = ["--ble-proxy"];
       };
 
+      services.openthread-border-router = {
+        enable = true;
+        radio.device = "/dev/serial/by-id/usb-SONOFF_SONOFF_Dongle_Plus_MG24_50ac8739e5a2ef11801e966661ce3355-if00-port0";
+        radio.baudRate = 460800; # per sonoff's firmware
+        radio.flowControl = false;
+        backboneInterfaces = ["end0"];
+        rest.listenAddress = "127.0.0.1";
+      };
+      services.dbus.packages = [pkgs.openthread-border-router];
+      networking.firewall.trustedInterfaces = ["wpan0"];
+
       services.music-assistant = {
         enable = true;
         openFirewall = true;

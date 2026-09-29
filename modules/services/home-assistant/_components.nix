@@ -24,6 +24,7 @@
   "mqtt"
   "music_assistant"
   "ollama"
+  "otbr"
   "playstation_network"
   "proximity"
   "recorder"

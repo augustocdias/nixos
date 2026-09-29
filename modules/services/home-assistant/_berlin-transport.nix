@@ -7,13 +7,13 @@
 buildHomeAssistantComponent (finalAttrs: {
   owner = "vas3k";
   domain = "berlin_transport";
-  version = "0.3.0";
+  version = "0.4.0";
 
   src = fetchFromGitHub {
     owner = "vas3k";
     repo = "home-assistant-berlin-transport";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-ygXz5BjKe45KAdeemwepBgWgLPL07iWZxH/ZObiQc+o=";
+    hash = "sha256-JzlQnirO9IYN6REwUYAvDQ0LTRHDAOWVDqI1ip7PZAs=";
   };
 
   dependencies = [async-timeout];
