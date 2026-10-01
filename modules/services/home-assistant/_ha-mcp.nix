@@ -11,13 +11,13 @@
 buildHomeAssistantComponent (finalAttrs: {
   owner = "homeassistant-ai";
   domain = "ha_mcp_tools";
-  version = "2.2.0";
+  version = "2.2.1";
 
   src = fetchFromGitHub {
     owner = "homeassistant-ai";
     repo = "ha-mcp-integration";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-U8rW/743M//IO4lR+pH2GV5iLkrocsovoUb/uVTYPbE=";
+    hash = "sha256-xn7olKzwv+Zj+q5fVYXnkLfm15GorcHm60tM/e5WZLc=";
   };
 
   # Every name here is a manifest.json requirement, enforced at build time by

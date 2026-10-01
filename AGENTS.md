@@ -585,10 +585,11 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 ### Configuration
 
-- **Model**: `anthropic/claude-opus-5` (Opus everywhere, including subagents)
+- **Model**: `anthropic/claude-opus-5.5` (Opus everywhere, including subagents)
 - **Default agent**: `plan`
 - **TUI theme**: `catppuccin-macchiato`
 - **Other settings**: `autoupdate = false`, `lsp = false`; anthropic + openai providers keyed from env (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+- **Plugins**: `@mohak34/opencode-notifier` (desktop notifications), `@dietrichgebert/ponytail` (YAGNI code-minimization ladder, injected every turn), `./plugins/caveman/plugin.js` (terse-prose communication mode from `JuliusBrussee/caveman`; native plugin deployed at activation time from the `caveman` flake input). Caveman complements ponytail — ponytail shrinks what the agent *builds*, caveman shrinks what it *says*. The plugin injects the ruleset every turn, persists `/caveman` mode switches, and registers slash commands. Levels: `lite`/`full`/`ultra`/`wenyan-*`. The upstream `bin/install.js` is reimplemented in Nix: plugin files are copied (`.js` → `.cjs` rename for ESM compat), agents get their frontmatter transformed at build time (`tools:` arrays and provider-less `model:` stripped), commands and skills are symlinked. A build-time hash check on the installer's opencode section (`cavemanInstallerHash` in `opencode.nix`) fails the build when upstream changes the deployment structure, so the Nix reimplementation stays in sync.
 - **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. The option is declared `nullable`, `home.packages` is guarded on it, and everything else it generates still applies. Darwin keeps the default package.
 
 ### Sandbox (Linux only)

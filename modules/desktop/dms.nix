@@ -517,7 +517,7 @@
                   showPrinterIcon = true;
                 }
                 {
-                  id = "sessionPower";
+                  id = "powerMenuButton";
                   enabled = true;
                 }
               ];
@@ -733,8 +733,6 @@
             enable = true;
             settings.defaultEngine = "duckduckgo";
           };
-
-          sessionPower.enable = true;
 
           emojiLauncher = {
             enable = true;

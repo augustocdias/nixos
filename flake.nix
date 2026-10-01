@@ -6,6 +6,10 @@
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
+    caveman = {
+      url = "github:JuliusBrussee/caveman";
+      flake = false;
+    };
     dank-greeter = {
       url = "github:AvengeMedia/dank-greeter";
       inputs.nixpkgs.follows = "nixpkgs";
