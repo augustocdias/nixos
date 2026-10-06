@@ -59,7 +59,7 @@ in {
 
   frosted-glass-themes = mkTheme {
     pname = "frosted-glass-themes";
-    version = "1.3";
+    version = "1.4";
     src = fetchFromGitHub {
       owner = "wessamlauf";
       repo = "homeassistant-frosted-glass-themes";

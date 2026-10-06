@@ -174,6 +174,8 @@
       "find*-ok*" = "ask";
       "find*-delete*" = "ask";
       "find*-fprintf*" = "ask";
+      "jgrep" = "allow";
+      "jgrep *" = "allow";
       "grep" = "allow";
       "grep *" = "allow";
       "which" = "allow";

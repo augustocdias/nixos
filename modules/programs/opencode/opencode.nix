@@ -40,7 +40,7 @@
       # `nix flake update caveman`, the build fails with an explicit message.
 
       caveman = inputs.caveman;
-      cavemanInstallerHash = "4e44d73eb6843f852bb3b982407f293b2b4fa71186b5ac3c6070c3cc4e4806c4";
+      cavemanInstallerHash = "ced67338dad484e1c08ab7ccef7e90786ab09ac470efb1959cac12f89bf6715e";
 
       cavemanInstallerCheck = pkgs.runCommand "caveman-installer-check" {} ''
         {
@@ -65,33 +65,41 @@
       '';
 
       # Transform agent frontmatter: strip tools: arrays and provider-less
-      # model: values (e.g. "model: haiku" → dropped). Mirrors
-      # bin/lib/opencode-agent.js transformOpencodeAgentFrontmatter().
-      cavemanAgents = pkgs.runCommand "caveman-agents" {
-        # Force a build-time dependency on the installer check.
-        inherit cavemanInstallerCheck;
-      } ''
-        mkdir -p $out
-        for f in cavecrew-investigator.md cavecrew-builder.md cavecrew-reviewer.md; do
-          ${pkgs.gawk}/bin/awk '
-            BEGIN { in_fm = 0; dropping = 0 }
-            /^---$/ && !in_fm { in_fm = 1; print; next }
-            /^---$/ && in_fm  { in_fm = 0; print; next }
-            in_fm && dropping && /^[^ \t]/ { dropping = 0 }
-            in_fm && dropping { next }
-            in_fm && /^tools[ \t]*:/ { dropping = 1; next }
-            in_fm && /^model[ \t]*:[ \t]*(.*)$/ {
-              # Drop if value has no slash (provider-less)
-              split($0, parts, /[ \t]*:[ \t]*/);
-              val = parts[2];
-              gsub(/[ \t]*#.*$/, "", val);  # strip YAML comment
-              gsub(/^["'"'"']|["'"'"']$/, "", val);  # strip quotes
-              if (val != "" && index(val, "/") == 0) next;
-            }
-            { print }
-          ' ${caveman}/agents/"$f" > $out/"$f"
-        done
-      '';
+      # model: values (e.g. "model: haiku" → dropped), and force
+      # mode: subagent so cavecrew agents are invoked via Task rather
+      # than showing in the agent picker alongside plan/build/pair.
+      # Mirrors bin/lib/opencode-agent.js transformOpencodeAgentFrontmatter().
+      cavemanAgents =
+        pkgs.runCommand "caveman-agents" {
+          # Force a build-time dependency on the installer check.
+          inherit cavemanInstallerCheck;
+        } ''
+          mkdir -p $out
+          for f in cavecrew-investigator.md cavecrew-builder.md cavecrew-reviewer.md; do
+            ${pkgs.gawk}/bin/awk '
+              BEGIN { in_fm = 0; dropping = 0 }
+              /^---$/ && !in_fm { in_fm = 1; print; next }
+              /^---$/ && in_fm  {
+                # Inject mode: subagent before closing the frontmatter
+                print "mode: subagent"
+                in_fm = 0; print; next
+              }
+              in_fm && dropping && /^[^ \t]/ { dropping = 0 }
+              in_fm && dropping { next }
+              in_fm && /^tools[ \t]*:/ { dropping = 1; next }
+              in_fm && /^mode[ \t]*:/ { next }
+              in_fm && /^model[ \t]*:[ \t]*(.*)$/ {
+                # Drop if value has no slash (provider-less)
+                split($0, parts, /[ \t]*:[ \t]*/);
+                val = parts[2];
+                gsub(/[ \t]*#.*$/, "", val);  # strip YAML comment
+                gsub(/^["'"'"']|["'"'"']$/, "", val);  # strip quotes
+                if (val != "" && index(val, "/") == 0) next;
+              }
+              { print }
+            ' ${caveman}/agents/"$f" > $out/"$f"
+          done
+        '';
 
       cavemanSkillDirs = [
         "caveman"
@@ -146,40 +154,41 @@
           $HOME/.config/opencode/agent/cavecrew-reviewer.md
       '';
 
-      xdg.configFile = {
-        # herdr's integration check reads tui.jsonc (hardcoded, no fallback
-        # to tui.json). Symlink the HM-generated file under both names so
-        # opencode reads it and herdr's `tui_plugin_is_configured` finds it.
-        "opencode/tui.jsonc".source =
-          config.xdg.configFile."opencode/tui.json".source;
+      xdg.configFile =
+        {
+          # herdr's integration check reads tui.jsonc (hardcoded, no fallback
+          # to tui.json). Symlink the HM-generated file under both names so
+          # opencode reads it and herdr's `tui_plugin_is_configured` finds it.
+          "opencode/tui.jsonc".source =
+            config.xdg.configFile."opencode/tui.json".source;
 
-        "opencode/agent/pair.md".source = ./agents/pair.md;
-        "opencode/agent/reviewer.md".source = ./agents/reviewer.md;
-        "opencode/agent/troubleshoot.md".source = ./agents/troubleshoot.md;
-        "opencode/agent/tickets.md".source = ./agents/tickets.md;
-        "opencode/agent/test-writer.md".source = ./agents/test-writer.md;
-        "opencode/command/commit.md".source = ./commands/commit.md;
-        "opencode/command/pr.md".source = ./commands/pr.md;
-        "opencode/command/review.md".source = ./commands/review.md;
-        "opencode/skills/git-conventions/SKILL.md".source = ./skills/git-conventions/SKILL.md;
-        "opencode/skills/datadog-queries/SKILL.md".source = ./skills/datadog-queries/SKILL.md;
-        "opencode/opencode-notifier.json".source = ./opencode-notifier.json;
-      }
-      # Caveman commands
-      // lib.listToAttrs (map (f: {
-        name = "opencode/command/${f}";
-        value.source = "${caveman}/src/plugins/opencode/commands/${f}";
-      })
-      cavemanCommandFiles)
-      # Caveman skills (recursive deploys the whole directory tree)
-      // lib.listToAttrs (map (d: {
-        name = "opencode/skills/${d}";
-        value = {
-          source = "${caveman}/skills/${d}";
-          recursive = true;
-        };
-      })
-      cavemanSkillDirs);
+          "opencode/agent/pair.md".source = ./agents/pair.md;
+          "opencode/agent/reviewer.md".source = ./agents/reviewer.md;
+          "opencode/agent/troubleshoot.md".source = ./agents/troubleshoot.md;
+          "opencode/agent/tickets.md".source = ./agents/tickets.md;
+          "opencode/agent/test-writer.md".source = ./agents/test-writer.md;
+          "opencode/command/commit.md".source = ./commands/commit.md;
+          "opencode/command/pr.md".source = ./commands/pr.md;
+          "opencode/command/review.md".source = ./commands/review.md;
+          "opencode/skills/git-conventions/SKILL.md".source = ./skills/git-conventions/SKILL.md;
+          "opencode/skills/datadog-queries/SKILL.md".source = ./skills/datadog-queries/SKILL.md;
+          "opencode/opencode-notifier.json".source = ./opencode-notifier.json;
+        }
+        # Caveman commands
+        // lib.listToAttrs (map (f: {
+            name = "opencode/command/${f}";
+            value.source = "${caveman}/src/plugins/opencode/commands/${f}";
+          })
+          cavemanCommandFiles)
+        # Caveman skills (recursive deploys the whole directory tree)
+        // lib.listToAttrs (map (d: {
+            name = "opencode/skills/${d}";
+            value = {
+              source = "${caveman}/skills/${d}";
+              recursive = true;
+            };
+          })
+          cavemanSkillDirs);
 
       programs.opencode = {
         enable = true;
@@ -213,7 +222,7 @@
         context = builtins.readFile ./context.md;
 
         settings = {
-          model = "anthropic/claude-opus-5.5";
+          model = "anthropic/claude-opus-5-5";
           autoupdate = false;
           default_agent = "plan";
           lsp = false;
@@ -222,7 +231,6 @@
 
           provider = {
             anthropic.options.apiKey = "{env:ANTHROPIC_API_KEY}";
-            openai.options.apiKey = "{env:OPENAI_API_KEY}";
           };
 
           mcp = import ./_mcp.nix {inherit pkgs lib;};

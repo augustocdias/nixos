@@ -17,6 +17,7 @@
       skim
       neovide
       opencode
+      jgrep
       cli-tools
       fonts
       development

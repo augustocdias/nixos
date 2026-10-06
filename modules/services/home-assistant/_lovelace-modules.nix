@@ -79,12 +79,12 @@ in {
 
   berlin-transport-card = mkCard {
     pname = "berlin-transport-card";
-    version = "0-unstable-2026-08-28";
+    version = "0.1.1-unstable-2026-10-05";
     src = fetchFromGitHub {
       owner = "vas3k";
       repo = "lovelace-berlin-transport-card";
-      rev = "78379a612f71d432a5a3bf2107c09d5cd961fea9";
-      hash = "sha256-+Al2Pzw0uo+he8acGjf9Ux1p4NnRnlVDdLhsSbq3GXc=";
+      rev = "bdf5381697f718b614f15dce07eef013dc10c89e";
+      hash = "sha256-ikPDsTX3UpCuDLz4MAzSPNXeZgcIKMClGhclgHVP0g0=";
     };
     file = "dist/berlin-transport-card.js";
     description = "Timetable card for the berlin_transport integration";

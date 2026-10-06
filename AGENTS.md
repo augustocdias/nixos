@@ -107,6 +107,7 @@ modules/
     thunderbird/            # Thunderbird with extensions
     udiskie.nix             # USB automount
     xdg.nix                 # XDG dirs and MIME associations
+    jgrep.nix               # jgrep semantic code search (TypeSafe Jev)
     yamllint/               # Yamllint config
     yazi/                   # Yazi file manager with plugins
 
@@ -585,10 +586,10 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 ### Configuration
 
-- **Model**: `anthropic/claude-opus-5.5` (Opus everywhere, including subagents)
+- **Model**: `anthropic/claude-opus-5-5` (Opus everywhere, including subagents)
 - **Default agent**: `plan`
 - **TUI theme**: `catppuccin-macchiato`
-- **Other settings**: `autoupdate = false`, `lsp = false`; anthropic + openai providers keyed from env (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+- **Other settings**: `autoupdate = false`, `lsp = false`; anthropic provider keyed from env (`ANTHROPIC_API_KEY`).
 - **Plugins**: `@mohak34/opencode-notifier` (desktop notifications), `@dietrichgebert/ponytail` (YAGNI code-minimization ladder, injected every turn), `./plugins/caveman/plugin.js` (terse-prose communication mode from `JuliusBrussee/caveman`; native plugin deployed at activation time from the `caveman` flake input). Caveman complements ponytail — ponytail shrinks what the agent *builds*, caveman shrinks what it *says*. The plugin injects the ruleset every turn, persists `/caveman` mode switches, and registers slash commands. Levels: `lite`/`full`/`ultra`/`wenyan-*`. The upstream `bin/install.js` is reimplemented in Nix: plugin files are copied (`.js` → `.cjs` rename for ESM compat), agents get their frontmatter transformed at build time (`tools:` arrays and provider-less `model:` stripped), commands and skills are symlinked. A build-time hash check on the installer's opencode section (`cavemanInstallerHash` in `opencode.nix`) fails the build when upstream changes the deployment structure, so the Nix reimplementation stays in sync.
 - **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. The option is declared `nullable`, `home.packages` is guarded on it, and everything else it generates still applies. Darwin keeps the default package.
 
@@ -596,7 +597,7 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 
 On Linux `opencode` **is** the jail: `jail/jail.nix` wraps `pkgs.opencode` with bubblewrap via the `jail-nix` combinator library and installs it as `bin/opencode`. Darwin has no sandbox and relies on the allowlist alone.
 
-Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, and the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, opencode's own state). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing.
+Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, and the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, `~/.cache/jgrep`, opencode's own state). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing.
 
 Things that cost real time to discover:
 
@@ -661,11 +662,11 @@ Linux-only (gated via `lib.optionalAttrs (!isDarwin)` — not present on the Mac
 
 Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell commands via `Bun.$`. Deployed via `home.activation` (cp, not symlink) due to Bun module resolution issue with Nix store symlinks (tracked: <https://github.com/anomalyco/opencode/issues/5914>).
 
-| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                                   |
-| -------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                                   |
-| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                                   |
-| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                                   |
+| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                               |
+| -------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                               |
+| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                               |
+| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                               |
 | `host.ts`            | `host_exec`, `host_mount`, `host_journal` | The jail's only route to the host, over loopback to `jail/_host-query`. All three are `ask` on every agent. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host dir at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv |
 
 `host_journal` exists because it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Its fixed argv also makes it the one host tool that is safe to approve with "always". Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.

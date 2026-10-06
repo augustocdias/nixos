@@ -10,8 +10,8 @@ inside it; it exists so you do not have to ask permission for ordinary work.
   main checkout's `.git` is bound too, so git works normally.
 - `~/granted/<name>` for any directory the user has granted (see `host_mount`).
 - Tool caches that persist across sessions: `~/.cache/nix`, `~/.npm`, `~/.bun`,
-  `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and opencode's
-  own state.
+  `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`,
+  `~/.cache/jgrep`, and opencode's own state.
 
 ## What looks writable but is not
 
