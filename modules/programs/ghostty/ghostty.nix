@@ -16,7 +16,7 @@
         cursor-style-blink = false;
 
         # Window appearance
-        background-opacity = 0.8;
+        # background-opacity = 0.8;
         window-padding-x = 0;
         window-padding-y = 0;
         window-padding-balance = true;

@@ -9,6 +9,9 @@
       slack
       wireguard
       sqlit
+      jgrep
+      claude-code
+      claude-code-jail
     ];
 
     homeManager = {pkgs, ...}: {

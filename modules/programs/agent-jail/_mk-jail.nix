@@ -1,0 +1,184 @@
+# Bubblewrap jail shared by every coding agent (opencode, claude).
+#
+# Usage: import ./_mk-jail.nix {inherit inputs lib pkgs config;} {
+#   name    = "claude";        # installed binary name, and the state dir prefix
+#   package = pkgs.claude-code;
+#   pre     = c: [ ... ];      # combinators that run before host-query starts
+#   extra   = c: [ ... ];      # agent-specific binds and env
+# `c` is jail-nix's combinator set, already extended with pkgs.
+# }
+{
+  inputs,
+  lib,
+  pkgs,
+  config,
+}: {
+  name,
+  package,
+  pre ? (_: []),
+  extra ? (_: []),
+}: let
+  jail = inputs.jail-nix.lib.extend {
+    inherit pkgs;
+    suppressExperimentalWarnings = true;
+  };
+
+  inherit (config.home) username;
+
+  git = lib.getExe pkgs.git;
+  curl = lib.getExe pkgs.curl;
+
+  hostQuery = pkgs.callPackage ./_host-query {};
+
+  rmSafe = pkgs.symlinkJoin {
+    name = "agent-jail-rm-safe";
+    paths = [
+      (pkgs.writeShellScriptBin "rm" ''exec ${lib.getExe' pkgs.rmtrash "rmtrash"} "$@"'')
+      (pkgs.writeShellScriptBin "rmdir" ''exec ${lib.getExe' pkgs.rmtrash "rmdirtrash"} "$@"'')
+    ];
+  };
+in
+  jail name package (
+    with jail.combinators;
+      [
+        reset
+        (unsafe-add-raw-args "--proc /proc")
+        (unsafe-add-raw-args "--dev /dev")
+        (unsafe-add-raw-args "--tmpfs /tmp")
+        (unsafe-add-raw-args "--tmpfs ~")
+        (ro-bind "${pkgs.bash}/bin/sh" "/bin/sh")
+        fake-passwd
+
+        network
+        no-new-session
+
+        (ro-bind "/nix/store" "/nix/store")
+        (set-env "NIX_REMOTE" "daemon")
+        (try-rw-bind "/nix/var/nix/daemon-socket" "/nix/var/nix/daemon-socket")
+        (try-readonly "/nix/var/nix/db")
+        (try-readonly "/nix/var/nix/profiles")
+        (try-readonly "/etc/nix")
+        (try-readonly "/etc/static")
+
+        (try-readonly "/run/current-system/sw")
+        (try-readonly "/etc/profiles/per-user/${username}")
+
+        (ro-bind "${pkgs.coreutils}/bin/env" "/usr/bin/env")
+
+        mount-cwd
+
+        (add-runtime ''
+          if git_common=$(${git} rev-parse --git-common-dir 2>/dev/null) \
+            && git_dir=$(${git} rev-parse --git-dir 2>/dev/null) \
+            && [ "$git_common" != "$git_dir" ]; then
+            git_common=$(realpath "$git_common")
+            RUNTIME_ARGS+=(--bind "$git_common" "$git_common")
+          fi
+        '')
+      ]
+      ++ pre jail.combinators
+      ++ [
+        (add-runtime ''
+          jail_state="$HOME/.local/share/${name}-jail"
+          grant_root="$jail_state/grants/$$"
+          mkdir -p "$grant_root" "$jail_state/log"
+
+          # Sweep grants left by sessions that died without running cleanup.
+          for stale in "$jail_state"/grants/*; do
+            [ -d "$stale" ] || continue
+            kill -0 "''${stale##*/}" 2>/dev/null && continue
+            for mnt in "$stale"/*; do
+              [ -d "$mnt" ] || continue
+              /run/wrappers/bin/fusermount3 -u "$mnt" 2>/dev/null || true
+              rmdir "$mnt" 2>/dev/null || true
+            done
+            rmdir "$stale" 2>/dev/null || true
+          done
+
+          host_query_port=19600
+          while [ "$host_query_port" -lt 19800 ]; do
+            (exec 3<>/dev/tcp/127.0.0.1/"$host_query_port") 2>/dev/null || break
+            host_query_port=$((host_query_port + 1))
+          done
+
+          ${lib.getExe hostQuery} "$host_query_port" "$grant_root" \
+            > "$jail_state/log/host-query.log" 2>&1 &
+          HOST_QUERY_PID=$!
+
+          host_query_up=
+          for _ in $(seq 1 20); do
+            if ${curl} -sf "http://127.0.0.1:$host_query_port/health" >/dev/null 2>&1; then
+              host_query_up=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [ -z "$host_query_up" ]; then
+            echo "${name}-jail: warning: host-query did not start on port $host_query_port" >&2
+            echo "  host_exec / host_mount / host_journal will be unavailable;" >&2
+            echo "  see $jail_state/log/host-query.log" >&2
+          fi
+
+          RUNTIME_ARGS+=(
+            --bind "$grant_root" "$HOME/granted"
+            # Read-only: the log is the first thing to check when a host_*
+            # tool misbehaves, and it is unreachable if only grants/ is bound.
+            --ro-bind "$jail_state/log" "$jail_state/log"
+            --setenv HOST_QUERY_PORT "$host_query_port"
+          )
+        '')
+        (add-cleanup ''
+          kill "''${HOST_QUERY_PID:-}" 2>/dev/null || true
+          if [ -n "''${grant_root:-}" ]; then
+            for mnt in "$grant_root"/*; do
+              [ -d "$mnt" ] || continue
+              /run/wrappers/bin/fusermount3 -u "$mnt" 2>/dev/null || true
+              rmdir "$mnt" 2>/dev/null || true
+            done
+            rmdir "$grant_root" 2>/dev/null || true
+          fi
+        '')
+
+        (add-runtime ''
+          nvim_sock="$HOME/.cache/nvim/server-''${HERDR_WORKSPACE_ID:-dettached}.pipe"
+          if [ -S "$nvim_sock" ]; then
+            RUNTIME_ARGS+=(--bind "$nvim_sock" "$nvim_sock")
+          fi
+        '')
+
+        (add-runtime ''
+          if [ -S "''${HERDR_SOCKET_PATH:-}" ]; then
+            RUNTIME_ARGS+=(--bind "$HERDR_SOCKET_PATH" "$HERDR_SOCKET_PATH")
+          fi
+        '')
+
+        (try-readonly (noescape "\"$HOME/.config/git\""))
+        (try-readonly (noescape "\"$HOME/.config/gh\""))
+
+        (add-runtime ''
+          gpg_ssh_sock="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/gnupg/S.gpg-agent.ssh"
+          if [ -S "$gpg_ssh_sock" ]; then
+            RUNTIME_ARGS+=(
+              --bind "$gpg_ssh_sock" "$gpg_ssh_sock"
+              --setenv SSH_AUTH_SOCK "$gpg_ssh_sock"
+            )
+          else
+            echo "${name}-jail: warning: no gpg-agent ssh socket at $gpg_ssh_sock" >&2
+            echo "  ssh will have no identity; is gpg-agent running with enableSshSupport?" >&2
+          fi
+        '')
+        (try-ro-bind (noescape "\"$HOME/.ssh/known_hosts\"") (noescape "~/.ssh/known_hosts"))
+
+        (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:$PATH\"")))
+
+        (try-readonly (noescape "\"$HOME/.config/direnv\""))
+
+        (try-rw-bind (noescape "\"$HOME/.cache/nix\"") (noescape "~/.cache/nix"))
+        (try-rw-bind (noescape "\"$HOME/.npm\"") (noescape "~/.npm"))
+        (try-rw-bind (noescape "\"$HOME/.bun\"") (noescape "~/.bun"))
+        (try-rw-bind (noescape "\"$HOME/.cargo/registry\"") (noescape "~/.cargo/registry"))
+        (try-rw-bind (noescape "\"$HOME/.cargo/git\"") (noescape "~/.cargo/git"))
+        (try-rw-bind (noescape "\"$HOME/.local/share/direnv\"") (noescape "~/.local/share/direnv"))
+      ]
+      ++ extra jail.combinators
+  )

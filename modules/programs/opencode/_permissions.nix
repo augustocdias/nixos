@@ -174,8 +174,6 @@
       "find*-ok*" = "ask";
       "find*-delete*" = "ask";
       "find*-fprintf*" = "ask";
-      "jgrep" = "allow";
-      "jgrep *" = "allow";
       "grep" = "allow";
       "grep *" = "allow";
       "which" = "allow";
@@ -386,19 +384,6 @@ in rec {
       gh_repo_write = "deny";
     };
 
-  denyDatadog = {"datadog_*" = "deny";};
-
-  denyTicketWrites = {
-    "linear_save_*" = "deny";
-    "linear_create_*" = "deny";
-    "linear_delete_*" = "deny";
-    "linear_prepare_attachment_upload" = "deny";
-    "Notion_notion-create-*" = "deny";
-    "Notion_notion-update-*" = "deny";
-    "Notion_notion-move-pages" = "deny";
-    "Notion_notion-duplicate-page" = "deny";
-  };
-
   sharedBase = {
     external_directory = {
       "/nix/store/**" = "allow";
@@ -417,7 +402,5 @@ in rec {
       bash = baseBash;
     }
     // sharedBase
-    // ghCustomTools
-    // denyDatadog
-    // denyTicketWrites;
+    // ghCustomTools;
 }

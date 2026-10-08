@@ -1,6 +1,6 @@
 # Identifier tying the two halves of the jailed setup together.
 #
-# The sandbox ships as a package (jail/jail.nix) while the config it describes
+# The sandbox ships as a package (jail/jail.nix + ../agent-jail) while the config it describes
 # ships through home.activation and xdg.configFile. Build one without the other
 # and the sandbox keeps working while jail-context.md, the bash allowlist and
 # the host_* tools silently disagree with it — an agent then reads a document
@@ -15,8 +15,9 @@ let
     ./_permissions.nix
     ./_agents.nix
     ./tools/host.ts
-    ./jail/jail-context.md
     ./jail/jail.nix
+    ../agent-jail/jail-context.md
+    ../agent-jail/_mk-jail.nix
   ];
 in
   builtins.hashString "sha256" (

@@ -43,11 +43,10 @@ in {
     in {
       home.packages = [jgrep];
 
-      # Skill for OpenCode agents.
-      xdg.configFile."opencode/skills/jgrep/SKILL.md".source =
-        "${jgrep}/share/jgrep/SKILL.md";
+      # Work-only, so the skill goes to Claude Code (the work harness) only.
+      programs.claude-code.skills.jgrep = "${jgrep}/share/jgrep/SKILL.md";
 
-      # Ensure the cache dir exists so the jail's try-rw-bind picks it up.
+      # Ensure the cache dir exists so the claude jail's try-rw-bind picks it up.
       home.activation.jgrep-cache = lib.hm.dag.entryAfter ["writeBoundary"] ''
         mkdir -p "$HOME/.cache/jgrep"
       '';

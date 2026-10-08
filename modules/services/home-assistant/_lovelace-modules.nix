@@ -79,12 +79,12 @@ in {
 
   berlin-transport-card = mkCard {
     pname = "berlin-transport-card";
-    version = "0.1.1-unstable-2026-10-05";
+    version = "0.1.2-unstable-2026-10-07";
     src = fetchFromGitHub {
       owner = "vas3k";
       repo = "lovelace-berlin-transport-card";
-      rev = "bdf5381697f718b614f15dce07eef013dc10c89e";
-      hash = "sha256-ikPDsTX3UpCuDLz4MAzSPNXeZgcIKMClGhclgHVP0g0=";
+      rev = "be73af705bc8ef11b978f6e37043b271d409dce5";
+      hash = "sha256-6kHdS8zB9BuzYcoT3G1CRJjvMPJ7vO5HmQ+pF1ltyAA=";
     };
     file = "dist/berlin-transport-card.js";
     description = "Timetable card for the berlin_transport integration";
@@ -110,11 +110,11 @@ in {
 
   status-card = stdenvNoCC.mkDerivation rec {
     pname = "status-card";
-    version = "3.3.2";
+    version = "3.3.3";
 
     src = fetchurl {
       url = "https://github.com/xBourner/status-card/releases/download/v${version}/status-card.js";
-      hash = "sha256-djkwzLoSDO+UYSSK6goaehCGMc/65ouSBeDQsQlAaeA=";
+      hash = "sha256-BMuCdElfMJqGpGvM8E9G2jroRed2e2BliUCWil9d7aA=";
     };
 
     dontUnpack = true;

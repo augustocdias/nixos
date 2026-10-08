@@ -100,14 +100,16 @@ modules/
     mpv.nix                 # MPV with hardware decoding
     neovide.nix             # Neovide (Neovim GUI) via home-manager's programs.neovide
     neovim/                 # Neovim — extensive config (see Neovim section)
-    opencode/               # OpenCode AI assistant (see OpenCode section)
+    agent-jail/             # shared bubblewrap jail (mkJail), host-query, host_* MCP shim
+    agent-shared/           # prompts/context/skills shared by opencode + claude-code
+    claude-code/            # Claude Code — work harness (see Claude Code section)
+    opencode/               # OpenCode — personal harness (see OpenCode section)
     skim.nix                # Skim fuzzy finder with rg/fd/bat
     starship.nix            # Starship prompt with Catppuccin powerline segments
     stylua.nix              # StyLua config
     thunderbird/            # Thunderbird with extensions
     udiskie.nix             # USB automount
     xdg.nix                 # XDG dirs and MIME associations
-    jgrep.nix               # jgrep semantic code search (TypeSafe Jev)
     yamllint/               # Yamllint config
     yazi/                   # Yazi file manager with plugins
 
@@ -125,7 +127,8 @@ modules/
     open-webui/
       open-webui.nix        # `open-webui` aspect (macmini only): launchd daemon, local-only
     work/
-      work.nix              # `work` aspect: aggregates the below + just, awscli2
+      work.nix              # `work` aspect: aggregates the below + claude-code(+jail), just, awscli2
+      jgrep.nix             # jgrep semantic code search (TypeSafe Jev); skill → Claude only
       datagrip.nix          # JetBrains DataGrip with plugins
       virtualization.nix    # libvirtd/QEMU
       wireguard.nix         # WireGuard tools
@@ -553,12 +556,7 @@ Dockerfile: hadolint | JS/TS: eslint | Lua: selene | Markdown: markdownlint + wr
 
 ### AI integration
 
-OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp:
-
-- **Vim mode**: Full modal editing in the TUI prompt input (hjkl, w/b/e, dd, cw, yy, p, u, visual mode)
-- **nvim-mcp**: MCP server connecting OpenCode to the running neovim instance via msgpack-RPC socket. Gives OpenCode access to open buffers, cursor position, diagnostics, selections, and in-buffer editing with full undo support.
-- **Socket discovery**: Neovim creates a socket at `~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`, falling back to `dettached` outside herdr. The nvim-mcp wrapper resolves the same value at runtime, so an OpenCode pane reaches the Neovim instance of its own herdr workspace.
-- **Global instructions**: Personal coding style preferences in `~/.config/opencode/AGENTS.md` (managed via `programs.opencode.context`), applied to all projects alongside project-level AGENTS.md files.
+The agent harness (OpenCode for personal work, Claude Code for work) runs in its own herdr pane next to Neovim. There is no editor MCP any more (the nvim-mcp server was removed); Neovim still creates its socket at `~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe` (`dettached` outside herdr), and the agent jail binds it when present.
 
 ### Notable custom features
 
@@ -567,37 +565,57 @@ OpenCode TUI (vim fork) runs standalone alongside neovim, connected via nvim-mcp
 - **Treesitter-aware fold text**: custom fold rendering preserving syntax highlighting
 - **Dual theme support**: Catppuccin (default) and Tokyo Night, switchable via one line in `init.lua`
 
+## Coding agents: OpenCode (personal) and Claude Code (work)
+
+The company blocks API keys and mandates Claude Code, so the two harnesses split by purpose:
+
+- **OpenCode** — personal harness, both hosts (`user-base`). No work integrations.
+- **Claude Code** — work harness, laptop only (pulled in by the `work` aspect).
+
+### Shared pieces (`modules/programs/agent-shared/`, `modules/programs/agent-jail/`)
+
+| Path                                  | Contents                                                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `agent-shared/_lib.nix`               | descriptions + `withFrontmatter`: prompt bodies are frontmatter-free, each harness renders its own frontmatter keys  |
+| `agent-shared/context.md`             | global instructions (both harnesses' `context`)                                                                      |
+| `agent-shared/agents/`                | `reviewer`, `test-writer` bodies                                                                                     |
+| `agent-shared/commands/`              | `/commit`, `/pr`, `/review` bodies                                                                                   |
+| `agent-shared/skills/git-conventions` | shared skill                                                                                                         |
+| `agent-jail/_mk-jail.nix`             | `mkJail {name, package, pre, extra}` — the bubblewrap jail; `pre`/`extra` are functions of jail-nix's combinator set |
+| `agent-jail/jail-context.md`          | instructions loaded **only** inside the sandbox (both harnesses)                                                     |
+| `agent-jail/_host-query/`             | host-side service backing the `host_*` tools (`agent-host-query`)                                                    |
+| `agent-jail/host-mcp.py`              | stdio MCP shim exposing `host_*` to Claude Code (dependency-free JSON-RPC → host-query over loopback)                |
+
+`_`-prefixed files are skipped by import-tree and imported by hand.
+
 ## OpenCode
 
 ### Module layout (`modules/programs/opencode/`)
 
-| File                   | Contents                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------ |
-| `opencode.nix`         | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation` |
-| `_permissions.nix`     | defines the permissioning for both jailed and non jailed agents                |
-| `_agents.nix`          | per-agent permission sets                                                      |
-| `_mcp.nix`             | the MCP server set + the `nvim-mcp` wrapper                                    |
-| `_sync.nix`            | hash coupling the jail package to its deployed config (see Sandbox)            |
-| `jail/jail.nix`        | the `opencode-jail` aspect — the bubblewrap sandbox                            |
-| `jail/jail-context.md` | instructions loaded **only** inside the sandbox                                |
-| `jail/_host-query/`    | host-side service backing the `host_*` tools                                   |
-
-`_`-prefixed files are skipped by import-tree and imported by hand.
+| File               | Contents                                                                        |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `opencode.nix`     | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation`  |
+| `_permissions.nix` | permissioning for jailed and non-jailed agents (also feeds Claude's bash rules) |
+| `_agents.nix`      | per-agent permission sets                                                       |
+| `_mcp.nix`         | the MCP server set                                                              |
+| `_sync.nix`        | hash coupling the jail package to its deployed config (see Sandbox)             |
+| `jail/jail.nix`    | the `opencode-jail` aspect — `mkJail` plus the opencode-specific parts          |
 
 ### Configuration
 
-- **Model**: `anthropic/claude-opus-5-5` (Opus everywhere, including subagents)
+- **Model**: not pinned in Nix; pick it in the TUI.
+- **Providers**: `ollama` → the macmini's voice-stack ollama at `http://macmini.local:11434/v1` (`@ai-sdk/openai-compatible`), model `gpt-oss:20b` with `limit.context = 16384` mirroring `OLLAMA_CONTEXT_LENGTH`. Model ids must exist in `macmini.nix`'s `ollamaModels`. Not the default.
 - **Default agent**: `plan`
 - **TUI theme**: `catppuccin-macchiato`
-- **Other settings**: `autoupdate = false`, `lsp = false`; anthropic provider keyed from env (`ANTHROPIC_API_KEY`).
-- **Plugins**: `@mohak34/opencode-notifier` (desktop notifications), `@dietrichgebert/ponytail` (YAGNI code-minimization ladder, injected every turn), `./plugins/caveman/plugin.js` (terse-prose communication mode from `JuliusBrussee/caveman`; native plugin deployed at activation time from the `caveman` flake input). Caveman complements ponytail — ponytail shrinks what the agent *builds*, caveman shrinks what it *says*. The plugin injects the ruleset every turn, persists `/caveman` mode switches, and registers slash commands. Levels: `lite`/`full`/`ultra`/`wenyan-*`. The upstream `bin/install.js` is reimplemented in Nix: plugin files are copied (`.js` → `.cjs` rename for ESM compat), agents get their frontmatter transformed at build time (`tools:` arrays and provider-less `model:` stripped), commands and skills are symlinked. A build-time hash check on the installer's opencode section (`cavemanInstallerHash` in `opencode.nix`) fails the build when upstream changes the deployment structure, so the Nix reimplementation stays in sync.
-- **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. The option is declared `nullable`, `home.packages` is guarded on it, and everything else it generates still applies. Darwin keeps the default package.
+- **Other settings**: `autoupdate = false`, `lsp = false`.
+- **Plugins**: `@mohak34/opencode-notifier` (desktop notifications), `@dietrichgebert/ponytail` (YAGNI code-minimization ladder, injected every turn), `./plugins/caveman/plugin.js` (terse-prose communication mode from `JuliusBrussee/caveman`; native plugin deployed at activation time from the `caveman` flake input). Caveman complements ponytail — ponytail shrinks what the agent *builds*, caveman shrinks what it *says*. The plugin injects the ruleset every turn, persists `/caveman` mode switches, and registers slash commands. Levels: `lite`/`full`/`ultra`/`wenyan-*`. The upstream installer is reimplemented in Nix: plugin files are copied (`.js` → `.cjs` rename for ESM compat), agents get their frontmatter transformed at build time (`tools:` arrays and provider-less `model:` stripped), commands and skills are symlinked. A build-time hash check on the installer's opencode section (`cavemanInstallerHash` in `opencode.nix`) fails the build when upstream changes the deployment structure, so the Nix reimplementation stays in sync. The hash covers the `OPENCODE_*` constants, the **whole** `installOpencode` body (an awk `/start/,/end/` range would stop on its own first line, which also matches `^function`) and `installer/lib/opencode-agent.js`. Last reviewed at `2e08b91`, where the installer moved from `bin/` to `installer/` and `ultracave`/`megacave` were found missing from the deployed skill and command lists.
+- **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. Darwin keeps the default package.
 
-### Sandbox (Linux only)
+### Sandbox (Linux only, shared with Claude Code)
 
-On Linux `opencode` **is** the jail: `jail/jail.nix` wraps `pkgs.opencode` with bubblewrap via the `jail-nix` combinator library and installs it as `bin/opencode`. Darwin has no sandbox and relies on the allowlist alone.
+On Linux `opencode` and `claude` **are** the jail: `agent-jail/_mk-jail.nix` wraps the package with bubblewrap via the `jail-nix` combinator library and installs it under the original binary name. Darwin has no sandbox and relies on the allowlist alone.
 
-Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, and the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, `~/.cache/jgrep`, opencode's own state). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing.
+Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`), and the harness's own state (opencode: its XDG dirs; claude: `~/.claude` and `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
 
 Things that cost real time to discover:
 
@@ -605,75 +623,88 @@ Things that cost real time to discover:
 - **`NIX_REMOTE=daemon` is mandatory.** bwrap's uid map makes the store look user-owned and tricks nix into single-user mode. `trusted-users = root` means a client cannot disable the build sandbox — which is *why* `nix build` is safe to allow in here.
 - **No enumerated toolbelt.** `/nix/store` is bound read-only and `/run/current-system/sw` + `/etc/profiles/per-user/<user>` supply PATH, so the host toolchain works as-is. Curating a toolbelt would be tidiness, not a boundary: every store binary is reachable by absolute path regardless.
 - **The whole host environment is inherited.** jail-nix's `base` ends with `--clearenv`, so we `reset` and rebuild its pieces without it — that is how sops-derived keys, `HERDR_*` and direnv's exports arrive. Consequence: `add-path` seeds from `state.env.PATH`, now empty, so PATH must be set with `set-env "PATH" "…:$PATH"` or it collapses to that one entry.
-- **No gpg-agent socket.** The agent is a signing *and* decryption oracle: it would let the jail sign as the user and decrypt every sops secret (`env.yaml` lives in the repo). With `signByDefault = true` in the read-only git config, `git commit` fails for want of a signer — that failure **is** the approval gate, and committing goes through `host_exec`.
-- **Herdr socket is bound read-write.** The real `$HERDR_SOCKET_PATH` is inside the sandbox, so the opencode plugins (`herdr-agent-state.js`, `herdr-tui-session.js`, `opencode-activity.js`) can report lifecycle state, session identity and sidebar tokens. Every `herdr*` and `*/herdr*` bash command is `ask`, but that gate is bash-only — any allowed interpreter (`python3`, `node`, `bun`) can speak the JSON-over-unix protocol directly without prompting. This is an accepted gap alongside the nvim MCP: `pane.split` + `pane.send_text` is an unjailed shell.
-- **`SSH_AUTH_SOCK` is unset** and `core.sshCommand` points at a deny script, so pushing is impossible from inside.
-- **`rm`/`rmdir` are rmtrash, and trash is per-mount.** Every writable path is its own bind mount, so the freedesktop spec picks that mount's own `.Trash-1000` — a rename into the home trash would be `EXDEV`. Deletions in the working directory therefore land in `<workdir>/.Trash-1000/`, which is why `programs.git.ignores = [".Trash-*/"]` exists (git reads `$XDG_CONFIG_HOME/git/ignore` by default; no `core.excludesFile` needed). `~/.local/share/Trash` is deliberately **not** bound — nothing could ever land there, and binding it only exposed real deleted files.
-- **`.sync-id` couples the two halves.** The sandbox ships as a package while the config it describes ships through `home.activation`/`xdg.configFile`. Deploy one without the other and `jail-context.md`, the allowlist and the `host_*` tools silently disagree. `_sync.nix` hashes both sides into one id and the jail refuses to start on mismatch (`OPENCODE_JAIL_SKIP_SYNC_CHECK=1` overrides). **Never test the jail by building the package alone** — that leaves the config half stale, and it cost two full smoke-test rounds before the guard existed.
-- **Known gaps, accepted deliberately.** Neovim runs *outside* the sandbox. The nvim MCP can write any path the user can (`nvim_write_full_buf` creates missing files) and run shell commands (`nvim_send_command` → `:!`, `lua vim.fn.system`). The herdr socket is in the same category: `pane.split` + `pane.send_text` is an unjailed shell. Both are complete bypasses of the filesystem boundary, mitigated **only** by the absolute prohibition in `context.md` — there is no enforcement.
+- **No gpg-agent signing socket.** The agent is a signing *and* decryption oracle: it would let the jail sign as the user and decrypt every sops secret (`env.yaml` lives in the repo). With `signByDefault = true` in the read-only git config, `git commit` fails for want of a signer — that failure **is** the approval gate, and committing goes through `host_exec`.
+- **SSH works via gpg-agent's *ssh* socket** (`S.gpg-agent.ssh`, bound with `SSH_AUTH_SOCK` pointing at it) plus read-only `~/.ssh/known_hosts`. Push yes, author no: a push only ever publishes commits the user signed.
+- **Herdr socket is bound read-write.** The real `$HERDR_SOCKET_PATH` is inside the sandbox, so the herdr plugins/hooks can report lifecycle state, session identity and sidebar tokens. Every `herdr*` and `*/herdr*` bash command is `ask`, but that gate is bash-only — any allowed interpreter (`python3`, `node`, `bun`) can speak the JSON-over-unix protocol directly without prompting.
+- **`rm`/`rmdir` are rmtrash, and trash is per-mount.** Every writable path is its own bind mount, so the freedesktop spec picks that mount's own `.Trash-1000` — a rename into the home trash would be `EXDEV`. Deletions in the working directory therefore land in `<workdir>/.Trash-1000/`, which is why `programs.git.ignores = [".Trash-*/"]` exists. `~/.local/share/Trash` is deliberately **not** bound.
+- **`.sync-id` couples opencode's two halves.** The opencode sandbox ships as a package while the config it describes ships through `home.activation`/`xdg.configFile`. `_sync.nix` hashes both sides (including `agent-jail/_mk-jail.nix` and `jail-context.md`) into one id and the jail refuses to start on mismatch (`OPENCODE_JAIL_SKIP_SYNC_CHECK=1` overrides). **Never test the jail by building the package alone.** Claude needs no sync-id: its config and jail come from the same HM generation via `home.file`.
+- **Known gap, accepted deliberately.** Neovim runs *outside* the sandbox and its socket is bound; the herdr socket likewise (`pane.split` + `pane.send_text` is an unjailed shell). Both are complete bypasses of the filesystem boundary, mitigated **only** by the prohibition in `context.md` — there is no enforcement.
 
-### Agents (`modules/programs/opencode/agents/*.md` → `~/.config/opencode/agent/`)
+### Agents (prompts from `agent-shared/agents/` → `~/.config/opencode/agent/`)
 
-Agent markdown files carry `description` + `mode` + prompt; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared `let` fragments explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
+Frontmatter (`description`, `mode`) is generated in `opencode.nix`; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared fragments explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
 
-**Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`), so denying an MCP's tools on the primaries strips those definitions from every session; they reappear only inside the subagent that needs them.
+**Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`).
 
-| Agent          | Mode              | Role                                                                                                                                                   | Notable permissions                                                                                                                                                           |
-| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build`        | primary           | Full development (unchanged)                                                                                                                           | `edit: allow`; `bash: allow` **inside the jail** (`unrestrictedBash`), the allowlist on Darwin; `host_exec: ask`; `datadog_*` + ticket writes denied                          |
-| `plan`         | primary (default) | Read-only analysis/planning                                                                                                                            | `edit: deny`; gh/ticket writes + `datadog_*` denied                                                                                                                           |
-| `pair`         | primary           | Read-only pairing companion — annotates the editor (highlights/virtual text) but never edits                                                           | `edit: deny`; mutating nvim tools (`nvim_find_and_replace_buf`, `nvim_write_full_buf`, `nvim_send_keys`) denied, `nvim_send_command: ask`; read/annotation nvim tools allowed |
-| `reviewer`     | subagent          | Pre-commit/PR code review                                                                                                                              | `edit: deny`; read-only git bash + `gh_*_read`                                                                                                                                |
-| `troubleshoot` | subagent          | Incident/issue investigation via Datadog (only agent with `datadog_*` enabled). Prompt encodes skill-discovery-first + logs→traces→metrics methodology | `datadog_*: allow`; `edit: deny`                                                                                                                                              |
-| `tickets`      | subagent          | Linear/Notion triage, spec writing, status updates                                                                                                     | reads allowed; `linear_*`/`Notion_*` writes `ask`                                                                                                                             |
-| `test-writer`  | subagent          | Writes tests only; prompt forbids editing implementation                                                                                               | `edit: ask` (build-tier)                                                                                                                                                      |
+| Agent         | Mode              | Role                                                     | Notable permissions                                                                      |
+| ------------- | ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `build`       | primary           | Full development (unchanged)                             | `edit: allow`; `bash: allow` **inside the jail**, the allowlist on Darwin; `host_*: ask` |
+| `plan`        | primary (default) | Read-only analysis/planning                              | `edit: deny`; gh writes denied                                                           |
+| `reviewer`    | subagent          | Pre-commit/PR code review                                | `edit: deny`; read-only git bash + `gh_*_read`                                           |
+| `test-writer` | subagent          | Writes tests only; prompt forbids editing implementation | `edit: ask` (build-tier)                                                                 |
 
-### Commands (`modules/programs/opencode/commands/*.md` → `~/.config/opencode/command/`)
+### Commands (bodies from `agent-shared/commands/` → `~/.config/opencode/command/`)
 
 Markdown command templates using `!` `` `cmd` `` shell injection and `$ARGUMENTS`.
 
-| Command   | Agent              | Purpose                                                                                              |
-| --------- | ------------------ | ---------------------------------------------------------------------------------------------------- |
-| `/commit` | build              | Drafts a conventional commit message from `git diff --cached`, commits after approval (never pushes) |
-| `/pr`     | build              | Drafts a PR description from the branch diff, opens via `gh_pr_write` after approval                 |
-| `/review` | reviewer (subtask) | Delegates the current diff/branch/PR to the `reviewer` subagent                                      |
+| Command   | Agent              | Purpose                                                                                               |
+| --------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
+| `/commit` | build              | Drafts a conventional commit message from `git diff --cached`, commits via `host_exec` after approval |
+| `/pr`     | build              | Drafts a PR description from the branch diff, opens via `gh pr create`/`gh_pr_write` after approval   |
+| `/review` | reviewer (subtask) | Delegates the current diff/branch/PR to the `reviewer` subagent                                       |
 
-Both agents and commands are plain markdown, so they deploy via `xdg.configFile` **symlinks** (the Bun symlink issue only affects the `.ts` custom tools). The loader scans both `agent/`+`agents/` and `command/`+`commands/`.
+Agents and commands are plain markdown, deployed via `xdg.configFile` **symlinks** (the Bun symlink issue only affects the `.ts` custom tools).
 
 ### MCP servers
 
-Always available:
+| Server   | Type                                        | Purpose                                               |
+| -------- | ------------------------------------------- | ----------------------------------------------------- |
+| Context7 | local (`@upstash/context7-mcp`)             | Library documentation (64k min tokens)                |
+| nixos    | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup |
 
-| Server   | Type                                        | Purpose                                                                              |
-| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Context7 | local (`@upstash/context7-mcp`)             | Library documentation (64k min tokens)                                               |
-| nvim     | local (nix run `nvim-mcp` wrapper)          | Neovim instance access via msgpack-RPC (auto-connects to the herdr workspace socket) |
-| nixos    | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup                                |
-
-Linux-only (gated via `lib.optionalAttrs (!isDarwin)` — not present on the Mac mini):
-
-| Server  | Type                   | Purpose                  |
-| ------- | ---------------------- | ------------------------ |
-| Notion  | remote                 | Notion workspace access  |
-| linear  | local (npx mcp-remote) | Issue tracking           |
-| datadog | remote (EU endpoint)   | Observability/monitoring |
+Work MCPs (Notion, Linear, Datadog) live in Claude Code only.
 
 ### Custom tools (deployed to `~/.config/opencode/tools/`)
 
 Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell commands via `Bun.$`. Deployed via `home.activation` (cp, not symlink) due to Bun module resolution issue with Nix store symlinks (tracked: <https://github.com/anomalyco/opencode/issues/5914>).
 
-| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                               |
-| -------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                               |
-| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                               |
-| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                               |
-| `host.ts`            | `host_exec`, `host_mount`, `host_journal` | The jail's only route to the host, over loopback to `jail/_host-query`. All three are `ask` on every agent. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host dir at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv |
+| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                                     |
+| -------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                                     |
+| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                                     |
+| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                                     |
+| `host.ts`            | `host_exec`, `host_mount`, `host_journal` | The jail's only route to the host, over loopback to `agent-jail/_host-query`. All three are `ask` on every agent. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host dir at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv |
 
-`host_journal` exists because it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Its fixed argv also makes it the one host tool that is safe to approve with "always". Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.
+`host_journal` exists because it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.
 
-**A custom tool is not gated by the `permission` config unless it gates itself.** opencode calls `Permission.ask` on behalf of its own built-in tools, and wraps every MCP tool in one automatically (`session/tools.ts`, the `ctx.ask({ permission: key, … })` in the `mcp.tools()` loop) — but a tool loaded from `tools/*.ts` is handed straight to `item.execute` (`tool/registry.ts`'s `fromPlugin`, then the registry loop in `session/tools.ts`). So `host_exec = "ask"` sat inert for as long as it existed, and every agent could reach the host silently. `host.ts` and `gh.ts` now each call `ctx.ask` themselves through a local `gate()` helper; delete that call and the tool goes back to running unprompted. `deny` is the exception — it works generically for any tool, because `resolveTools` (`session/llm/request.ts`) drops denied names from the schema before the request, which is why the read-only agents never see `gh_*_write`.
+**A custom tool is not gated by the `permission` config unless it gates itself.** opencode calls `Permission.ask` on behalf of its own built-in tools, and wraps every MCP tool in one automatically (`session/tools.ts`) — but a tool loaded from `tools/*.ts` is handed straight to `item.execute`. So `host_exec = "ask"` sat inert for as long as it existed. `host.ts` and `gh.ts` now each call `ctx.ask` themselves through a local `gate()` helper; delete that call and the tool goes back to running unprompted. `deny` works generically for any tool, because `resolveTools` drops denied names from the schema before the request.
 
-Two details of `gate()` worth keeping: approval is **per command**, since `always` carries the specific pattern rather than `*`; and `always` is withheld when that pattern contains `*` or `?`, because `Wildcard.match` compiles both to regex wildcards with no escape — an approved `rm -rf build/*` would otherwise also match `rm -rf build/../../home`. `host_mount` puts the mode in the pattern so approving read-only cannot cover a later read-write remount, and the `gh` writes use the operation shape (`gh pr merge 7`) rather than the full argv so a long `--body` does not make the approval unmatchable; identifier-less creates (`gh issue create`, `gh pr create`) pass an empty `always` and so can only ever be approved once.
+Two details of `gate()` worth keeping: approval is **per command**, since `always` carries the specific pattern rather than `*`; and `always` is withheld when that pattern contains `*` or `?`, because `Wildcard.match` compiles both to regex wildcards with no escape. `host_mount` puts the mode in the pattern so approving read-only cannot cover a later read-write remount, and the `gh` writes use the operation shape (`gh pr merge 7`) rather than the full argv.
+
+## Claude Code
+
+`modules/programs/claude-code/`, aspects `claude-code` + `claude-code-jail`, both included by `work` (laptop only). Configured through home-manager's `programs.claude-code`.
+
+| File                     | Contents                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `claude-code.nix`        | settings, permissions, MCP, agents, commands, skills, plugins, the herdr hook; `ponytail` input |
+| `_permissions.nix`       | translates opencode's jailed `baseBash` into `Bash(...)` allow/ask/deny lists                   |
+| `jail.nix`               | `mkJail` for `pkgs.claude-code`                                                                 |
+| `agents/`                | work-only prompts: `troubleshoot` (Datadog), `tickets` (Linear/Notion)                          |
+| `skills/datadog-queries` | work-only skill                                                                                 |
+
+- **`CLAUDE_CONFIG_DIR=$HOME/.claude`** is set inside the jail so `.claude.json` lives *inside* the bound dir — Claude rewrites it by rename, which fails on a bind-mounted single file.
+- **`package = null`**: the jail installs `claude`. **`settings.json` is immutable** (store symlink, `mutableSettings = false`); changes made from the UI do not persist — declare them in Nix.
+- **Permissions**: `defaultMode = "plan"`. Bash rules come from opencode's jailed `baseBash` (`"*"` → plain `Bash`). The translation is only lossless because every override in that set narrows toward ask/deny: opencode resolves by last match, Claude by **deny > ask > allow**, so an override that *widens* would silently stop working. MCP rules use `mcp__plugin_hm_<server>__<tool>` — the HM module bundles all servers into a generated plugin named `hm`. Allow-rule globs need the literal `mcp__<server>__` prefix.
+- **MCP**: context7, nixos, `host` (the `host-mcp.py` shim — `host_*` are in `ask`, which prompts even when an allow also matches), Notion, Linear, Datadog (`type = "http"`, OAuth via `/mcp`). Linear/Notion reads are allowed; writes fall through to a prompt. Datadog is fully allowed. Unlike opencode they are global, not scoped to the subagents — subagent-only inline servers would not appear in `/mcp` for the OAuth login.
+- **Agents**: `reviewer`, `test-writer` (shared bodies), `troubleshoot`, `tickets`. Read-only agents use `disallowedTools: Write, Edit, NotebookEdit`.
+- **Status line**: `claude-statusline` (`statusline.jq` + a shell wrapper adding the git branch, `*` when tracked files are dirty). Shows model + effort, active agent, dir + branch, context %, the 5h/7d plan limits (and `$` spend limit behind a gateway) with time to reset, and lines +/-. Percentages go green/yellow/red at 70/90%. Limits only appear after the first response in a session.
+- **Prompt input**: `editorMode = "vim"` (the opencode TUI equivalent is the vim plugin). Vim motions are not remappable; only `vimInsertModeRemaps` exists.
+- **Commands**: `/commit`, `/pr`, `/review` (`context: fork`, `agent: reviewer`).
+- **Skills**: `git-conventions`, `datadog-queries`, plus `herdr` (from `herdr.nix`) and `jgrep` (from `work/jgrep.nix`) via `programs.claude-code.skills`, which is a no-op when the module is disabled.
+- **Plugins**: `caveman` and `ponytail` straight from their flake inputs — both repos are native Claude plugins (`.claude-plugin/plugin.json` at the root), so no reimplementation like opencode's.
+- **herdr**: `hooks."herdr-agent-state.sh"` is deployed from `${pkgs.herdr.src}` (version-matched) and registered as a `SessionStart` hook with the **exact** command string herdr's own installer writes, so `herdr integration install claude` is a no-op and `herdr integration status` is clean. Never run the installer: it would try to rewrite the immutable `settings.json`.
+- No equivalent yet for opencode's `gh_*`/`google_calendar`/`date` tools (`gh` CLI covers the first) or the notifier.
 
 ## Security Model
 
@@ -682,7 +713,7 @@ Two details of `gate()` worth keeping: approval is **per command**, since `alway
 - **Secrets**: sops-nix with age (per-machine key) + GPG (YubiKey master key)
 - **GPG**: YubiKey-backed key for git signing, SSH auth (gpg-agent), password store, sops decryption
 - **Immutable users**: `users.mutableUsers = false`
-- **Agent sandbox (Linux)**: `opencode` runs inside bubblewrap — deny-by-default writes, no setuid, no gpg agent. Herdr socket is bound (plugins need it for sidebar tokens and session identity); every `herdr` bash command asks. See the OpenCode Sandbox section, including the two accepted bypasses (nvim MCP and herdr socket).
+- **Agent sandbox (Linux)**: `opencode` and `claude` run inside the shared bubblewrap jail — deny-by-default writes, no setuid, no gpg signing socket. Herdr and nvim sockets are bound; every `herdr` bash command asks. See the OpenCode Sandbox section, including the accepted bypasses.
 
 ## Theming
 
@@ -759,6 +790,6 @@ herdr-workspace ~/dev/some-repo my-name            # explicit workspace name
 - **DMS greeter compositor config**: `programs.dms-greeter.compositor.customConfig` must also be Lua. dms-greeter picks its own appended launch snippet via `launcher.isHyprlandLuaConfig`, which sniffs the custom config for `hl.` (or a `.lua` suffix); without a match it appends a hyprlang `exec-once` line and the greeter dies before quickshell starts.
 - **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. OmniWM bindings use hjkl with `Option` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
 - **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).
-- **OpenCode jail**: the sandbox package and the config it describes are two halves of one change and must deploy together — `_sync.nix` hashes both and the jail refuses to start on mismatch. Never smoke-test it by building the package alone; use `nixos-rebuild switch`. After touching `_permissions.nix`, verify the rendered ruleset rather than the source (see Bash permission philosophy).
+- **Agent jail**: `agent-jail/_mk-jail.nix` is shared — a change there affects both harnesses. For opencode the sandbox package and the config it describes must deploy together — `_sync.nix` hashes both and the jail refuses to start on mismatch. Never smoke-test it by building the package alone; use `nixos-rebuild switch`. After touching `_permissions.nix`, verify the rendered ruleset rather than the source (see Bash permission philosophy).
 - **Secrets**: Never commit plaintext secrets. All secrets go through sops-nix. API keys are in `modules/security/secrets/env.yaml`.
 - **Flake inputs**: Declare per-module using `flake-file.inputs`, not in `flake.nix` directly.

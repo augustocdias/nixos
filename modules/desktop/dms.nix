@@ -747,15 +747,6 @@
           dankHyprlandWindows.enable = true;
           developerUtilities.enable = true;
 
-          aiAssistant = {
-            enable = true;
-            settings = {
-              provider = "anthropic";
-              model = "claude-opus-4-6";
-              apiKeyEnvVar = "ANTHROPIC_API_KEY";
-            };
-          };
-
           dankKDEConnect.enable = true;
           wallpaperCarousel.enable = true;
 

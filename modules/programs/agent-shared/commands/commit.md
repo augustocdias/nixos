@@ -1,8 +1,3 @@
----
-description: Draft a commit message from staged changes and commit after approval
-agent: build
----
-
 Staged changes:
 
 !`git diff --cached --stat`
@@ -25,7 +20,7 @@ Write a commit message for the staged changes above.
   commits.
 - If nothing is staged, say so and stop — do not stage anything yourself.
 
-Be terse: show only the proposed message, then run `git commit` with it (this
-prompts for approval). No preamble, no summary. Do not push.
+Be terse: show only the proposed message, then commit it. Signing only works on
+the host, so inside the sandbox use `host_exec` (it prompts for approval). No preamble, no summary. Do not push.
 
 $ARGUMENTS

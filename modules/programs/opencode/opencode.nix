@@ -22,8 +22,14 @@
         jailed = pkgs.stdenv.hostPlatform.isLinux;
       };
 
+      shared = import ../agent-shared/_lib.nix {inherit lib;};
+      prompt = kind: name: fm:
+        pkgs.writeText "${name}.md" (shared.withFrontmatter
+          ({description = shared.description.${name};} // fm)
+          "${shared.${kind}}/${name}.md");
+
       # --- Caveman native plugin (JuliusBrussee/caveman) -----------------
-      # Reimplements the opencode-specific parts of bin/install.js in Nix so
+      # Reimplements the opencode-specific parts of installer/install.js in Nix so
       # the deploy is pure and does not fight the Nix-generated opencode.json.
       #
       # What the upstream installer does for --only opencode:
@@ -40,14 +46,16 @@
       # `nix flake update caveman`, the build fails with an explicit message.
 
       caveman = inputs.caveman;
-      cavemanInstallerHash = "ced67338dad484e1c08ab7ccef7e90786ab09ac470efb1959cac12f89bf6715e";
+      cavemanInstallerHash = "2732df386d7be86313177e388dd5eebb5a8ad51d2af938ee074f76838c5aa2ea";
 
       cavemanInstallerCheck = pkgs.runCommand "caveman-installer-check" {} ''
         {
-          grep '^const OPENCODE_' ${caveman}/bin/install.js
-          awk '/^function installOpencode\(/,/^function [a-zA-Z]/' \
-            ${caveman}/bin/install.js | head -n -1
-          cat ${caveman}/bin/lib/opencode-agent.js
+          grep '^const OPENCODE_' ${caveman}/installer/install.js
+          # Whole function body: a /start/,/end/ range would stop on the start
+          # line itself, since it also matches the end pattern.
+          awk '/^function installOpencode\(/{f=1; print; next}
+               f && /^function [a-zA-Z]/{exit} f' ${caveman}/installer/install.js
+          cat ${caveman}/installer/lib/opencode-agent.js
         } | sha256sum | cut -d' ' -f1 > $out
 
         actual=$(cat $out)
@@ -57,8 +65,8 @@
           echo "  expected: ${cavemanInstallerHash}"
           echo "  got:      $actual"
           echo ""
-          echo "Review the installOpencode function in bin/install.js and"
-          echo "bin/lib/opencode-agent.js, update the Nix reimplementation"
+          echo "Review the installOpencode function in installer/install.js and"
+          echo "installer/lib/opencode-agent.js, update the Nix reimplementation"
           echo "in opencode.nix, then set cavemanInstallerHash to the new value."
           exit 1
         fi
@@ -68,7 +76,8 @@
       # model: values (e.g. "model: haiku" → dropped), and force
       # mode: subagent so cavecrew agents are invoked via Task rather
       # than showing in the agent picker alongside plan/build/pair.
-      # Mirrors bin/lib/opencode-agent.js transformOpencodeAgentFrontmatter().
+      # Mirrors installer/lib/opencode-agent.js transformOpencodeAgentFrontmatter()
+      # with { subagent: true }.
       cavemanAgents =
         pkgs.runCommand "caveman-agents" {
           # Force a build-time dependency on the installer check.
@@ -103,6 +112,8 @@
 
       cavemanSkillDirs = [
         "caveman"
+        "ultracave"
+        "megacave"
         "caveman-commit"
         "caveman-review"
         "caveman-help"
@@ -113,6 +124,8 @@
 
       cavemanCommandFiles = [
         "caveman.md"
+        "ultracave.md"
+        "megacave.md"
         "caveman-commit.md"
         "caveman-review.md"
         "caveman-compress.md"
@@ -162,16 +175,15 @@
           "opencode/tui.jsonc".source =
             config.xdg.configFile."opencode/tui.json".source;
 
-          "opencode/agent/pair.md".source = ./agents/pair.md;
-          "opencode/agent/reviewer.md".source = ./agents/reviewer.md;
-          "opencode/agent/troubleshoot.md".source = ./agents/troubleshoot.md;
-          "opencode/agent/tickets.md".source = ./agents/tickets.md;
-          "opencode/agent/test-writer.md".source = ./agents/test-writer.md;
-          "opencode/command/commit.md".source = ./commands/commit.md;
-          "opencode/command/pr.md".source = ./commands/pr.md;
-          "opencode/command/review.md".source = ./commands/review.md;
-          "opencode/skills/git-conventions/SKILL.md".source = ./skills/git-conventions/SKILL.md;
-          "opencode/skills/datadog-queries/SKILL.md".source = ./skills/datadog-queries/SKILL.md;
+          "opencode/agent/reviewer.md".source = prompt "agents" "reviewer" {mode = "subagent";};
+          "opencode/agent/test-writer.md".source = prompt "agents" "test-writer" {mode = "subagent";};
+          "opencode/command/commit.md".source = prompt "commands" "commit" {agent = "build";};
+          "opencode/command/pr.md".source = prompt "commands" "pr" {agent = "build";};
+          "opencode/command/review.md".source = prompt "commands" "review" {
+            agent = "reviewer";
+            subtask = true;
+          };
+          "opencode/skills/git-conventions/SKILL.md".source = "${shared.skills}/git-conventions/SKILL.md";
           "opencode/opencode-notifier.json".source = ./opencode-notifier.json;
         }
         # Caveman commands
@@ -219,21 +231,28 @@
           ];
         };
 
-        context = builtins.readFile ./context.md;
+        context = builtins.readFile shared.context;
 
         settings = {
-          model = "anthropic/claude-opus-5-5";
           autoupdate = false;
           default_agent = "plan";
           lsp = false;
 
           plugin = ["@mohak34/opencode-notifier" "@dietrichgebert/ponytail" "./plugins/caveman/plugin.js"];
 
-          provider = {
-            anthropic.options.apiKey = "{env:ANTHROPIC_API_KEY}";
+          # The macmini's voice-stack ollama (macmini.nix). Model ids must be in
+          # its `ollamaModels`; the context limit mirrors its
+          # OLLAMA_CONTEXT_LENGTH, past which the server truncates silently.
+          provider.ollama = {
+            npm = "@ai-sdk/openai-compatible";
+            name = "Ollama (macmini)";
+            options.baseURL = "http://macmini.local:11434/v1";
+            models."gpt-oss:20b" = {
+              name = "gpt-oss 20b";
+            };
           };
 
-          mcp = import ./_mcp.nix {inherit pkgs lib;};
+          mcp = import ./_mcp.nix;
 
           permission =
             perms.sharedBase

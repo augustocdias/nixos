@@ -343,7 +343,6 @@ in {
             (bind "${mod} + SPACE" (exec "dms ipc call launcher toggle"))
             (bind "${mod} + Q" "hl.dsp.window.close()")
             (bind "${mod} + SHIFT + SPACE" (exec "dms ipc call powermenu toggle"))
-            (bind "${mod} + A" (exec "dms ipc call plugins toggle aiAssistant"))
 
             (bind "PRINT" (exec "dms screenshot --no-file"))
             (bind "SHIFT + PRINT" (exec "dms screenshot full --no-file"))

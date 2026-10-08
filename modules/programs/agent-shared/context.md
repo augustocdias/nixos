@@ -88,4 +88,4 @@ directory you are already in.
 - Provide links to official docs or authoritative sources for technical claims
 - If no source is available, state the claim is based on general knowledge and may need verification
 - Never present unverified information as fact
-- If any for any task you need the date use the date tool
+- If a task needs the current date, get it from a tool (`date`); never guess it

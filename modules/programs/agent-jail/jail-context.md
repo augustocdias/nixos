@@ -10,8 +10,8 @@ inside it; it exists so you do not have to ask permission for ordinary work.
   main checkout's `.git` is bound too, so git works normally.
 - `~/granted/<name>` for any directory the user has granted (see `host_mount`).
 - Tool caches that persist across sessions: `~/.cache/nix`, `~/.npm`, `~/.bun`,
-  `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`,
-  `~/.cache/jgrep`, and opencode's own state.
+  `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and your own state directory (plus
+  `~/.cache/jgrep` under claude).
 
 ## What looks writable but is not
 
@@ -33,9 +33,6 @@ session was launched from, so the working directory's `.envrc` is already in
 effect. There is no hook running inside here. If you move to a directory with a
 different `.envrc`, the environment does **not** reload — use
 `direnv exec <dir> <command>` for that, or ask the user to relaunch. `direnv allow` works; its state is persisted.
-
-`SSH_AUTH_SOCK` is deliberately unset, so ssh reports "no agent" rather than
-pointing at a socket that is not bound.
 
 ## Reaching outside
 

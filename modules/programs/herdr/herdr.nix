@@ -69,6 +69,9 @@
     in {
       home.packages = [workspace worktree];
 
+      # No-op unless the claude-code aspect enables the module.
+      programs.claude-code.skills.herdr = herdrSkill;
+
       home.activation.herdr-plugins = lib.hm.dag.entryAfter ["writeBoundary"] ''
         ${pluginsSync}/bin/herdr-plugins-sync ${lib.escapeShellArgs plugins} \
           || echo "herdr: plugin sync failed" >&2

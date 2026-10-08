@@ -2,7 +2,7 @@
 """host-query: the jail's only route to the host.
 
 Runs outside bubblewrap, started by the jail launcher. The agent reaches it
-over loopback; opencode gates /exec and /mount behind an "ask" permission, so
+over loopback; the agent harness gates every call behind an "ask" permission, so
 the user approves each one in the TUI before it arrives here.
 
 Usage: host-query <port> [grant-root]
