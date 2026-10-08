@@ -10,6 +10,8 @@
         python3Packages = pkgs.home-assistant.python3Packages;
       };
       gruenbeck-softliq = pkgs.callPackage ./_gruenbeck-softliq.nix {};
+      laya = pkgs.callPackage ./_laya.nix {};
+      snapmaker-u1 = pkgs.callPackage ./_snapmaker-u1.nix {};
     in {
       services.home-assistant = {
         enable = true;
@@ -22,6 +24,8 @@
           berlin-transport
           gruenbeck-softliq
           ha-mcp-tools
+          laya
+          snapmaker-u1
         ];
 
         customLovelaceModules =
@@ -67,8 +71,6 @@
         config = {
           default_config = {};
           bluetooth = {};
-
-          tts = [{platform = "google_translate";}];
 
           recorder.exclude = {
             domains = [

@@ -17,10 +17,12 @@
         };
 
         gruenbeck-softliq = pkgs.callPackage ./_gruenbeck-softliq.nix {};
+
+        snapmaker-u1 = pkgs.callPackage ./_snapmaker-u1.nix {};
       in
         lib.mapAttrs' (name: lib.nameValuePair "hass-${name}")
         (lib.filterAttrs (_: lib.isDerivation) (
-          {inherit berlin-transport gruenbeck-softliq ha-mcp-tools;}
+          {inherit berlin-transport gruenbeck-softliq ha-mcp-tools snapmaker-u1;}
           // (pkgs.callPackage ./_lovelace-modules.nix {})
           // (pkgs.callPackage ./_themes.nix {})
         ))

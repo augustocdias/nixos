@@ -20,9 +20,6 @@ buildHomeAssistantComponent (finalAttrs: {
     hash = "sha256-xn7olKzwv+Zj+q5fVYXnkLfm15GorcHm60tM/e5WZLc=";
   };
 
-  # Every name here is a manifest.json requirement, enforced at build time by
-  # manifestRequirementsCheckHook. `mcp` is the *shared* copy, new in 2.2.0 —
-  # the server vendors its own under ha_mcp/_vendor/mcp, so it is not that one.
   dependencies = with python3Packages; [
     ha-mcp
     mcp

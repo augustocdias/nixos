@@ -12,6 +12,8 @@
   den.aspects.macmini = {
     includes = with den.aspects; [
       open-webui
+      laya
+      libretranslate
     ];
 
     darwin = {pkgs, ...}: let
@@ -319,7 +321,7 @@
             OLLAMA_HOST = "[::]:${toString ollamaPort}";
             OLLAMA_MODELS = "${ollamaHome}/models";
             OLLAMA_CONTEXT_LENGTH = "16384";
-            OLLAMA_KEEP_ALIVE = "5m";
+            OLLAMA_KEEP_ALIVE = "-1";
             OLLAMA_NUM_PARALLEL = "1";
             OLLAMA_FLASH_ATTENTION = "1";
             OLLAMA_NO_CLOUD = "1";

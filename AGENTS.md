@@ -122,8 +122,16 @@ modules/
       _lovelace-modules.nix # 6 cards nixpkgs lacks (ex-HACS)
       _themes.nix           # 3 themes nixpkgs lacks (ex-HACS)
       _berlin-transport.nix # berlin_transport custom component (ex-HACS)
+      _snapmaker-u1.nix     # snapmaker_u1 custom component (Moonraker on the U1 printer; tracks master)
       _ha-mcp.nix           # ha_mcp_tools custom component (server = nixpkgs' python3Packages.ha-mcp)
-      pins.nix              # the 12 hand-pinned sources as packages.hass-*, for nix-update
+      pins.nix              # the 13 hand-pinned sources as packages.hass-*, for nix-update
+      _laya.nix             # our own `laya` conversation agent, built from ./laya (no upstream, not pinned)
+      laya/                 # its source; pipeline.py is pure stdlib and shared with laya-eval
+      laya-eval/            # offline accuracy harness: eval.py + cases.json (home snapshot lives in /tmp, never in the repo)
+    laya/
+      laya.nix              # `laya` aspect (macmini only): laya.serve, LAN-bound, no auth
+    libretranslate/
+      libretranslate.nix    # `libretranslate` aspect (macmini only): en<->pt translation for laya, port 5000
     open-webui/
       open-webui.nix        # `open-webui` aspect (macmini only): launchd daemon, local-only
     work/
@@ -171,10 +179,11 @@ Managed entirely through `modules/hardware/macmini/macmini.nix` (aspect `den.asp
 - **Power**: `sleep.computer = "never"` + `restartAfterPowerFailure` — the voice stack depends on this host staying up.
 - **Voice stack**: `launchd.daemons` for `ollama` (`OLLAMA_HOST=[::]:11434`), `wyoming-faster-whisper` (port 10300, `--language auto` for EN+pt-BR; needs `HF_HOME=/tmp`, an upstream bug) and `wyoming-piper` (port 10200). `services.wyoming.*` and `services.ollama` are NixOS-only, hence hand-rolled by the `voiceDaemon` helper. State dirs are created in `postActivation`.
   - **launchd system daemons inherit only `PATH`** — no `HOME`. `ollama serve` aborts with `Error: $HOME is not defined` while creating `~/.ollama/id_ed25519`, so it gets `HOME=/var/lib/ollama` (mirroring the NixOS module's `HOME = cfg.home`). This crash-looped invisibly for a long time; `voiceDaemon` now also sets `StandardOutPath`/`StandardErrorPath` to `/var/log/<name>.log`, because a launchd daemon without them sends stderr nowhere and `log show` has nothing.
-  - **Two ollama env vars matter more than the model.** `OLLAMA_CONTEXT_LENGTH=16384` because the default is 4096 and HA's entity list + tool schemas silently truncate past it; `OLLAMA_KEEP_ALIVE=-1` because voice usage is bursty and the default 5m unload makes every cold request pay a model load. Also `OLLAMA_FLASH_ATTENTION=1`, and `OLLAMA_NUM_PARALLEL=2` — it defaults to 1 under a memory-tight load, which would make an HA voice command queue behind a long Open WebUI turn; each extra slot costs one more KV cache of `OLLAMA_CONTEXT_LENGTH`.
+  - **Two ollama env vars matter more than the model.** `OLLAMA_CONTEXT_LENGTH=16384` because the default is 4096 and HA's entity list + tool schemas silently truncate past it; `OLLAMA_KEEP_ALIVE=-1` because voice usage is bursty and the default 5m unload makes every cold request pay a model load. Also `OLLAMA_FLASH_ATTENTION=1`, and `OLLAMA_NUM_PARALLEL=1` — deliberate: a second slot would stop an HA voice command queueing behind a long Open WebUI turn, but costs one more KV cache of `OLLAMA_CONTEXT_LENGTH` on a 32 GB machine that keeps the model resident.
   - **Models are declared in Nix but not hash-pinned.** The `ollamaModels` list drives an `ollama-model-loader` daemon (`KeepAlive.SuccessfulExit = false`, i.e. retry-on-failure only) that polls `127.0.0.1:11434/api/version` — launchd has no ordering — then `ollama pull`s each entry. Re-pulling an existing model is a no-op, so running it every boot is free. True pinning would mean `fetchurl` a GGUF plus `ollama create`, which still needs a live server, doubles disk, and loses the model's curated chat/tool-call template — not worth it.
   - Metal works fine from a root daemon (`library=Metal name=MTL0 description="Apple M4"`). A one-off `llama-server GPU discovery watchdog timed out` on a cold start is not a real CPU fallback.
 - **Open WebUI**: shares that same ollama instance; loopback-only on port 8080. See the Open WebUI section.
+- **Laya**: decision-model server for the HA `laya` agent, `0.0.0.0:8000`, plus **LibreTranslate** on `0.0.0.0:5000` in front of it. See the Laya section.
 - **Other**: 1Password GUI, fish as login shell.
 
 ### Window management — `omniwm`
@@ -216,7 +225,7 @@ Runs as native `services.home-assistant` on `raspi`. **There is no Supervisor an
 
 `extraPackages = ps: [zlib-ng isal]` supplies the optional aiohttp compression backends; without them HA logs that websocket compression is degraded.
 
-- **`configuration.yaml` is Nix-owned** (`configWritable = false`) and mirrors the previous file: `default_config`, `bluetooth`, `tts` google_translate, and `!include` lines for `groups/automations/scripts/scenes/templates.yaml`. Those five stay **mutable** under `/var/lib/hass` so the HA UI editors keep working. (Note `template: !include templates.yaml` — not the older `sensor: !include sensors.yaml`, which nested a `template:` block under `sensor:`.) The module unquotes leading bangs when rendering YAML (`sed` on the generated file), which is what makes `!include` work from a Nix string.
+- **`configuration.yaml` is Nix-owned** (`configWritable = false`) and mirrors the previous file: `default_config`, `bluetooth`, `tts` and `!include` lines for `groups/automations/scripts/scenes/templates.yaml`. Those five stay **mutable** under `/var/lib/hass` so the HA UI editors keep working. (Note `template: !include templates.yaml` — not the older `sensor: !include sensors.yaml`, which nested a `template:` block under `sensor:`.) The module unquotes leading bangs when rendering YAML (`sed` on the generated file), which is what makes `!include` work from a Nix string.
 - **Do not set `frontend.themes` or `lovelace.resources`/`resource_mode` in `config`** — setting `themes` and `customLovelaceModules` makes the module take authoritative control of both.
 - **`go2rtc` is deliberately not in `_components.nix`, and that is correct.** It is a hard dependency of `default_config`, is `integration_type: system` with `config_flow: false`, and re-creates its own config entry through `SOURCE_SYSTEM` — deleting that entry in the UI achieves nothing. Its python dependency (`go2rtc-client`) still reaches the environment through `default_config`; verified via `systemd.services.home-assistant.environment.PYTHONPATH`, **not** `services.home-assistant.package`, which is the un-overridden option and always looks empty. On a non-docker install with no configured URL, `go2rtc` removes its own entry and returns `True`, so it self-disables cleanly.
 
@@ -245,17 +254,17 @@ Version coupling worth knowing:
 
 ### Keeping the pins current (`pins.nix`)
 
-Dropping HACS also dropped its update notifications. Only two things still self-report: the **ha-mcp server**, whose coordinator polls PyPI every `UPDATE_CHECK_INTERVAL` (6h) and is *not* gated on `skip_pip`, so its `update` entity still shows installed-vs-latest (just with no Install button) — which now tells you **nixpkgs** is behind, since the server is no longer a pin of ours; and `component_outdated`, a repair issue raised when the installed server needs a newer `ha_mcp_tools` than is running. Nothing watches the other 10 pins.
+Dropping HACS also dropped its update notifications. Only two things still self-report: the **ha-mcp server**, whose coordinator polls PyPI every `UPDATE_CHECK_INTERVAL` (6h) and is *not* gated on `skip_pip`, so its `update` entity still shows installed-vs-latest (just with no Install button) — which now tells you **nixpkgs** is behind, since the server is no longer a pin of ours; and `component_outdated`, a repair issue raised when the installed server needs a newer `ha_mcp_tools` than is running. Nothing watches the other 12 pins.
 
-`pins.nix` therefore re-exports all 11 as `packages.hass-*` **solely so `nix-update` can reach them** — nothing consumes these outputs, the HA module callPackages the same files itself. `update-system` stage [2/4] drives the whole set; `--skip-pins` opts out (it builds each one).
+`pins.nix` therefore re-exports all 13 as `packages.hass-*` **solely so `nix-update` can reach them** — nothing consumes these outputs, the HA module callPackages the same files itself. `update-system` stage [2/4] drives the whole set; `--skip-pins` opts out (it builds each one).
 
 Three optional `passthru` knobs, read by that stage:
 
-| knob                 | why                                                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `updatePolicy`       | `"stable"` (default) follows releases; `"branch"` follows default-branch HEAD, for the 3 cards upstream never tags |
-| `updateFile`         | repo-relative path, forced via `--override-filename`                                                               |
-| `updateVersionRegex` | rejects tags upstream publishes but we don't want                                                                  |
+| knob                 | why                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `updatePolicy`       | `"stable"` (default) follows releases; `"branch"` follows default-branch HEAD, for the 3 cards + snapmaker_u1 (never tagged) |
+| `updateFile`         | repo-relative path, forced via `--override-filename`                                                                         |
+| `updateVersionRegex` | rejects tags upstream publishes but we don't want                                                                            |
 
 **`buildHomeAssistantComponent` needs `updateFile`.** It goes through `lib.extendMkDerivation`, which relocates the derivation's position info into nixpkgs' own `build-custom-component/default.nix`; nix-update then throws `… is not in /nix/store/…-source` (`eval.nix:77`) rather than edit a path outside the flake. Both `_ha-mcp.nix` and `_berlin-transport.nix` set it.
 
@@ -264,9 +273,44 @@ Three optional `passthru` knobs, read by that stage:
 **How nix-update edits these, and the two rules that follow.** It anchors the target file on `unsafeGetAttrPos "src"`. Measured across all 11: the *file* is right everywhere, the *line* is wrong for 10 — `mkCard`/`mkTheme` report their own `inherit` line for every package they build, and `extendMkDerivation` points into nixpkgs. `update.py:36-58` handles that by checking whether the recorded line actually contains the old version and, when it doesn't, falling back to a **whole-file** string replace. Rev replacement is whole-file *unconditionally, and runs first*. So:
 
 - **Every version and tag string must stay unique within its file.** Verified clean today; `_themes.nix` is closest to the edge with `"1.4"` and `"1.3"`. Prefer one pin per file for anything new rather than growing `_lovelace-modules.nix` (6) or `_themes.nix` (3).
-- **Never embed the rev in the version string.** A `"branch"` pin must be `0-unstable-<date>` with the **full** rev. With `0-unstable-1a80547` the global rev replacement rewrites the short rev inside the version first, the version substitution then no longer matches, and you get `version = "0-unstable-1a805470152c86d9351abc7b0b56ef3ecb7e3a39"`. This is why the three commit-pinned cards are date-versioned.
+- **Never embed the rev in the version string.** A `"branch"` pin must be `0-unstable-<date>` with the **full** rev. With `0-unstable-1a80547` the global rev replacement rewrites the short rev inside the version first, the version substitution then no longer matches, and you get `version = "0-unstable-1a805470152c86d9351abc7b0b56ef3ecb7e3a39"`. This is why the commit-pinned pins (three cards, `snapmaker_u1`) are date-versioned.
 
 `update-firefox` and `update-thunderbird` are **not** replaceable by this: Firefox extensions are `ExtensionSettings` policies with an `install_url` that Firefox fetches at runtime (no Nix fetch, no hash at all), and Thunderbird's come from the AMO API, which nix-update has no version source for.
+
+## Laya
+
+A local fast path for voice commands, in front of the ollama agent. Two halves:
+
+- **Server** (`modules/services/laya/laya.nix`, macmini): `laya.serve` from the `laya` PyPI wheel, a launchd daemon on `0.0.0.0:8000`, `LAYA_DEVICE=mps`. It speaks TypeSafe's `/v1/systemone` protocol. **No auth, no sops, deliberately**: it is LAN-only and can only score questions, never act. Only the `multilingual` checkpoint (mmBERT, 322M) is loaded. `LAYA_REVISION=reviewed` pins the HF bundle to the SHA that laya release vetted, so weights only move with a package bump; they are fetched into `/var/lib/laya/hf` on first start (~1 GB). No `trust_remote_code`.
+- **Translator** (`modules/services/libretranslate/libretranslate.nix`, macmini): LibreTranslate with only the en\<->pt Argos models (`--load-only en,pt`, ~160 MB, fetched on first start), launchd daemon on `0.0.0.0:5000`, no auth. All argos paths go through `HOME` + `XDG_*_HOME`, every one of them pinned to `/var/lib/libretranslate` (under a systemd user unit `HOME` was overridden and models landed in the real home). ~1 GB resident, ~80 ms per command.
+- **Client** (`modules/services/home-assistant/laya/`, Pi): our own conversation agent, domain `laya`. It does not derive from `allenporter/home-assistant-jev`/`-laya`, whose BM25 retrieval, English stopwords and unit-word regexes break on pt-BR before the model sees anything. Config flow: server URL, translator URL (empty disables it); options: fallback agent, confidence and compound thresholds. Anything it is unsure of, questions, and multi-step requests go **unchanged** to the fallback (ollama) agent via `conversation.async_converse`; laya being down escalates too.
+
+**Laya only chooses among options it is given; it never generates.** That shapes `pipeline.py`:
+
+- Numbers are read from the text (`\d+([.,]\d+)?`, pt decimal comma); the chosen *action* decides the slot (brightness, position, temperature, volume). No unit words, so nothing is language-specific.
+- Round 1: request kind (command / question / other), device kind, compound, portuguese. Round 2 (one request): the kind's *own verbs* (blinds: open / close / set position), asked twice with the options reversed — both must agree; plus the device, only when the text leaves more than one. Measured: a flat 13-way intent choice collapsed (pt requests landed on the vacuum).
+- **Option keys are human text.** Laya renders an option as `"key: description"`, so `HassTurnOn: Turn on` / `light.x: Kitchen Light` fed identifier noise straight into the decision. Keys are now the labels; `Planner._ids` maps answers back.
+- **Which device is grounded in the text, never chosen by the model alone.** The model confidently picked wrong rooms ("open Tobias's blinds" → bedroom at 0.88), and no threshold removes high-confidence errors. Names and aliases of entities and areas are matched as whole phrases (casefolded, accent-free, possessive `'s` dropped; a match inside a longer one is dropped, so "quarto do Tobias" is not the bedroom). A device must be named, or be the only one of its kind in the named room (or the house). A named device must sit in the named room, and settles its own kind. **Aliases are therefore what makes pt-BR work** — an entity with none ("Livia Light") is only reachable in English.
+- **Translation feeds the model, never the grounding.** The model reads LibreTranslate's English; names and numbers are grounded in what was said first, and in the translation only when the original names nothing. Translation loses names ("luz da sala" -> "the room light", "escada" -> "ladder", "depósito" -> "warehouse") but keeps verbs, which is exactly the split. A down translator just passes the original through.
+- **The request language is the pipeline's, not detected.** With one Assist pipeline per language (EN, BR) and conversation language `*`, HA sends the pipeline's STT language as `language` — and that same language overrides whisper's `--language auto` on every request, so a BR request really is Portuguese. It becomes LibreTranslate's `source` (`pt-BR` -> `pt`); `en` skips translation. Only `*`/missing falls back to LibreTranslate's detection, which called "desliga a luz da sala" English at 0 confidence. The fallback LLM always gets the original words.
+- Numbers must fit the action both ways ("dim to 20%" answered "turn on" escalates). Area-wide requests ("all the lights") are not handled; they escalate.
+- **Nouls are badly calibrated on this model** — one yes/no per area answered "yes, HWR" at 0.95 for nearly everything. Use choices for anything that matters.
+- Entities are addressed as name + their own area (two exposed entities are both named "Hallway Light").
+
+**Status: 0 wrong actions on the test set**, laptop CPU, live HA snapshot (with aliases), `cases.json` (45 utterances):
+
+| checkpoint                 | set | ok    | escalated | WRONG | median  |
+| -------------------------- | --- | ----- | --------- | ----- | ------- |
+| multilingual               | en  | 16/22 | 6         | 0     | ~0.35 s |
+| multilingual               | pt  | 7/23  | 16        | 0     | ~0.35 s |
+| english                    | en  | 12/22 | 10        | 0     | ~0.85 s |
+| english                    | pt  | 3/23  | 20        | 0     | ~0.85 s |
+| multilingual + translation | pt  | 10/23 | 13        | 0     | ~0.4 s  |
+| english + translation      | pt  | 8/23  | 15        | 0     | ~0.95 s |
+
+English cases are unchanged by translation (passed through). These numbers used detection; the harness now passes each case's language, as the pipeline does.
+
+Before grounding, the same set gave 7–9 WRONG. Remaining pt escalations are mostly the model's *verb/kind* reading of Portuguese (low confidence), which is what a translation layer would address. 45 cases is a small set: grow `cases.json` before trusting the zero. Re-measure on the macmini with `laya-eval/eval.py --home <snapshot> --url http://macmini.local:8000` before enabling it in an Assist pipeline; `-v` prints the per-question trace, `--translate http://macmini.local:5000` adds the translator, `--model english --head-max-len 384` compares checkpoints (the server must load it; english's window is 512 tokens). The snapshot is dumped fresh from HA into a temp file each time (exposed entities **with their registry aliases** — the first measurements left aliases out and understated both languages); `--selftest` needs none.
 
 ## Open WebUI
 

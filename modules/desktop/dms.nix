@@ -81,7 +81,10 @@
         ++ lib.optionals (inputs ? dankcalendar) [inputs.dankcalendar.homeModules.default]
         ++ lib.optionals (inputs ? dank-pinentry) [inputs.dank-pinentry.homeModules.default];
 
-      programs.dank-pinentry.enable = true;
+      programs.dank-pinentry = {
+        enable = true;
+        installPlugin = false;
+      };
 
       xsession.preferStatusNotifierItems = true;
 
@@ -701,15 +704,18 @@
         };
 
         plugins = {
-          dankbarPinentry.settings = {
-            placement = "bar";
-            barText = false;
-            focusMode = "take";
-            autoOpen = false;
-            notify = true;
-            notifyIcon = "dialog-password";
-            showOwner = true;
-            timeoutRing = true;
+          dankbarPinentry = {
+            enable = true;
+            settings = {
+              placement = "bar";
+              barText = false;
+              focusMode = "take";
+              autoOpen = false;
+              notify = true;
+              notifyIcon = "dialog-password";
+              showOwner = true;
+              timeoutRing = true;
+            };
           };
 
           commandRunner.enable = true;

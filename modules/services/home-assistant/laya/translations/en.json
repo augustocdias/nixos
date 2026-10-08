@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Laya",
+        "description": "Connect to a laya.serve endpoint on the local network.",
+        "data": {
+          "url": "Server URL",
+          "translate_url": "Translator URL (LibreTranslate; empty to disable)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the Laya server"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Laya options",
+        "data": {
+          "fallback_agent": "Fallback conversation agent",
+          "confidence_threshold": "Confidence threshold",
+          "compound_threshold": "Compound request threshold"
+        },
+        "data_description": {
+          "fallback_agent": "Receives every request Laya is unsure about, questions, and multi-step requests.",
+          "confidence_threshold": "Minimum count-normalised confidence (0 = guess, 1 = certain) to act without escalating.",
+          "compound_threshold": "Requests at least this likely to contain several actions are escalated."
+        }
+      }
+    }
+  }
+}
