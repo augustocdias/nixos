@@ -249,6 +249,10 @@
             options.baseURL = "http://macmini.local:11434/v1";
             models."gpt-oss:20b" = {
               name = "gpt-oss 20b";
+              limit = {
+                context = 131072;
+                output = 8192;
+              };
             };
           };
 

@@ -320,7 +320,7 @@
           environment = {
             OLLAMA_HOST = "[::]:${toString ollamaPort}";
             OLLAMA_MODELS = "${ollamaHome}/models";
-            OLLAMA_CONTEXT_LENGTH = "16384";
+            OLLAMA_CONTEXT_LENGTH = "131072";
             OLLAMA_KEEP_ALIVE = "-1";
             OLLAMA_NUM_PARALLEL = "1";
             OLLAMA_FLASH_ATTENTION = "1";
