@@ -88,11 +88,6 @@
 
       xsession.preferStatusNotifierItems = true;
 
-      # Inject sops-decrypted API keys into the DMS systemd service
-      systemd.user.services.dms.Service = {
-        EnvironmentFile = ["%t/dms-env"];
-      };
-
       programs.dank-material-shell = {
         enable = true;
         systemd.enable = true;
@@ -279,8 +274,11 @@
           useAutoLocation = true;
           weatherEnabled = true;
 
-          networkPreference = "wifi";
           iconTheme = "Papirus";
+
+          dashOptions = {
+            media.animatedArt = true;
+          };
 
           cursorSettings = {
             theme = "System Default";
@@ -465,7 +463,12 @@
               ];
               centerWidgets = [
                 "weather"
-                "music"
+                {
+                  id = "music";
+                  enabled = true;
+                  "mediaSize" = 3;
+                  "audioScrollMode" = "nothing";
+                }
                 {
                   id = "clock";
                   enabled = true;

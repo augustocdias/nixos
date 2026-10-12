@@ -410,7 +410,6 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - Home Manager module (`homeModules.dank-material-shell`): 700+ lines of declarative config
 - Plugin registry: separate flake input (`dms-plugins`)
 - Pinentry (`dank-pinentry` flake input, `homeModules.default` → `programs.dank-pinentry`): the gpg-agent pinentry. Prompts in the terminal when one is usable, otherwise inside DankBar via the `dankbarPinentry` plugin (widget first in the right section, hidden when idle). The DMS aspect sets `services.gpg-agent.pinentry.package` to it; `security.nix` keeps pinentry-bemenu (Linux) / pinentry_mac as the `mkDefault`.
-- SOPS secrets injected via systemd environment file at `%t/dms-env`
 
 ## Herdr
 
