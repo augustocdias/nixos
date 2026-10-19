@@ -7,13 +7,13 @@ buildHomeAssistantComponent {
   owner = "kbaker827";
   domain = "snapmaker_u1";
   # Upstream never tags; the prefix is manifest.json's version.
-  version = "0-unstable-2026-09-28";
+  version = "0-unstable-2026-10-14";
 
   src = fetchFromGitHub {
     owner = "kbaker827";
     repo = "ha-snapmaker-u1";
-    rev = "e462267b856a33f7881c95410653838ba248e1db";
-    hash = "sha256-PPwAOwLppDA4vkNIr6xDpE0fwXw8th3ZXrb89a8VaeI=";
+    rev = "1e1cd97c9f980c94da07a4602489635bb2cb1e19";
+    hash = "sha256-e020/dxx+8S5vho+YVv+C9zerr0iLuNsoGw6m6a17Kg=";
   };
 
   dependencies = [

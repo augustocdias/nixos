@@ -34,7 +34,7 @@
       #
       # What the upstream installer does for --only opencode:
       #   1. Plugin files  → ~/.config/opencode/plugins/caveman/
-      #      (plugin.js, package.json, caveman-config.cjs, caveman-parse.cjs)
+      #      (plugin.js, server.js, package.json, caveman-config.cjs, caveman-parse.cjs)
       #   2. Commands      → ~/.config/opencode/commands/
       #   3. Agents        → ~/.config/opencode/agents/   (frontmatter transformed)
       #   4. Skills        → ~/.config/opencode/skills/
@@ -46,7 +46,7 @@
       # `nix flake update caveman`, the build fails with an explicit message.
 
       caveman = inputs.caveman;
-      cavemanInstallerHash = "2732df386d7be86313177e388dd5eebb5a8ad51d2af938ee074f76838c5aa2ea";
+      cavemanInstallerHash = "80ee6356f0d00e82f1ddbc056075c5400c8b59e73770001f0e6b032228ce22c1";
 
       cavemanInstallerCheck = pkgs.runCommand "caveman-installer-check" {} ''
         {
@@ -151,6 +151,8 @@
         mkdir -p $HOME/.config/opencode/plugins/caveman
         cp -f ${caveman}/src/plugins/opencode/plugin.js \
           $HOME/.config/opencode/plugins/caveman/plugin.js
+        cp -f ${caveman}/src/plugins/opencode/server.js \
+          $HOME/.config/opencode/plugins/caveman/server.js
         cp -f ${caveman}/src/plugins/opencode/package.json \
           $HOME/.config/opencode/plugins/caveman/package.json
         cp -f ${caveman}/src/hooks/caveman-config.js \
@@ -238,7 +240,7 @@
           default_agent = "plan";
           lsp = false;
 
-          plugin = ["@mohak34/opencode-notifier" "@dietrichgebert/ponytail" "./plugins/caveman/plugin.js"];
+          plugin = ["@mohak34/opencode-notifier" "@dietrichgebert/ponytail" "./plugins/caveman"];
 
           # The macmini's voice-stack ollama (macmini.nix). Model ids must be in
           # its `ollamaModels`; the context limit mirrors its
