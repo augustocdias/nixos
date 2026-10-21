@@ -9,9 +9,9 @@
       firefox
       thunderbird
       mpv
-      udiskie
       xdg
       opencode-jail
+      omp-jail
       work
     ];
   };

@@ -1,7 +1,7 @@
 # Prompts shared by opencode and claude-code. The bodies are plain markdown
 # without frontmatter; each harness adds its own via `withFrontmatter`, since
 # the two disagree on keys (opencode: mode/agent/subtask, claude: name/tools).
-{lib}: {
+{lib}: rec {
   description = {
     reviewer = "Read-only code reviewer for pre-commit and PR review. Inspects diffs for bugs, security issues, edge cases, and style violations. Cannot edit files. Invoke with @reviewer or via the /review command.";
     test-writer = "Writes and improves tests only — unit, integration, and edge-case coverage. Does not modify implementation code. Use when you want tests added for existing behavior or new code without touching the code under test.";
@@ -11,11 +11,13 @@
   };
 
   # JSON strings are valid YAML scalars, so values never need hand-quoting.
-  withFrontmatter = fm: body:
+  withFrontmatter = fm: body: withFrontmatterText fm (builtins.readFile body);
+
+  withFrontmatterText = fm: text:
     "---\n"
     + lib.concatLines (lib.mapAttrsToList (k: v: "${k}: ${builtins.toJSON v}") fm)
     + "---\n\n"
-    + builtins.readFile body;
+    + text;
 
   agents = ./agents;
   commands = ./commands;

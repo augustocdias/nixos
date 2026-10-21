@@ -11,7 +11,7 @@ inside it; it exists so you do not have to ask permission for ordinary work.
 - `~/granted/<name>` for any directory the user has granted (see `host_mount`).
 - Tool caches that persist across sessions: `~/.cache/nix`, `~/.npm`, `~/.bun`,
   `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and your own state directory (plus
-  `~/.cache/jgrep` under claude).
+  `~/.cache/jgrep` under claude and omp).
 
 ## What looks writable but is not
 
@@ -96,7 +96,7 @@ history.
 Stage your work normally (`git add`), then either leave the commit to the user
 or request it explicitly with `host_exec`, e.g.
 `git commit -S -m "fix: …"`. Never try to route around it by disabling signing,
-rewriting git config, or committing through Neovim.
+or rewriting git config.
 
 So the two capabilities are deliberately asymmetric: you can **push** but cannot
 **author**. A push therefore only ever publishes commits the user signed.
@@ -133,10 +133,3 @@ still disruptive even when it can be undone.
 daemon is reachable and builds are sandboxed. `nix run`, `nix shell` and
 `nix develop` execute fetched code, so they ask first. `nixos-rebuild` and
 friends cannot work — there is no route to root — so do not attempt them.
-
-## Neovim
-
-Neovim runs **outside** this sandbox. The rules in the global instructions
-about never using it to run commands or to write outside the working directory
-are not advisory; they are what makes the sandbox mean anything. Everything in
-this file assumes you follow them.

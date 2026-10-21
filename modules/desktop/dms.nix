@@ -33,6 +33,17 @@
     }: {
       imports = lib.optionals (inputs ? dank-greeter) [inputs.dank-greeter.nixosModules.default];
 
+      # khal (pulled in by enableCalendarEvents) 0.14.1's sphinx man build no
+      # longer lands in $man; drop once nixpkgs fixes it
+      nixpkgs.overlays = [
+        (final: prev: {
+          khal = prev.khal.overridePythonAttrs {
+            outputs = ["out" "doc"];
+            sphinxBuilders = ["html"];
+          };
+        })
+      ];
+
       qt.enable = true;
       programs.kdeconnect.enable = true;
 

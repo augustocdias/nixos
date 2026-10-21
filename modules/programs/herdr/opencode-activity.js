@@ -32,7 +32,7 @@ let agentActive = false;
 const subagents = new Map();
 
 function nextReportSeq() {
-  reportSeq += 1;
+  reportSeq = Math.max(reportSeq + 1, Date.now() * 1000);
   return reportSeq;
 }
 
@@ -183,6 +183,7 @@ async function seedFromSession(client, sessionID) {
 function todoSummary(todos) {
   const active = todos.find((todo) => todo.status === "in_progress");
   const done = todos.filter((todo) => todo.status === "completed").length;
+  if (done === todos.length) return "";
   return `${done}/${todos.length} ${active?.content ?? ""}`;
 }
 

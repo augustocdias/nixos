@@ -258,16 +258,13 @@
       url = "github:folke/which-key.nvim";
       flake = false;
     };
+    oh-my-pi.url = "github:can1357/oh-my-pi";
     ponytail = {
       url = "github:DietrichGebert/ponytail";
       flake = false;
     };
     sops-nix = {
       url = "github:Mic92/sops-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    sqlit = {
-      url = "github:Maxteabag/sqlit";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     win98se-plymouth = {

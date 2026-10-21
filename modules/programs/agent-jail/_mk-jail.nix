@@ -140,13 +140,6 @@ in
         '')
 
         (add-runtime ''
-          nvim_sock="$HOME/.cache/nvim/server-''${HERDR_WORKSPACE_ID:-dettached}.pipe"
-          if [ -S "$nvim_sock" ]; then
-            RUNTIME_ARGS+=(--bind "$nvim_sock" "$nvim_sock")
-          fi
-        '')
-
-        (add-runtime ''
           if [ -S "''${HERDR_SOCKET_PATH:-}" ]; then
             RUNTIME_ARGS+=(--bind "$HERDR_SOCKET_PATH" "$HERDR_SOCKET_PATH")
           fi

@@ -6,7 +6,11 @@
   version = "0.6.0";
 in {
   den.aspects.jgrep = {
-    homeManager = {pkgs, lib, ...}: let
+    homeManager = {
+      pkgs,
+      lib,
+      ...
+    }: let
       jgrep = pkgs.stdenvNoCC.mkDerivation {
         pname = "jgrep";
         inherit version;
@@ -43,8 +47,9 @@ in {
     in {
       home.packages = [jgrep];
 
-      # Work-only, so the skill goes to Claude Code (the work harness) only.
+      # Work-only, so the skill goes to the work-capable harnesses only.
       programs.claude-code.skills.jgrep = "${jgrep}/share/jgrep/SKILL.md";
+      home.file.".omp/agent/skills/jgrep/SKILL.md".source = "${jgrep}/share/jgrep/SKILL.md";
 
       # Ensure the cache dir exists so the claude jail's try-rw-bind picks it up.
       home.activation.jgrep-cache = lib.hm.dag.entryAfter ["writeBoundary"] ''

@@ -1,6 +1,6 @@
 # Opens a workspace for a directory, with the default layout:
 #
-#   tab "neovim"   -> nvim (70%) | opencode (30%)
+#   tab "neovim"   -> nvim (70%) | @agent@ (30%)
 #   tab "terminal" -> main (70%) | tooling (30%)
 #
 # usage: herdr-workspace [dir] [label]
@@ -16,7 +16,7 @@
 # herdr is attached at the end unless we are already inside it.
 #
 # herdr panes are always interactive shells (pane create takes no argv), so
-# `pane run` types into the shell and quitting nvim/opencode leaves the pane
+# `pane run` types into the shell and quitting nvim or the agent leaves the pane
 # alive on a prompt.
 
 set -l herdr $HERDR_BIN_PATH
@@ -77,7 +77,7 @@ function _herdr_build_layout -a herdr workspace editor_tab editor_pane
         | @jq@ -r '.result.pane.pane_id')
 
     $herdr pane rename $editor_pane neovim >/dev/null
-    $herdr pane rename $agent_pane opencode >/dev/null
+    $herdr pane rename $agent_pane @agent@ >/dev/null
 
     set -l terminal ($herdr tab create --workspace $workspace --label terminal --no-focus \
         | @jq@ -r '.result.tab.tab_id, .result.root_pane.pane_id')
@@ -91,7 +91,7 @@ function _herdr_build_layout -a herdr workspace editor_tab editor_pane
     _herdr_ready $herdr $editor_pane
     $herdr pane run $editor_pane nvim >/dev/null
     _herdr_ready $herdr $agent_pane
-    $herdr pane run $agent_pane opencode >/dev/null
+    $herdr pane run $agent_pane @agent@ >/dev/null
 end
 
 # Every command below needs a server; a bare `herdr` would attach instead of
@@ -106,7 +106,7 @@ if not _herdr_server_running $herdr
 end
 
 # Trust the environment before any pane shell starts, otherwise nvim and
-# opencode come up without it. Repos without direnv are left alone.
+# the agent come up without it. Repos without direnv are left alone.
 if test -f $dir/.envrc
     @direnv@ allow $dir 2>/dev/null
 end

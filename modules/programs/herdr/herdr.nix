@@ -32,7 +32,8 @@
 
       nav = mkFish "herdr-nav" ./nav.fish {};
       resize = mkFish "herdr-resize" ./resize.fish {};
-      workspace = mkFish "herdr-workspace" ./workspace.fish {};
+      # The agent the default layout starts next to nvim.
+      workspace = mkFish "herdr-workspace" ./workspace.fish {"@agent@" = "omp";};
       worktree = mkFish "herdr-worktree" ./worktree.fish {
         "@workspace@" = "${workspace}/bin/herdr-workspace";
       };
@@ -71,6 +72,16 @@
 
       # No-op unless the claude-code aspect enables the module.
       programs.claude-code.skills.herdr = herdrSkill;
+
+      home.file = {
+        # herdr's omp integration: lifecycle state, session identity and
+        # resume. Same file `herdr integration install omp` writes, from the
+        # same source revision as the binary, so status stays clean.
+        ".omp/agent/extensions/herdr-omp-agent-state.ts".source = "${pkgs.herdr.src}/src/integration/assets/omp/herdr-agent-state.ts";
+        # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
+        ".omp/agent/extensions/herdr-activity.ts".source = ./omp-activity.ts;
+        ".omp/agent/skills/herdr/SKILL.md".source = herdrSkill;
+      };
 
       home.activation.herdr-plugins = lib.hm.dag.entryAfter ["writeBoundary"] ''
         ${pluginsSync}/bin/herdr-plugins-sync ${lib.escapeShellArgs plugins} \
@@ -147,7 +158,7 @@
             pane_scrollbars = false;
             hide_tab_bar_when_single_tab = true;
 
-            # Tokens come from opencode-activity.js. Rows and tokens with no
+            # Tokens come from opencode-activity.js / omp-activity.ts. Rows and tokens with no
             # value disappear, so an idle agent collapses to the first line.
             sidebar.agents.rows = [
               [

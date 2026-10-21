@@ -110,7 +110,7 @@ in {
 
   status-card = stdenvNoCC.mkDerivation rec {
     pname = "status-card";
-    version = "3.3.3";
+    version = "3.4.0b2";
 
     src = fetchurl {
       url = "https://github.com/xBourner/status-card/releases/download/v${version}/status-card.js";
