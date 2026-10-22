@@ -5,15 +5,15 @@
   ...
 }: {
   flake-file.inputs.dms = {
-    url = lib.mkDefault "github:AvengeMedia/DankMaterialShell";
+    url = lib.mkDefault "github:duxlabs-dev/dux-shell";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   flake-file.inputs.dms-plugins = {
-    url = lib.mkDefault "github:AvengeMedia/dms-plugin-registry";
+    url = lib.mkDefault "github:duxlabs-dev/dux-plugin-registry";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   flake-file.inputs.dankcalendar = {
-    url = lib.mkDefault "github:AvengeMedia/dankcalendar";
+    url = lib.mkDefault "github:duxlabs-dev/dux-calendar";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   flake-file.inputs.dank-pinentry = {
@@ -21,7 +21,7 @@
     inputs.nixpkgs.follows = "nixpkgs";
   };
   flake-file.inputs.dank-greeter = {
-    url = lib.mkDefault "github:AvengeMedia/dank-greeter";
+    url = lib.mkDefault "github:duxlabs-dev/dux-greeter";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 

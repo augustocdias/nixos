@@ -1,25 +1,24 @@
-# omp approval settings, built from opencode's bash ruleset so all three
-# harnesses share one source of truth.
+# omp approval settings, built from the bash ruleset shared with Claude Code
+# (agent-shared/_bash.nix).
 #
 # omp resolves `bash.patterns` by first match, so the rules are emitted
-# strictest first: deny, then prompt, then allow. That matches opencode
-# (last match) and Claude (deny > ask > allow) only because every override in
-# the source narrows toward ask/deny — the same caveat as
-# claude-code/_permissions.nix.
+# strictest first: deny, then prompt, then allow. That matches Claude
+# (deny > ask > allow) only because every override in the source narrows
+# toward ask/deny.
 {
   lib,
   jailed,
 }: let
-  baseBash = (import ../opencode/_permissions.nix {inherit jailed;}).baseBash;
+  baseBash = import ../agent-shared/_bash.nix {inherit jailed;};
 
   rules = action: approval:
     map (match: {inherit match approval;})
     (builtins.filter (k: k != "*" && baseBash.${k} == action) (builtins.attrNames baseBash));
 in {
   tools = {
-    # Jailed: the sandbox is the boundary and unmatched bash runs, as with
-    # opencode's `* = allow`. Darwin has no jail: edits pass, anything that
-    # executes code (unmatched bash, eval, task, browser) asks.
+    # Jailed: the sandbox is the boundary and unmatched bash runs (`* = allow`).
+    # Darwin has no jail: edits pass, anything that executes code (unmatched
+    # bash, eval, task, browser) asks.
     approvalMode =
       if jailed
       then "yolo"

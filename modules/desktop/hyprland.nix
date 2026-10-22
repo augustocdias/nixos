@@ -278,7 +278,7 @@ in {
             }
             {
               name = "ws-dankcalendar";
-              match.class = "^(com\\.danklinux\\.dankcalendar)$";
+              match.class = "^(dev\\.duxlabs\\.calendar)$";
               workspace = "3 silent";
             }
             {

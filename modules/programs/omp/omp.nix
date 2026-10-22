@@ -1,9 +1,14 @@
 {
   den,
   inputs,
+  lib,
   ...
 }: {
   flake-file.inputs.oh-my-pi.url = "github:can1357/oh-my-pi";
+  flake-file.inputs.caveman = {
+    url = lib.mkDefault "github:JuliusBrussee/caveman";
+    flake = false;
+  };
 
   den.aspects.omp = {
     homeManager = {
@@ -22,7 +27,7 @@
           "${shared.${kind}}/${name}.md");
 
       # omp has no `!`cmd`` injection in command templates, so the shared
-      # bodies (written for opencode/claude) are told to run them instead.
+      # bodies (written for claude) are told to run them instead.
       command = name: let
         body = builtins.readFile "${shared.commands}/${name}.md";
         lead =
@@ -56,6 +61,8 @@
         startup.setupWizard = false;
         marketplace.autoUpdate = "off";
         telemetry.otlpExportEnabled = false;
+        astGrep.enabled = true;
+        error.notify = "on";
         # Extension packages: their package.json entry plus sibling skills/,
         # commands/, agents/ and rules/ load as if plugin-installed.
         extensions = ["${caveman}" "${inputs.ponytail}"];

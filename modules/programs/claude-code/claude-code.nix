@@ -28,7 +28,7 @@
       mcp = server: tool: "mcp__plugin_hm_${server}__${tool}";
 
       perms = import ./_permissions.nix {
-        baseBash = (import ../opencode/_permissions.nix {jailed = true;}).baseBash;
+        baseBash = import ../agent-shared/_bash.nix {jailed = true;};
       };
 
       statusline = pkgs.writeShellApplication {

@@ -1,4 +1,4 @@
-# Bubblewrap jail shared by every coding agent (opencode, claude).
+# Bubblewrap jail shared by every coding agent (omp, claude).
 #
 # Usage: import ./_mk-jail.nix {inherit inputs lib pkgs config;} {
 #   name    = "claude";        # installed binary name, and the state dir prefix

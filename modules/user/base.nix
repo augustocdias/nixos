@@ -16,7 +16,6 @@
       yazi
       skim
       neovide
-      opencode
       omp
       cli-tools
       fonts

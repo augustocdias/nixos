@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = {
-    description = "Host-side query service for jailed coding agents (opencode, claude)";
+    description = "Host-side query service for jailed coding agents (omp, claude)";
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
     mainProgram = "agent-host-query";

@@ -135,7 +135,7 @@ def validate_request(request, pane_id, agent):
         required |= {"tokens"}
         optional |= {"ttl_ms"}
         source = "user:" + agent + "-activity"
-    elif method == "pane.report_agent" and agent in {"omp", "opencode"}:
+    elif method == "pane.report_agent" and agent == "omp":
         required |= {"agent", "state"}
         optional |= {"message", "agent_session_id", "agent_session_path"}
         source = "herdr:" + agent
@@ -184,8 +184,6 @@ def validate_request(request, pane_id, agent):
             session_id = clean["agent_session_id"]
             if not isinstance(session_id, str) or len(session_id) > 512 or SESSION_ID.fullmatch(session_id) is None:
                 invalid("invalid agent_session_id")
-        if "agent_session_path" in clean and agent == "opencode":
-            denied("OpenCode session paths are not allowed")
         if "agent_session_path" in clean:
             path = clean["agent_session_path"]
             text(path, 4096, "agent_session_path")
@@ -277,7 +275,7 @@ def main():
     parser.add_argument("--listen", required=True)
     parser.add_argument("--upstream", required=True)
     parser.add_argument("--pane-id", required=True)
-    parser.add_argument("--agent", choices=("omp", "opencode", "claude"), required=True)
+    parser.add_argument("--agent", choices=("omp", "claude"), required=True)
     args = parser.parse_args()
     if not os.path.isabs(args.listen) or not os.path.isabs(args.upstream):
         parser.error("listen and upstream socket paths must be absolute")

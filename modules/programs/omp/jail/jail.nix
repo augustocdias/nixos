@@ -4,6 +4,8 @@
   lib,
   ...
 }: {
+  flake-file.inputs.jail-nix.url = lib.mkDefault "sourcehut:~alexdavid/jail.nix";
+
   den.aspects.omp-jail = {
     homeManager = {
       pkgs,

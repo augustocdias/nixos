@@ -47,7 +47,7 @@
             lib.optionals (plugin.skills != null) (
               map
               (name:
-                lib.nameValuePair "opencode/skills/${name}/SKILL.md" {
+                lib.nameValuePair ".omp/agent/skills/${name}/SKILL.md" {
                   source = "${plugin.skills}/${name}/SKILL.md";
                 })
               (builtins.attrNames (builtins.readDir plugin.skills))
@@ -103,36 +103,22 @@
         };
       };
 
-      home.file = {
-        # herdr's omp integration: lifecycle state, session identity and
-        # resume. Same file `herdr integration install omp` writes, from the
-        # same source revision as the binary, so status stays clean.
-        ".omp/agent/extensions/herdr-omp-agent-state.ts".source = "${pkgs.herdr.src}/src/integration/assets/omp/herdr-agent-state.ts";
-        # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
-        ".omp/agent/extensions/herdr-activity.ts".source = ./omp-activity.ts;
-        ".omp/agent/skills/herdr/SKILL.md".source = herdrSkill;
-      };
+      home.file =
+        {
+          # herdr's omp integration: lifecycle state, session identity and
+          # resume. Same file `herdr integration install omp` writes, from the
+          # same source revision as the binary, so status stays clean.
+          ".omp/agent/extensions/herdr-omp-agent-state.ts".source = "${pkgs.herdr.src}/src/integration/assets/omp/herdr-agent-state.ts";
+          # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
+          ".omp/agent/extensions/herdr-activity.ts".source = ./omp-activity.ts;
+          ".omp/agent/skills/herdr/SKILL.md".source = herdrSkill;
+        }
+        // pluginSkills;
 
       home.activation.herdr-plugins = lib.hm.dag.entryAfter ["writeBoundary"] ''
         ${pluginsSync}/bin/herdr-plugins-sync ${lib.escapeShellArgs plugins} \
           || echo "herdr: plugin sync failed" >&2
       '';
-
-      xdg.configFile =
-        {
-          # opencode integration throgh skill and plugin
-          "opencode/plugins/herdr-agent-state.js".source = "${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js";
-          "opencode/skills/herdr/SKILL.md".source = herdrSkill;
-
-          # TUI session plugin: reports agent session identity for resume.
-          # Installed at the config-dir root (not plugins/) because herdr's
-          # integration check reads it from there (registry.rs:420).
-          "opencode/herdr-tui-session.js".source = "${pkgs.herdr.src}/src/integration/assets/opencode/herdr-tui-session.js";
-
-          # Ours, next to herdr's: metadata only, feeding the Agents sidebar.
-          "opencode/plugins/herdr-activity.js".source = ./opencode-activity.js;
-        }
-        // pluginSkills;
 
       systemd.user.services.herdr = {
         Unit = {
@@ -180,15 +166,12 @@
             sidebar_width = 36;
             sidebar_max_width = 36;
             agent_panel_sort = "priority";
-            toast = {
-              delivery = "herdr";
-              herdr.position = "top-right";
-            };
+            toast.delivery = "system";
             right_click_passthrough_modifier = "ctrl";
             pane_scrollbars = false;
             hide_tab_bar_when_single_tab = true;
 
-            # Tokens come from opencode-activity.js / omp-activity.ts. Rows and tokens with no
+            # Tokens come from omp-activity.ts / claude-activity.py. Rows and tokens with no
             # value disappear, so an idle agent collapses to the first line.
             sidebar.agents.rows = [
               [

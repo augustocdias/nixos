@@ -160,10 +160,10 @@ class OmpTest(RelayTest):
     def test_identity_mismatch_denied(self):
         cases = [
             ("pane.report_metadata", self.metadata(pane_id="w1:p2")),
-            ("pane.report_metadata", self.metadata(source="user:opencode-activity")),
+            ("pane.report_metadata", self.metadata(source="user:claude-activity")),
             ("pane.report_agent", self.state(source="herdr:claude")),
             ("pane.report_agent", self.state(agent="claude")),
-            ("pane.report_agent_session", self.session(agent="opencode")),
+            ("pane.report_agent_session", self.session(agent="claude")),
         ]
         for method, params in cases:
             self.assertDenied(self.call(method, params))
@@ -280,23 +280,6 @@ class OmpTest(RelayTest):
              "--pane-id", PANE, "--agent", "omp"], capture_output=True, timeout=5)
         self.assertNotEqual(second.returncode, 0)
         self.assertTrue(os.path.exists(self.listen))
-
-
-class OpencodeTest(RelayTest):
-    agent = "opencode"
-
-    def test_reports(self):
-        params = self.metadata()
-        self.assertForwarded(self.call("pane.report_metadata", params), params)
-        params = self.state(agent_session_id="ses_01JABC")
-        self.assertForwarded(self.call("pane.report_agent", params), params)
-        # The TUI session plugin sends no seq.
-        params = {"pane_id": PANE, "source": "herdr:opencode", "agent": "opencode",
-                  "agent_session_id": "ses_01JABC", "session_start_source": "select"}
-        self.assertForwarded(self.call("pane.report_agent_session", params), params)
-
-    def test_session_path_denied(self):
-        self.assertDenied(self.call("pane.report_agent", self.state(agent_session_path="/x")))
 
 
 class ClaudeTest(RelayTest):

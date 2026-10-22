@@ -5,7 +5,7 @@
         enable = true;
         lfs.enable = true;
 
-        # The opencode jail shadows rm with rmtrash. Inside the jail the working
+        # The agent jail shadows rm with rmtrash. Inside the jail the working
         # directory is its own bind mount, so the freedesktop spec's topdir
         # fallback puts deletions in <workdir>/.Trash-1000 rather than the home
         # trash — a cross-mount rename would be EXDEV. Keep those out of sight.

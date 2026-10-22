@@ -1,6 +1,6 @@
-# Prompts shared by opencode and claude-code. The bodies are plain markdown
-# without frontmatter; each harness adds its own via `withFrontmatter`, since
-# the two disagree on keys (opencode: mode/agent/subtask, claude: name/tools).
+# Prompts shared by omp and claude-code. The bodies are plain markdown without
+# frontmatter; each harness adds its own via `withFrontmatter`, since they
+# disagree on keys.
 {lib}: rec {
   description = {
     reviewer = "Read-only code reviewer for pre-commit and PR review. Inspects diffs for bugs, security issues, edge cases, and style violations. Cannot edit files. Invoke with @reviewer or via the /review command.";

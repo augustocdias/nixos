@@ -10,7 +10,6 @@
       thunderbird
       mpv
       xdg
-      opencode-jail
       omp-jail
       work
     ];

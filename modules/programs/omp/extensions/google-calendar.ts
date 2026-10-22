@@ -1,5 +1,4 @@
-// Read-only Google Calendar via gcalcli. Port of opencode's
-// tools/google_calendar.ts.
+// Read-only Google Calendar via gcalcli.
 //
 // Managed by nix (modules/programs/omp/extensions/google-calendar.ts).
 

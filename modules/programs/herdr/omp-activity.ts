@@ -1,6 +1,5 @@
-// Feeds herdr's Agents sidebar with what omp is actually doing. Port of
-// opencode-activity.js; the tokens and their meaning are the same, except
-// $agent, which is the active model: omp has no named primary agents.
+// Feeds herdr's Agents sidebar with what omp is actually doing. $agent is the
+// active model: omp has no named primary agents.
 //
 // Managed by nix (modules/programs/herdr/omp-activity.ts). It publishes
 // display-only pane metadata through `pane.report_metadata` and never calls

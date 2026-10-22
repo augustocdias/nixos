@@ -2,7 +2,7 @@
 
 A fully declarative cross-platform configuration for a single user (`augusto`) spanning two machines: an Intel laptop running NixOS + Hyprland + DankMaterialShell on Wayland, and a Mac mini running macOS via nix-darwin. Managed with the **Den** framework for composable, aspect-based module organization.
 
-> **Keep this file current.** When you change hosts, aspects, module layout, inputs, LSP/formatter/linter sets, OpenCode config, or any documented behavior, update the relevant section of this AGENTS.md in the same change. Treat it as part of the diff, not an afterthought.
+> **Keep this file current.** When you change hosts, aspects, module layout, inputs, LSP/formatter/linter sets, agent harness config, or any documented behavior, update the relevant section of this AGENTS.md in the same change. Treat it as part of the diff, not an afterthought.
 
 ## Framework & Module System
 
@@ -20,7 +20,7 @@ A fully declarative cross-platform configuration for a single user (`augusto`) s
 | **nix-homebrew**      | `zhaofengli/nix-homebrew`    | Declarative Homebrew (casks) on Darwin                                      |
 | **nixos-raspberrypi** | `nvmd/nixos-raspberrypi`     | Raspberry Pi 4 boot: firmware partition, config.txt, vendor kernel+firmware |
 | **sops-nix**          | `Mic92/sops-nix`             | Secrets management                                                          |
-| **jail-nix**          | `~alexdavid/jail.nix`        | Bubblewrap combinator library (sourcehut) — backs the opencode sandbox      |
+| **jail-nix**          | `~alexdavid/jail.nix`        | Bubblewrap combinator library (sourcehut) — backs the agent sandbox         |
 
 ### How it works
 
@@ -101,10 +101,9 @@ modules/
     neovide.nix             # Neovide (Neovim GUI) via home-manager's programs.neovide
     neovim/                 # Neovim — extensive config (see Neovim section)
     agent-jail/             # shared bubblewrap jail (mkJail), host-query, host_* MCP shim
-    agent-shared/           # prompts/context/skills shared by opencode + claude-code
+    agent-shared/           # prompts/context/skills + bash ruleset shared by omp + claude-code
     claude-code/            # Claude Code — work harness (see Claude Code section)
-    opencode/               # OpenCode — personal harness (see OpenCode section)
-    omp/                    # oh-my-pi — successor to OpenCode under evaluation (see omp section)
+    omp/                    # oh-my-pi — personal harness (see omp section)
     skim.nix                # Skim fuzzy finder with rg/fd/bat
     starship.nix            # Starship prompt with Catppuccin powerline segments
     stylua.nix              # StyLua config
@@ -393,7 +392,7 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 - **Bar**: top position, 50% transparency, Catppuccin theme, widgets: launcher, workspaces, window title, apps, MPRIS, clock, weather, tray, recorder, notifications, clipboard, CPU/RAM/battery, control center, session power
 - **Launcher**: list view, compact, recent-first sorting, DuckDuckGo web search, emoji (`:` trigger), calculator
 - **Lock screen**: password + fingerprint + FIDO2/U2F parallel auth, video wallpaper from `~/media/animated/`
-- **Greeter**: the greeter now ships as a **separate flake** (`AvengeMedia/dank-greeter`, input `dank-greeter`), driven by `programs.dms-greeter` (Hyprland compositor). It syncs the user's DMS theme/wallpaper/settings into its cache dir `/var/lib/dms-greeter` (copied from `~/.config/DankMaterialShell/` etc. via `configHome`) before greetd starts.
+- **Greeter**: the greeter now ships as a **separate flake** (`duxlabs-dev/dux-greeter`, input `dank-greeter`), driven by `programs.dms-greeter` (Hyprland compositor). It syncs the user's DMS theme/wallpaper/settings into its cache dir `/var/lib/dms-greeter` (copied from `~/.config/DankMaterialShell/` etc. via `configHome`) before greetd starts.
 - **Control center**: volume, brightness, WiFi, Bluetooth, audio I/O, DND, idle inhibitor, VPN, KDE Connect
 - **Notifications**: 5s timeout (normal), persistent (critical), 50 history items, 7-day retention
 - **Desktop widgets**: system monitor (CPU/RAM/network/disk) + weather forecast
@@ -418,15 +417,14 @@ DMS runs as a **systemd user service** and communicates with Hyprland through:
 
 | File                   | Purpose                                                                                                        |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `herdr.nix`            | aspect `herdr`: `programs.herdr.settings`, the fish helpers, the plugin list, herdr's own OpenCode integration |
+| `herdr.nix`            | aspect `herdr`: `programs.herdr.settings`, the fish helpers, the plugin list, herdr's omp/Claude integrations  |
 | `_plugins.nix`         | `mkHerdrPlugin` — builds and installs herdr plugins declaratively                                              |
 | `nav.fish`             | `herdr-nav <dir>` — vim-aware pane focus                                                                       |
 | `resize.fish`          | `herdr-resize <dir>` — pane resize through the CLI                                                             |
 | `workspace.fish`       | `herdr-workspace [dir] [label]` — opens a workspace with the default layout                                    |
 | `worktree.fish`        | `herdr-worktree [branch]` — creates/reuses the checkout, then opens the workspace                              |
 | `plugins-sync.fish`    | converges herdr's plugin registry with the declared set during home-manager activation                         |
-| `opencode-activity.js` | OpenCode plugin feeding the Agents sidebar tokens (see Agents sidebar)                                         |
-| `omp-activity.ts`      | the same, as an omp extension                                                                                  |
+| `omp-activity.ts`      | omp extension feeding the Agents sidebar tokens (see Agents sidebar)                                           |
 | `claude-activity.py`   | the same, as Claude Code hooks                                                                                 |
 
 Config is generated from a nix attrset (`settings` → `~/.config/herdr/config.toml`) rather than kept as a static file, because the keybindings interpolate store paths. The home-manager module runs `herdr server reload-config` on change. All helper scripts are fish (`pkgs.writers.writeFishBin`, syntax-checked at build time) with `@herdr@`/`@jq@` substituted for absolute store paths.
@@ -501,15 +499,15 @@ The repo half of the label comes from `git remote get-url origin` (basename minu
 
 ### Agents sidebar
 
-`ui.sidebar.agents.rows` is fed by `opencode-activity.js` (deployed to `~/.config/opencode/plugins/herdr-activity.js`) and its omp port `omp-activity.ts` (`~/.omp/agent/extensions/herdr-activity.ts`; same tokens, but `$agent` is the active model since omp has no named primary agents, and nested sessions are skipped via `OMPCODE=1`). Each reports **display-only** pane metadata through `pane.report_metadata` and never calls `pane.report_agent` — so it cannot disturb the lifecycle state or session identity owned by herdr's own integration sitting next to it.
+`ui.sidebar.agents.rows` is fed by `omp-activity.ts` (`~/.omp/agent/extensions/herdr-activity.ts`; nested sessions are skipped via `OMPCODE=1`) and Claude's `claude-activity.py` (below). Each reports **display-only** pane metadata through `pane.report_metadata` and never calls `pane.report_agent` — so it cannot disturb the lifecycle state or session identity owned by herdr's own integration sitting next to it.
 
-| Token                     | OpenCode event → field                                                               | Example                              |
-| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
-| `$agent`                  | `chat.message` → `input.agent`, cleared on `session.idle`                            | `build`                              |
-| `$title`                  | `session.updated` → `info.title`, minus OpenCode's `New session - <iso>` placeholder | `Async core client block_on…`        |
-| `$todo`                   | `todo.updated` → completed count + the `in_progress` item                            | `1/3 wire the plugin into herdr.nix` |
-| `$sub1`, `$sub2`, `$sub3` | `tool.execute.before` where `tool == "task"` → `subagent_type` + `description`       | `explore: audit the bash allowlist`  |
-| `$submore`                | the overflow beyond three slots, subagent types joined by `, `                       | `test-writer, tickets`               |
+| Token                     | Meaning                                                | Example                              |
+| ------------------------- | ------------------------------------------------------ | ------------------------------------ |
+| `$agent`                  | active model, shown only while a turn runs             | `gpt-6.1-sol`                        |
+| `$title`                  | session title                                          | `Async core client block_on…`        |
+| `$todo`                   | completed count + the in-progress item                 | `1/3 wire the plugin into herdr.nix` |
+| `$sub1`, `$sub2`, `$sub3` | running subagents: type + description                  | `explore: audit the bash allowlist`  |
+| `$submore`                | the overflow beyond three slots, subagent types joined | `test-writer, tickets`               |
 
 For omp, `$title` subscribes to `sessionManager.onSessionNameChanged`, covering asynchronous automatic titles and idle `/rename` changes. Session navigation replaces the listener; shutdown removes it. Run `node --test modules/programs/herdr/omp-activity.test.mjs` to check delayed titles, renames, and session isolation.
 
@@ -519,30 +517,25 @@ Both reporters clear `$todo` when every task is completed, hiding the sidebar ro
 
 **herdr keys metadata by pane + source, not by process**, so tokens outlive the agent that wrote them until their TTL. omp therefore publishes every token empty on `session_shutdown`; without it a `0/4 …` todo from an omp that quit mid-task sat under the next agent in that pane for 12h.
 
-**Claude Code** has its own reporter, `claude-activity.py` (deployed to `~/.claude/hooks/herdr-activity.py`, wired from `herdr.nix` into `programs.claude-code.settings.hooks`), source `user:claude-activity`. Hooks are separate processes, so it keeps per-session state in `~/.claude/herdr-activity/<session_id>.json` under `flock` (parallel tool calls fire hooks concurrently). `$agent` is the model from `SessionStart`, shown between `UserPromptSubmit` and `Stop`; `$todo` comes from `PostToolUse` on `TaskCreate`/`TaskUpdate`/`TodoWrite`; `$sub*` from `SubagentStart`/`SubagentStop`, with the description taken from the preceding `PreToolUse` on `Agent` (SubagentStart carries only the type). No hook carries the session title, so `$title` is the last `ai-title` entry in the transcript (`transcript_path`; Claude rewrites it every few turns, so only the last 1 MiB is read). `Stop` does not fire on an interrupt, so `Notification` `idle_prompt` also hides `$agent`, a minute later. Events carrying `agent_id` (inside a subagent) are ignored except the subagent lifecycle. `SessionStart` resets, except on `compact`; on `resume`/`fork` it replays the transcript's successful `TaskCreate`/`TaskUpdate`/`TodoWrite` calls (non-sidechain) and title, the counterpart of omp's `todoFromBranch` and opencode's `seedFromSession`. `SessionEnd` clears everything. The todo tools are off by default on newer models, hence `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in `claude-code.nix`. Tests: `python3 modules/programs/herdr/claude-activity.test.py`.
+**Claude Code** has its own reporter, `claude-activity.py` (deployed to `~/.claude/hooks/herdr-activity.py`, wired from `herdr.nix` into `programs.claude-code.settings.hooks`), source `user:claude-activity`. Hooks are separate processes, so it keeps per-session state in `~/.claude/herdr-activity/<session_id>.json` under `flock` (parallel tool calls fire hooks concurrently). `$agent` is the model from `SessionStart`, shown between `UserPromptSubmit` and `Stop`; `$todo` comes from `PostToolUse` on `TaskCreate`/`TaskUpdate`/`TodoWrite`; `$sub*` from `SubagentStart`/`SubagentStop`, with the description taken from the preceding `PreToolUse` on `Agent` (SubagentStart carries only the type). No hook carries the session title, so `$title` is the last `ai-title` entry in the transcript (`transcript_path`; Claude rewrites it every few turns, so only the last 1 MiB is read). `Stop` does not fire on an interrupt, so `Notification` `idle_prompt` also hides `$agent`, a minute later. Events carrying `agent_id` (inside a subagent) are ignored except the subagent lifecycle. `SessionStart` resets, except on `compact`; on `resume`/`fork` it replays the transcript's successful `TaskCreate`/`TaskUpdate`/`TodoWrite` calls (non-sidechain) and title, the counterpart of omp's `todoFromBranch`. `SessionEnd` clears everything. The todo tools are off by default on newer models, hence `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in `claude-code.nix`. Tests: `python3 modules/programs/herdr/claude-activity.test.py`.
 
-`rows` is static, so one subagent per line means one fixed slot per line. Values are pre-truncated at 72 characters (herdr caps at 80) so the ellipsis is ours, every report carries the full token set (an empty value is how herdr clears a key), a monotonic `seq` drops stale writes, and a 12h TTL keeps a `kill -9` from leaving stale lines. Events from sessions with a `parentID` are dropped, so a subagent's todo list can never overwrite yours; the `$subN` slots come from the parent's own `task` tool calls and each clears when its `callID` finishes. `$agent` clears on `session.idle`, because `Tab` cycles the agent purely inside the TUI (`local.agent.move` writes an in-memory store, with no bus event, no persistence and no `agent` field in the plugin's `TuiState` view) — an idle pane would otherwise keep showing whichever agent last sent a message.
+`rows` is static, so one subagent per line means one fixed slot per line. Values are pre-truncated at 72 characters (herdr caps at 80) so the ellipsis is ours, every report carries the full token set (an empty value is how herdr clears a key), a monotonic `seq` drops stale writes, and a 12h TTL keeps a `kill -9` from leaving stale lines. Subagent sessions never report their own todo list, so it cannot overwrite yours.
 
 Line one is the only undimmed row, and the rest carry explicit muted foregrounds because `dim` alone is not quiet enough: `#6f8f6b` for `$todo`, `#6c7086` for the subagent slots. `ui.agent_panel_sort = "priority"` floats agents needing attention to the top, and the sidebar is pinned to 36 columns because these rows clip badly at the default 26.
 
-### OpenCode integration and skills
+### Notifications
 
-`herdr.nix` owns these (not `opencode.nix` — herdr's integration is herdr's business):
-
-- `~/.config/opencode/plugins/herdr-agent-state.js` ← `${pkgs.herdr.src}/src/integration/assets/opencode/herdr-agent-state.js`. Reports lifecycle state and session identity, which is what makes the sidebar show `working`/`blocked`/`idle` and makes agent panes resumable. Deployed from the same source revision as the binary, so it can never skew — never run `herdr integration install opencode`.
-- `~/.config/opencode/herdr-tui-session.js` ← `${pkgs.herdr.src}/src/integration/assets/opencode/herdr-tui-session.js`. Reports agent session id for session resume. Installed at the **config-dir root** (not `plugins/`), because that is where `registry.rs:420` looks. Same source-pinning as the agent-state asset. Registered in `tui.jsonc` as `"./herdr-tui-session.js"` (string matching in `plugin_entry_matches`).
-- `~/.config/opencode/tui.jsonc` ← symlink to the `tui.json` generated by `programs.opencode.tui`. herdr's `opencode_tui_integration_is_valid` reads **only** `tui.jsonc` (`TUI_CONFIG_NAME`, hardcoded with no fallback); opencode itself reads both. Without this alias `herdr integration status` reports `needs repair` permanently.
-- `~/.config/opencode/skills/herdr/SKILL.md` ← **`herdr --skill`** (a `runCommand` that pipes the flag's output to `$out`). Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`. Do **not** read this from `${pkgs.herdr.src}`: 0.8 moved the file from the repo root to `skills/herdr/SKILL.md` and the old path broke silently. The CLI flag is a stable contract and guarantees the skill matches the installed binary.
-- Skills shipped by plugins, picked up from `mkHerdrPlugin`'s `passthru.skills`.
+`ui.toast.delivery = "system"`: the herdr client runs `notify-send --app-name Herdr` (DMS shows it; `terminal-notifier`/`osascript` on macOS) when an agent turns `blocked` ("needs attention") or goes working → idle ("finished"). It is skipped only when the pane is in the visible tab **and** Ghostty has focus (or focus is unknown) — per tab, not per pane, and not configurable. `delivery` is one choice, so this replaces the in-herdr toast.
 
 ### omp integration
 
-Also owned by `herdr.nix`:
+Owned by `herdr.nix`:
 
 - `~/.omp/agent/extensions/herdr-omp-agent-state.ts` ← `${pkgs.herdr.src}/src/integration/assets/omp/herdr-agent-state.ts`, the exact file `herdr integration install omp` writes. Status is clean when it contains `HERDR_INTEGRATION_VERSION>=10`. Gives state, session identity and resume (`omp --resume=<ref>`). It also listens on the omp event bus channel `herdr:blocked`, which the omp `gate.ts` extension emits so its approval dialogs show as `blocked`. Never run the installer.
-- `~/.omp/agent/skills/herdr/SKILL.md` ← the same `herdr --skill` output.
+- `~/.omp/agent/skills/herdr/SKILL.md` ← **`herdr --skill`** (a `runCommand` that pipes the flag's output to `$out`). Teaches agents to drive herdr; self-gates on `HERDR_ENV=1`. Do **not** read this from `${pkgs.herdr.src}`: 0.8 moved the file from the repo root to `skills/herdr/SKILL.md` and the old path broke silently. The CLI flag is a stable contract and guarantees the skill matches the installed binary.
+- Skills shipped by plugins, picked up from `mkHerdrPlugin`'s `passthru.skills`, also land in `~/.omp/agent/skills/`.
 
-`opencode.nix` gates every herdr command at `ask` (`"herdr*"` + `"*/herdr*"` in both the jailed and Darwin bash permission branches). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.
+`agent-shared/_bash.nix` gates every herdr command at `ask` (`"herdr*"` + `"*/herdr*"` in both the jailed and Darwin branches). `pane run`, `pane send-text`, both `send-keys`, and `agent start`/`agent prompt` deliberately stay at `ask`: they type arbitrary input into a live shell — or into another agent — and would sidestep the entire bash allowlist.
 
 ### Plugins (`mkHerdrPlugin`)
 
@@ -617,7 +610,7 @@ Dockerfile: hadolint | JS/TS: eslint | Lua: selene | Markdown: markdownlint + wr
 
 ### AI integration
 
-The agent harness (omp, with OpenCode until its removal, for personal work; Claude Code or omp for work) runs in its own herdr pane next to Neovim. There is no editor MCP any more (the nvim-mcp server was removed), and the agent jail does not bind Neovim's socket (`~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`), so agents cannot reach the editor.
+The agent harness (omp for personal work; Claude Code or omp for work) runs in its own herdr pane next to Neovim. There is no editor MCP any more (the nvim-mcp server was removed), and the agent jail does not bind Neovim's socket (`~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`), so agents cannot reach the editor.
 
 ### Notable custom features
 
@@ -626,10 +619,9 @@ The agent harness (omp, with OpenCode until its removal, for personal work; Clau
 - **Treesitter-aware fold text**: custom fold rendering preserving syntax highlighting
 - **Dual theme support**: Catppuccin (default) and Tokyo Night, switchable via one line in `init.lua`
 
-## Coding agents: omp, OpenCode and Claude Code
+## Coding agents: omp and Claude Code
 
-- **omp** (oh-my-pi) — being evaluated as OpenCode's replacement, both hosts (`user-base`). Everything is wired as for the full migration; only OpenCode's removal is deferred. Work MCPs included, since the company now allows OpenAI models.
-- **OpenCode** — personal harness, both hosts (`user-base`). No work integrations. Slated for removal.
+- **omp** (oh-my-pi) — personal harness, both hosts (`user-base`). Work MCPs included, since the company now allows OpenAI models.
 - **Claude Code** — work harness, laptop only (pulled in by the `work` aspect).
 
 ### Shared pieces (`modules/programs/agent-shared/`, `modules/programs/agent-jail/`)
@@ -641,43 +633,20 @@ The agent harness (omp, with OpenCode until its removal, for personal work; Clau
 | `agent-shared/agents/`                | `reviewer`, `test-writer` bodies                                                                                     |
 | `agent-shared/commands/`              | `/commit`, `/pr`, `/review` bodies                                                                                   |
 | `agent-shared/skills/git-conventions` | shared skill                                                                                                         |
+| `agent-shared/_bash.nix`              | `{jailed}:` bash ruleset (pattern → allow/ask/deny), translated by each harness's `_permissions.nix`                 |
 | `agent-jail/_mk-jail.nix`             | `mkJail {name, package, pre, extra}` — the bubblewrap jail; `pre`/`extra` are functions of jail-nix's combinator set |
 | `agent-jail/jail-context.md`          | instructions loaded **only** inside the sandbox (both harnesses)                                                     |
 | `agent-jail/_host-query/`             | host-side service backing the `host_*` tools (`agent-host-query`)                                                    |
-| `agent-jail/host-mcp.py`              | stdio MCP shim exposing `host_*` to Claude Code (dependency-free JSON-RPC → host-query over loopback)                |
-| `agent-jail/_herdr-relay/`            | host-side allowlisting relay standing in for the herdr socket (sidebar + lifecycle + resume reports only)           |
+| `agent-jail/host-mcp.py`              | stdio MCP shim exposing `host_*` to both harnesses (dependency-free JSON-RPC → host-query over loopback)             |
+| `agent-jail/_herdr-relay/`            | host-side allowlisting relay standing in for the herdr socket (sidebar + lifecycle + resume reports only)            |
 
 `_`-prefixed files are skipped by import-tree and imported by hand.
 
-## OpenCode
+## Agent sandbox (Linux only)
 
-### Module layout (`modules/programs/opencode/`)
+On Linux `omp` and `claude` **are** the jail: `agent-jail/_mk-jail.nix` wraps the package with bubblewrap via the `jail-nix` combinator library and installs it under the original binary name. Darwin has no sandbox and relies on the allowlist alone.
 
-| File               | Contents                                                                        |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `opencode.nix`     | the `opencode` aspect: settings, `xdg.configFile`, the tools `home.activation`  |
-| `_permissions.nix` | permissioning for jailed and non-jailed agents (also feeds Claude's bash rules) |
-| `_agents.nix`      | per-agent permission sets                                                       |
-| `_mcp.nix`         | the MCP server set                                                              |
-| `_sync.nix`        | hash coupling the jail package to its deployed config (see Sandbox)             |
-| `jail/jail.nix`    | the `opencode-jail` aspect — `mkJail` plus the opencode-specific parts          |
-
-### Configuration
-
-- **Model**: not pinned in Nix; pick it in the TUI.
-- **Providers**: `ollama` → the macmini's voice-stack ollama at `http://macmini.local:11434/v1` (`@ai-sdk/openai-compatible`), model `gpt-oss:20b` with `limit.context = 16384` mirroring `OLLAMA_CONTEXT_LENGTH`. Model ids must exist in `macmini.nix`'s `ollamaModels`. Not the default.
-- **Default agent**: `plan`
-- **TUI theme**: `catppuccin-macchiato`
-- **Other settings**: `autoupdate = false`, `lsp = false`.
-- **Plugins**: `@mohak34/opencode-notifier` (desktop notifications), `@dietrichgebert/ponytail` (YAGNI code-minimization ladder, injected every turn), `./plugins/caveman/plugin.js` (terse-prose communication mode from `JuliusBrussee/caveman`; native plugin deployed at activation time from the `caveman` flake input). Caveman complements ponytail — ponytail shrinks what the agent *builds*, caveman shrinks what it *says*. The plugin injects the ruleset every turn, persists `/caveman` mode switches, and registers slash commands. Levels: `lite`/`full`/`ultra`/`wenyan-*`. The upstream installer is reimplemented in Nix: plugin files are copied (`.js` → `.cjs` rename for ESM compat), agents get their frontmatter transformed at build time (`tools:` arrays and provider-less `model:` stripped), commands and skills are symlinked. A build-time hash check on the installer's opencode section (`cavemanInstallerHash` in `opencode.nix`) fails the build when upstream changes the deployment structure, so the Nix reimplementation stays in sync. The hash covers the `OPENCODE_*` constants, the **whole** `installOpencode` body (an awk `/start/,/end/` range would stop on its own first line, which also matches `^function`) and `installer/lib/opencode-agent.js`. Last reviewed at `2e08b91`, where the installer moved from `bin/` to `installer/` and `ultracave`/`megacave` were found missing from the deployed skill and command lists.
-- **Caveman installer review at `bad48a0` (4.0.1)** supersedes the `2e08b91` review above. The plugin entry is now `./plugins/caveman`: activation copies `server.js` alongside `plugin.js`, `package.json`, and the two `.cjs` helpers. OpenCode 2.x uses `server.js`; 1.x resolves `plugin.js` through `package.json`. The installer hash covers the new entrypoint deployment and CRLF-preserving AGENTS.md edits; our deployment still skips that block because the plugin injects the rules. Skill/command lists and agent transformation are unchanged. The updated `plugin.js` also prevents subagent sessions from resetting the user's mode.
-- **`programs.opencode.package = null` on Linux** — the jail installs the binary as `opencode` itself, so the HM module must not also put one on PATH. Darwin keeps the default package.
-
-### Sandbox (Linux only, shared with Claude Code)
-
-On Linux `opencode` and `claude` **are** the jail: `agent-jail/_mk-jail.nix` wraps the package with bubblewrap via the `jail-nix` combinator library and installs it under the original binary name. Darwin has no sandbox and relies on the allowlist alone.
-
-Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`), and the harness's own state (opencode: its XDG dirs; claude: `~/.claude` and `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
+Deny-by-default. Writable: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*`, the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`), and the harness's own state (omp: `~/.omp`, `~/.config/ponytail`; claude: `~/.claude`; both: `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
 
 Things that cost real time to discover:
 
@@ -687,61 +656,15 @@ Things that cost real time to discover:
 - **The whole host environment is inherited.** jail-nix's `base` ends with `--clearenv`, so we `reset` and rebuild its pieces without it — that is how sops-derived keys, `HERDR_*` and direnv's exports arrive. Consequence: `add-path` seeds from `state.env.PATH`, now empty, so PATH must be set with `set-env "PATH" "…:$PATH"` or it collapses to that one entry.
 - **No gpg-agent signing socket.** The agent is a signing *and* decryption oracle: it would let the jail sign as the user and decrypt every sops secret (`env.yaml` lives in the repo). With `signByDefault = true` in the read-only git config, `git commit` fails for want of a signer — that failure **is** the approval gate, and committing goes through `host_exec`.
 - **SSH works via gpg-agent's *ssh* socket** (`S.gpg-agent.ssh`, bound with `SSH_AUTH_SOCK` pointing at it) plus read-only `~/.ssh/known_hosts`. Push yes, author no: a push only ever publishes commits the user signed.
-- **Herdr is reached only through a relay, never the real socket.** Inside herdr (`HERDR_ENV=1`) the launcher starts `agent-jail/_herdr-relay` on the host, pinned to this pane's `HERDR_PANE_ID` and the harness `name`, in a private `mktemp -d /tmp/agent-herdr-relay.*` dir. Its socket is bound over `$HERDR_SOCKET_PATH` (and the canonical path if different) as the **last** runtime arg, so no caller overlay can re-expose the real one. It forwards exactly `pane.report_metadata` (all three, `user:<name>-activity`, the seven sidebar tokens), `pane.report_agent` (omp/opencode, `herdr:<name>`) and `pane.report_agent_session` (all three), each re-serialized from validated fields; everything else — `pane.read`, `send_*`, `split`, `agent.*`, `ping`, events — is `relay_denied` without touching herdr. `resume_argv` is always refused, so resume can only be herdr's built-in `<agent> --resume <ref>`; session ids must match `[A-Za-z0-9][A-Za-z0-9_-]*`. A relay that fails to start aborts the launch (no fallback), and the launcher refuses a cwd/git-common-dir that contains the socket's directory. Outside herdr the relay is not started and `HERDR_SOCKET_PATH` is unset. `HERDR_AGENT` (herdr's wrapper hint) was considered and rejected: it only feeds screen scraping, while resume ids and sidebar tokens exist solely as socket reports. Tests: `python3 -m unittest discover -s modules/programs/agent-jail/_herdr-relay`, also run as the package's `checkPhase`.
+- **Herdr is reached only through a relay, never the real socket.** Inside herdr (`HERDR_ENV=1`) the launcher starts `agent-jail/_herdr-relay` on the host, pinned to this pane's `HERDR_PANE_ID` and the harness `name`, in a private `mktemp -d /tmp/agent-herdr-relay.*` dir. Its socket is bound over `$HERDR_SOCKET_PATH` (and the canonical path if different) as the **last** runtime arg, so no caller overlay can re-expose the real one. It forwards exactly `pane.report_metadata` (both, `user:<name>-activity`, the seven sidebar tokens), `pane.report_agent` (omp only, `herdr:<name>`) and `pane.report_agent_session` (both), each re-serialized from validated fields; everything else — `pane.read`, `send_*`, `split`, `agent.*`, `ping`, events — is `relay_denied` without touching herdr. `resume_argv` is always refused, so resume can only be herdr's built-in `<agent> --resume <ref>`; session ids must match `[A-Za-z0-9][A-Za-z0-9_-]*`. A relay that fails to start aborts the launch (no fallback), and the launcher refuses a cwd/git-common-dir that contains the socket's directory. Outside herdr the relay is not started and `HERDR_SOCKET_PATH` is unset. `HERDR_AGENT` (herdr's wrapper hint) was considered and rejected: it only feeds screen scraping, while resume ids and sidebar tokens exist solely as socket reports. Tests: `python3 -m unittest discover -s modules/programs/agent-jail/_herdr-relay`, also run as the package's `checkPhase`.
 - **`rm`/`rmdir` are rmtrash, and trash is per-mount.** Every writable path is its own bind mount, so the freedesktop spec picks that mount's own `.Trash-1000` — a rename into the home trash would be `EXDEV`. Deletions in the working directory therefore land in `<workdir>/.Trash-1000/`, which is why `programs.git.ignores = [".Trash-*/"]` exists. `~/.local/share/Trash` is deliberately **not** bound.
-- **`.sync-id` couples opencode's two halves.** The opencode sandbox ships as a package while the config it describes ships through `home.activation`/`xdg.configFile`. `_sync.nix` hashes both sides (including `agent-jail/_mk-jail.nix` and `jail-context.md`) into one id and the jail refuses to start on mismatch (`OPENCODE_JAIL_SKIP_SYNC_CHECK=1` overrides). **Never test the jail by building the package alone.** Claude needs no sync-id: its config and jail come from the same HM generation via `home.file`.
 - **Already-running jails keep the old raw socket** until restarted. The `herdr*` bash `ask` rules stay as defense in depth; the herdr CLI inside the jail now just gets `relay_denied`.
 
-### Agents (prompts from `agent-shared/agents/` → `~/.config/opencode/agent/`)
+### `host_*` tools
 
-Frontmatter (`description`, `mode`) is generated in `opencode.nix`; **permissions are owned by nix** in `_agents.nix`, built from the fragments in `_permissions.nix`. Agent permissions merge with and override the global `permission` block, so the primaries re-apply the shared fragments explicitly — otherwise a built-in agent's own ruleset would stomp the global bash whitelist.
-
-**Tool gating = context debloat.** A `"*": "deny"` rule removes the tool from the model's schema entirely (verified via `Permission.visibleTools`).
-
-| Agent         | Mode              | Role                                                     | Notable permissions                                                                      |
-| ------------- | ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `build`       | primary           | Full development (unchanged)                             | `edit: allow`; `bash: allow` **inside the jail**, the allowlist on Darwin; `host_*: ask` |
-| `plan`        | primary (default) | Read-only analysis/planning                              | `edit: deny`; gh writes denied                                                           |
-| `reviewer`    | subagent          | Pre-commit/PR code review                                | `edit: deny`; read-only git bash + `gh_*_read`                                           |
-| `test-writer` | subagent          | Writes tests only; prompt forbids editing implementation | `edit: ask` (build-tier)                                                                 |
-
-### Commands (bodies from `agent-shared/commands/` → `~/.config/opencode/command/`)
-
-Markdown command templates using `!` `` `cmd` `` shell injection and `$ARGUMENTS`.
-
-| Command   | Agent              | Purpose                                                                                               |
-| --------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
-| `/commit` | build              | Drafts a conventional commit message from `git diff --cached`, commits via `host_exec` after approval |
-| `/pr`     | build              | Drafts a PR description from the branch diff, opens via `gh pr create`/`gh_pr_write` after approval   |
-| `/review` | reviewer (subtask) | Delegates the current diff/branch/PR to the `reviewer` subagent                                       |
-
-Agents and commands are plain markdown, deployed via `xdg.configFile` **symlinks** (the Bun symlink issue only affects the `.ts` custom tools).
-
-### MCP servers
-
-| Server   | Type                                        | Purpose                                               |
-| -------- | ------------------------------------------- | ----------------------------------------------------- |
-| Context7 | local (`@upstash/context7-mcp`)             | Library documentation (64k min tokens)                |
-| nixos    | local (nix run `github:utensils/mcp-nixos`) | nixpkgs / NixOS / HM / darwin option + package lookup |
-
-Work MCPs (Notion, Linear, Datadog) live in Claude Code only.
-
-### Custom tools (deployed to `~/.config/opencode/tools/`)
-
-Tools are TypeScript files using `@opencode-ai/plugin` SDK, executing shell commands via `Bun.$`. Deployed via `home.activation` (cp, not symlink) due to Bun module resolution issue with Nix store symlinks (tracked: <https://github.com/anomalyco/opencode/issues/5914>).
-
-| Tool file            | Exports                                   | Purpose                                                                                                                                                                                                                                                                     |
-| -------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `date.ts`            | `date`                                    | Date arithmetic via Unix `date` command                                                                                                                                                                                                                                     |
-| `gh.ts`              | 12 tools (read/write split)               | GitHub CLI wrapper: issues, PRs, workflows, runs, search, status, repos                                                                                                                                                                                                     |
-| `google_calendar.ts` | `google_calendar`                         | Read-only Google Calendar via `gcalcli`                                                                                                                                                                                                                                     |
-| `host.ts`            | `host_exec`, `host_mount`, `host_journal` | The jail's only route to the host, over loopback to `agent-jail/_host-query`. All three are `ask` on every agent. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host dir at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv |
+`host_exec`, `host_mount` and `host_journal` are the jail's only route to the host, served by `agent-jail/_host-query` over loopback and exposed to both harnesses by `host-mcp.py`. Each harness prompts on every call. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host dir at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv.
 
 `host_journal` exists because it is the *only* way to read the journal from inside: bubblewrap's user namespace cannot map supplementary groups, so the `wheel` membership the journal's ACL depends on is gone. Bash `journalctl` there prints "No journal files were found" and **exits 0**, which is a silent-success trap. Outside the jail `HOST_QUERY_PORT` is unset and all three tools short-circuit with an explanation.
-
-**A custom tool is not gated by the `permission` config unless it gates itself.** opencode calls `Permission.ask` on behalf of its own built-in tools, and wraps every MCP tool in one automatically (`session/tools.ts`) — but a tool loaded from `tools/*.ts` is handed straight to `item.execute`. So `host_exec = "ask"` sat inert for as long as it existed. `host.ts` and `gh.ts` now each call `ctx.ask` themselves through a local `gate()` helper; delete that call and the tool goes back to running unprompted. `deny` works generically for any tool, because `resolveTools` drops denied names from the schema before the request.
-
-Two details of `gate()` worth keeping: approval is **per command**, since `always` carries the specific pattern rather than `*`; and `always` is withheld when that pattern contains `*` or `?`, because `Wildcard.match` compiles both to regex wildcards with no escape. `host_mount` puts the mode in the pattern so approving read-only cannot cover a later read-write remount, and the `gh` writes use the operation shape (`gh pr merge 7`) rather than the full argv.
 
 ## oh-my-pi (omp)
 
@@ -750,11 +673,11 @@ Two details of `gate()` worth keeping: approval is **per command**, since `alway
 | File                            | Contents                                                                         |
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `omp.nix`                       | flake input (tag-pinned), wrapped package, settings, `mcp.json`, keys, prompts   |
-| `_permissions.nix`              | `tools.approval*` + `bash.patterns`, built from opencode's `baseBash`            |
+| `_permissions.nix`              | `tools.approval*` + `bash.patterns`, built from `agent-shared/_bash.nix`         |
 | `_caveman.nix`                  | caveman's omp plugin package, rebuilt from the `caveman` input with a hash guard |
 | `jail/jail.nix`                 | `mkJail` binding `~/.omp`, `~/.config/ponytail`, `~/.cache/jgrep`                |
 | `extensions/gate.ts`            | approval for the work MCPs (see below)                                           |
-| `extensions/google-calendar.ts` | port of opencode's `google_calendar` tool (`approval: "read"`)                   |
+| `extensions/google-calendar.ts` | read-only `google_calendar` tool via `gcalcli` (`approval: "read"`)              |
 
 - **Not the upstream HM module**: its `package` is not nullable (the jail installs `omp`) and it only writes `config.yml`.
 - **Settings go through `PI_CONFIG_FILES`**, set by `wrapProgram`. omp rewrites `~/.omp/agent/config.yml` from `/settings` and migrations, so that file cannot be a store symlink. The env overlay is per-process, ranks above global *and project* config, and is never written back. Nix owns theme, `tui.vimMode`, update/telemetry switches, `extensions` and approvals; the rest of `config.yml` stays omp's. Overlays replace arrays rather than merging them, so a project `extensions:` cannot drop caveman/ponytail.
@@ -767,7 +690,7 @@ Two details of `gate()` worth keeping: approval is **per command**, since `alway
 
 ### Approvals
 
-- Jailed: `approvalMode = yolo`; `bash.patterns` = opencode's jailed `baseBash` emitted **deny → prompt → allow**, because omp is first-match (lossless for the same reason as Claude's translation). Darwin: `approvalMode = write` plus the unjailed allowlist.
+- Jailed: `approvalMode = yolo`; `bash.patterns` = the jailed `_bash.nix` ruleset emitted **deny → prompt → allow**, because omp is first-match (lossless for the same reason as Claude's translation). Darwin: `approvalMode = write` plus the unjailed allowlist.
 - `mcp__host_{exec,mount,journal}` are `tools.approval: prompt`. Explicit prompts hold even in yolo and never offer "approve for session".
 - **Approval keys are exact names with no wildcards**, so the work MCPs (whose tool lists grow upstream) are gated by `gate.ts`: a `tool_call` handler that lets read verbs through (`get list search fetch query aggregate analyze`, after skipping `notion`/`calendar`/`datadog` nouns) and `ctx.ui.confirm`s the rest. Without a UI it blocks, so a subagent can never write to Linear/Notion/Datadog. Stricter than Claude, which fully allows Datadog.
 - `eval` is not gated in the jail: it reaches no more than bash already can there.
@@ -788,7 +711,7 @@ Startup: `plan.defaultOnStartup = true` (sessions open in plan mode; `alt+p` or 
 
 `tui.hyperlinks = "always"` forces OSC 8 links for paths and URLs instead of relying on terminal capability detection.
 
-Also enabled beyond the defaults: `advisor`, `memory.backend = mnemopi` (SQLite; `mnemopi.scoping = global`, because the default per-project scope keys on the absolute cwd and every herdr worktree would start empty), `autolearn` (needs memory; with mnemopi its lessons go into the same bank), `lsp.diagnosticsOnEdit`, `github`, `bash.gitGuard` (blocks stash, `reset --hard`, checkout/switch/restore — herdr owns worktrees), `retry.usageAwareFallback`, `edit.autoRepair`, `checkpoint`.
+Also enabled beyond the defaults: `advisor`, `astGrep` (the `ast_grep` tool), `error.notify` (same delivery as the other omp notifications: no D-Bus in the jail, so in-band OSC or BEL), `memory.backend = mnemopi` (SQLite; `mnemopi.scoping = global`, because the default per-project scope keys on the absolute cwd and every herdr worktree would start empty), `autolearn` (needs memory; with mnemopi its lessons go into the same bank), `lsp.diagnosticsOnEdit`, `github`, `bash.gitGuard` (blocks stash, `reset --hard`, checkout/switch/restore — herdr owns worktrees), `retry.usageAwareFallback`, `edit.autoRepair`, `checkpoint`.
 
 Mnemopi embeds locally (`bge-base-en-v1.5`, CPU, downloaded into `~/.omp` on first use) through a detached `omp mnemopi embed` server shared over a socket in `~/.omp/run/mnemopi/`. It is spawned by whichever jailed omp needs it first; if that jail's teardown kills it, the next omp has to respawn it — worth checking if recall ever hangs. Under mnemopi `memory://root` does not resolve; use `recall`, `reflect` and `read memory://<id>`.
 
@@ -828,23 +751,22 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 | File                     | Contents                                                                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------- |
 | `claude-code.nix`        | settings, permissions, MCP, agents, commands, skills, plugins, the herdr hook; `ponytail` input |
-| `_permissions.nix`       | translates opencode's jailed `baseBash` into `Bash(...)` allow/ask/deny lists                   |
+| `_permissions.nix`       | translates the jailed `agent-shared/_bash.nix` into `Bash(...)` allow/ask/deny lists            |
 | `jail.nix`               | `mkJail` for `pkgs.claude-code`                                                                 |
 | `agents/`                | work-only prompts: `troubleshoot` (Datadog), `tickets` (Linear/Notion)                          |
 | `skills/datadog-queries` | work-only skill                                                                                 |
 
 - **`CLAUDE_CONFIG_DIR=$HOME/.claude`** is set inside the jail so `.claude.json` lives *inside* the bound dir — Claude rewrites it by rename, which fails on a bind-mounted single file.
 - **`package = null`**: the jail installs `claude`. **`settings.json` is immutable** (store symlink, `mutableSettings = false`); changes made from the UI do not persist — declare them in Nix.
-- **Permissions**: `defaultMode = "plan"`. Bash rules come from opencode's jailed `baseBash` (`"*"` → plain `Bash`). The translation is only lossless because every override in that set narrows toward ask/deny: opencode resolves by last match, Claude by **deny > ask > allow**, so an override that *widens* would silently stop working. MCP rules use `mcp__plugin_hm_<server>__<tool>` — the HM module bundles all servers into a generated plugin named `hm`. Allow-rule globs need the literal `mcp__<server>__` prefix.
-- **MCP**: context7, nixos, `host` (the `host-mcp.py` shim — `host_*` are in `ask`, which prompts even when an allow also matches), Notion, Linear, Datadog (`type = "http"`, OAuth via `/mcp`). Linear/Notion reads are allowed; writes fall through to a prompt. Datadog is fully allowed. Unlike opencode they are global, not scoped to the subagents — subagent-only inline servers would not appear in `/mcp` for the OAuth login.
+- **Permissions**: `defaultMode = "plan"`. Bash rules come from the jailed `agent-shared/_bash.nix` (`"*"` → plain `Bash`). The translation is only lossless because every override in that set narrows toward ask/deny: Claude resolves by **deny > ask > allow**, so an override that *widens* would silently stop working. MCP rules use `mcp__plugin_hm_<server>__<tool>` — the HM module bundles all servers into a generated plugin named `hm`. Allow-rule globs need the literal `mcp__<server>__` prefix.
+- **MCP**: context7, nixos, `host` (the `host-mcp.py` shim — `host_*` are in `ask`, which prompts even when an allow also matches), Notion, Linear, Datadog (`type = "http"`, OAuth via `/mcp`). Linear/Notion reads are allowed; writes fall through to a prompt. Datadog is fully allowed. They are global, not scoped to the subagents — subagent-only inline servers would not appear in `/mcp` for the OAuth login.
 - **Agents**: `reviewer`, `test-writer` (shared bodies), `troubleshoot`, `tickets`. Read-only agents use `disallowedTools: Write, Edit, NotebookEdit`.
 - **Status line**: `claude-statusline` (`statusline.jq` + a shell wrapper adding the git branch, `*` when tracked files are dirty). Shows model + effort, active agent, dir + branch, context %, the 5h/7d plan limits (and `$` spend limit behind a gateway) with time to reset, and lines +/-. Percentages go green/yellow/red at 70/90%. Limits only appear after the first response in a session.
-- **Prompt input**: `editorMode = "vim"` (the opencode TUI equivalent is the vim plugin). Vim motions are not remappable; only `vimInsertModeRemaps` exists.
+- **Prompt input**: `editorMode = "vim"`. Vim motions are not remappable; only `vimInsertModeRemaps` exists.
 - **Commands**: `/commit`, `/pr`, `/review` (`context: fork`, `agent: reviewer`).
 - **Skills**: `git-conventions`, `datadog-queries`, plus `herdr` (from `herdr.nix`) and `jgrep` (from `work/jgrep.nix`) via `programs.claude-code.skills`, which is a no-op when the module is disabled.
-- **Plugins**: `caveman` and `ponytail` straight from their flake inputs — both repos are native Claude plugins (`.claude-plugin/plugin.json` at the root), so no reimplementation like opencode's.
+- **Plugins**: `caveman` and `ponytail` straight from their flake inputs — both repos are native Claude plugins (`.claude-plugin/plugin.json` at the root).
 - **herdr**: `hooks."herdr-agent-state.sh"` is deployed from `${pkgs.herdr.src}` (version-matched) and registered as a `SessionStart` hook with the **exact** command string herdr's own installer writes, so `herdr integration install claude` is a no-op and `herdr integration status` is clean. Never run the installer: it would try to rewrite the immutable `settings.json`. Sidebar tokens come from our own `claude-activity.py` hooks (see Agents sidebar); `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` turns on the task tools it reads.
-- No equivalent yet for opencode's `gh_*`/`google_calendar`/`date` tools (`gh` CLI covers the first) or the notifier.
 
 ## Security Model
 
@@ -853,7 +775,7 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 - **Secrets**: sops-nix with age (per-machine key) + GPG (YubiKey master key)
 - **GPG**: YubiKey-backed key for git signing, SSH auth (gpg-agent), password store, sops decryption
 - **Immutable users**: `users.mutableUsers = false`
-- **Agent sandbox (Linux)**: `opencode`, `claude` and `omp` run inside the shared bubblewrap jail — deny-by-default writes, no setuid, no gpg signing socket. Herdr is reachable only through a per-pane relay that forwards status/sidebar/session reports and denies everything else (nvim's socket is not bound at all). See the OpenCode Sandbox section.
+- **Agent sandbox (Linux)**: `claude` and `omp` run inside the shared bubblewrap jail — deny-by-default writes, no setuid, no gpg signing socket. Herdr is reachable only through a per-pane relay that forwards status/sidebar/session reports and denies everything else (nvim's socket is not bound at all). See the Agent sandbox section.
 
 ## Theming
 
@@ -932,7 +854,6 @@ herdr-workspace ~/dev/some-repo my-name            # explicit workspace name
 - **Hyprland config**: Lua (`configType = "lua"`), never hyprlang — 0.56 removed that parser. All directional bindings use hjkl, no arrow keys; the modifier is `SUPER`, interpolated in Nix rather than a `$mainMod` variable. Verify new `hl.*` calls against `<hyprland>/share/hypr/stubs/hl.meta.lua`.
 - **DMS greeter compositor config**: `programs.dms-greeter.compositor.customConfig` must also be Lua. dms-greeter picks its own appended launch snippet via `launcher.isHyprlandLuaConfig`, which sniffs the custom config for `hl.` (or a `.lua` suffix); without a match it appends a hyprlang `exec-once` line and the greeter dies before quickshell starts.
 - **macOS (nix-darwin)**: New Darwin config goes in a `darwin = { ... }` aspect block. OmniWM bindings use hjkl with `Option` as the modifier (no arrow keys). Homebrew casks are declared in `macmini.nix` (`cleanup = "zap"` removes undeclared ones).
-- **OpenCode tools**: TypeScript using `@opencode-ai/plugin` SDK. Deploy via `home.activation` copy (not xdg.configFile symlink).
-- **Agent jail**: `agent-jail/_mk-jail.nix` is shared — a change there affects both harnesses. For opencode the sandbox package and the config it describes must deploy together — `_sync.nix` hashes both and the jail refuses to start on mismatch. Never smoke-test it by building the package alone; use `nixos-rebuild switch`. After touching `_permissions.nix`, verify the rendered ruleset rather than the source (see Bash permission philosophy).
+- **Agent jail**: `agent-jail/_mk-jail.nix` is shared — a change there affects both harnesses. After touching `agent-shared/_bash.nix` or a harness's `_permissions.nix`, verify the rendered ruleset rather than the source.
 - **Secrets**: Never commit plaintext secrets. All secrets go through sops-nix. API keys are in `modules/security/secrets/env.yaml`.
 - **Flake inputs**: Declare per-module using `flake-file.inputs`, not in `flake.nix` directly.

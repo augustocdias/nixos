@@ -1,10 +1,9 @@
-"""host_* tools as a stdio MCP server, for harnesses without custom tools.
+"""host_* tools as a stdio MCP server for the jailed harnesses.
 
-opencode reaches host-query through tools/host.ts; Claude Code only speaks
-MCP, so this exposes the same three tools over JSON-RPC and forwards each call
-to host-query on HOST_QUERY_PORT. Approval is the harness's job: Claude Code
-lists these tools under permissions.ask, which prompts on every call even when
-an allow rule also matches.
+Exposes the three tools over JSON-RPC and forwards each call to host-query on
+HOST_QUERY_PORT. Approval is the harness's job: Claude Code lists these tools
+under permissions.ask, which prompts on every call even when an allow rule
+also matches.
 
 No dependencies on purpose: the protocol subset needed here is
 initialize / tools/list / tools/call over newline-delimited JSON.
