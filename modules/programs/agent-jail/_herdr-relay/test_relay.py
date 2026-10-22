@@ -309,9 +309,18 @@ class ClaudeTest(RelayTest):
         del params["agent_session_path"]
         self.assertForwarded(response, params)
 
-    def test_only_session_reports(self):
+    def test_metadata_forwarded_including_clears(self):
+        params = self.metadata(tokens={"agent": "claude-opus-5-5", "todo": "1/3 x", "sub1": "Explore: y"})
+        self.assertForwarded(self.call("pane.report_metadata", params), params)
+        params = self.metadata(tokens={key: "" for key in ("agent", "title", "todo", "sub1", "sub2", "sub3", "submore")})
+        self.assertForwarded(self.call("pane.report_metadata", params), params)
+
+    def test_metadata_identity_enforced(self):
+        self.assertDenied(self.call("pane.report_metadata", self.metadata(source="user:omp-activity")))
+        self.assertDenied(self.call("pane.report_metadata", self.metadata(pane_id="w1:p2")))
+
+    def test_no_lifecycle_reports(self):
         self.assertDenied(self.call("pane.report_agent", self.state()))
-        self.assertDenied(self.call("pane.report_metadata", self.metadata()))
         params = self.session(agent_session_path="/home/u/x.jsonl")
         del params["agent_session_id"]
         self.assertDenied(self.call("pane.report_agent_session", params), "invalid_request")

@@ -131,7 +131,7 @@ def validate_request(request, pane_id, agent):
         invalid("invalid method or params")
     required = {"pane_id", "source"}
     optional = {"seq"}
-    if method == "pane.report_metadata" and agent in {"omp", "opencode"}:
+    if method == "pane.report_metadata":
         required |= {"tokens"}
         optional |= {"ttl_ms"}
         source = "user:" + agent + "-activity"

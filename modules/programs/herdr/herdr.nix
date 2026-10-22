@@ -1,6 +1,7 @@
 {den, ...}: {
   den.aspects.herdr = {
     homeManager = {
+      config,
       pkgs,
       lib,
       ...
@@ -71,7 +72,36 @@
       home.packages = [workspace worktree];
 
       # No-op unless the claude-code aspect enables the module.
-      programs.claude-code.skills.herdr = herdrSkill;
+      programs.claude-code = {
+        skills.herdr = herdrSkill;
+
+        # Ours, next to herdr's SessionStart hook: metadata only, feeding the Agents sidebar.
+        hooks."herdr-activity.py" = ./claude-activity.py;
+        settings.hooks = let
+          hook = matcher: [
+            ({
+                hooks = [
+                  {
+                    type = "command";
+                    command = "${lib.getExe pkgs.python3} '${config.programs.claude-code.configDir}/hooks/herdr-activity.py'";
+                    timeout = 5;
+                  }
+                ];
+              }
+              // lib.optionalAttrs (matcher != null) {inherit matcher;})
+          ];
+        in {
+          SessionStart = hook null;
+          UserPromptSubmit = hook null;
+          Stop = hook null;
+          PreToolUse = hook "^(Agent|Task)$";
+          PostToolUse = hook "^(TaskCreate|TaskUpdate|TodoWrite)$";
+          SubagentStart = hook null;
+          SubagentStop = hook null;
+          Notification = hook "^idle_prompt$";
+          SessionEnd = hook null;
+        };
+      };
 
       home.file = {
         # herdr's omp integration: lifecycle state, session identity and

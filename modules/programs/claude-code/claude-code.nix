@@ -73,7 +73,10 @@
           + builtins.readFile ../agent-jail/jail-context.md;
 
         settings = {
-          env.DISABLE_AUTOUPDATER = "1";
+          env = {
+            DISABLE_AUTOUPDATER = "1";
+            CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
+          };
           editorMode = "vim";
           tui = "fullscreen";
           statusLine = {

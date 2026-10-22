@@ -187,10 +187,18 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
+  // herdr keys metadata by pane and source, not by process: without an explicit
+  // clear the last tokens outlive omp until their TTL, under whatever runs next.
   pi.on("session_shutdown", async (_event, ctx) => {
     if (!isRoot(ctx)) return;
     unsubscribeTitle?.();
     unsubscribeTitle = undefined;
+    state.agent = "";
+    state.title = "";
+    state.todo = "";
+    subagents.clear();
+    agentActive = false;
+    await publish();
   });
 
   pi.on("agent_start", async (_event, ctx) => {
