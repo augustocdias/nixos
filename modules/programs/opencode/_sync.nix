@@ -18,6 +18,9 @@ let
     ./jail/jail.nix
     ../agent-jail/jail-context.md
     ../agent-jail/_mk-jail.nix
+    ../agent-jail/_herdr-relay/server.py
+    ../agent-jail/_herdr-relay/default.nix
+    ../agent-jail/_herdr-relay/test_relay.py
   ];
 in
   builtins.hashString "sha256" (

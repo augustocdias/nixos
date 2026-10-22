@@ -29,6 +29,7 @@
   curl = lib.getExe pkgs.curl;
 
   hostQuery = pkgs.callPackage ./_host-query {};
+  herdrRelay = pkgs.callPackage ./_herdr-relay {};
 
   rmSafe = pkgs.symlinkJoin {
     name = "agent-jail-rm-safe";
@@ -139,12 +140,6 @@ in
           fi
         '')
 
-        (add-runtime ''
-          if [ -S "''${HERDR_SOCKET_PATH:-}" ]; then
-            RUNTIME_ARGS+=(--bind "$HERDR_SOCKET_PATH" "$HERDR_SOCKET_PATH")
-          fi
-        '')
-
         (try-readonly (noescape "\"$HOME/.config/git\""))
         (try-readonly (noescape "\"$HOME/.config/gh\""))
 
@@ -174,4 +169,67 @@ in
         (try-rw-bind (noescape "\"$HOME/.local/share/direnv\"") (noescape "~/.local/share/direnv"))
       ]
       ++ extra jail.combinators
+      ++ [
+        (add-cleanup ''
+          if [ -n "''${HERDR_RELAY_PID:-}" ]; then
+            kill "$HERDR_RELAY_PID" 2>/dev/null || true
+            wait "$HERDR_RELAY_PID" 2>/dev/null || true
+          fi
+          if [ -n "''${herdr_relay_dir:-}" ]; then
+            ${lib.getExe' pkgs.coreutils "rm"} -f "$herdr_relay_dir/relay.sock"
+            ${lib.getExe' pkgs.coreutils "rmdir"} "$herdr_relay_dir" 2>/dev/null || true
+          fi
+        '')
+        (add-runtime ''
+          if [ "''${HERDR_ENV:-}" = 1 ]; then
+            if [ -z "''${HERDR_PANE_ID:-}" ] \
+              || [[ "''${HERDR_SOCKET_PATH:-}" != /* ]] \
+              || [ ! -S "$HERDR_SOCKET_PATH" ]; then
+              echo "herdr relay: missing pane ID or absolute live socket path" >&2
+              exit 1
+            fi
+            herdr_upstream=$(realpath "$HERDR_SOCKET_PATH")
+            herdr_socket_parent=$(dirname "$herdr_upstream")
+            herdr_cwd=$(realpath "$PWD")
+            for mounted in "$herdr_cwd" "''${git_common:-}"; do
+              [ -n "$mounted" ] || continue
+              mounted=$(realpath "$mounted")
+              if [ "$mounted" = / ] || [ "$herdr_socket_parent" = "$mounted" ] \
+                || [[ "$herdr_socket_parent" == "$mounted/"* ]]; then
+                echo "herdr relay: refusing a working tree containing the Herdr socket directory" >&2
+                exit 1
+              fi
+            done
+
+            herdr_relay_dir=$(mktemp -d /tmp/agent-herdr-relay.XXXXXXXX)
+            ${lib.getExe herdrRelay} \
+              --listen "$herdr_relay_dir/relay.sock" \
+              --upstream "$herdr_upstream" \
+              --pane-id "$HERDR_PANE_ID" --agent ${lib.escapeShellArg name} \
+              > "$jail_state/log/herdr-relay-$$.log" 2>&1 &
+            HERDR_RELAY_PID=$!
+            herdr_relay_up=
+            for _ in $(seq 1 100); do
+              kill -0 "$HERDR_RELAY_PID" 2>/dev/null || break
+              if [ -S "$herdr_relay_dir/relay.sock" ]; then
+                herdr_relay_up=1
+                break
+              fi
+              sleep 0.05
+            done
+            if [ -z "$herdr_relay_up" ]; then
+              echo "herdr relay: failed to start; see $jail_state/log/herdr-relay-$$.log" >&2
+              exit 1
+            fi
+
+            # Mount last so a caller's state/config overlay cannot expose the real socket.
+            RUNTIME_ARGS+=(--bind "$herdr_relay_dir/relay.sock" "$HERDR_SOCKET_PATH")
+            if [ "$herdr_upstream" != "$HERDR_SOCKET_PATH" ]; then
+              RUNTIME_ARGS+=(--bind "$herdr_relay_dir/relay.sock" "$herdr_upstream")
+            fi
+          else
+            RUNTIME_ARGS+=(--unsetenv HERDR_SOCKET_PATH)
+          fi
+        '')
+      ]
   )
