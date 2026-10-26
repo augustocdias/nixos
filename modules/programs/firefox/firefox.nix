@@ -147,27 +147,6 @@
 
         profiles."00000000000000000000000000" = {
           name = "Default";
-          sites."01KKC8KPKEX5XZPBBK02D5ZM67" = {
-            name = "WhatsApp";
-            url = "https://web.whatsapp.com/";
-            manifestUrl = "https://web.whatsapp.com/data/manifest.json";
-            desktopEntry = {
-              icon = pkgs.fetchurl {
-                url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
-                hash = "sha256-INh2EnJyenlgdfPTEN2SHGSGamVJ58qkw6MLwhNsvkc=";
-              };
-              categories = ["Network" "InstantMessaging"];
-            };
-            settings = {
-              config = {
-                icon_url = "https://static.whatsapp.net/rsrc.php/yR/r/ivOukiEvXdZ.webp";
-                categories = ["social"];
-              };
-              manifest = {
-                scope = "https://web.whatsapp.com";
-              };
-            };
-          };
           sites."01M0ZTWRAQ3S5NKZG9JMXF02JN" = {
             name = "Apple Podcasts";
             url = "https://podcasts.apple.com/";

@@ -21,8 +21,6 @@
 
       boot = {
         initrd = {
-          systemd.enable = true;
-          verbose = false;
           availableKernelModules = ["tpm_crb" "tpm_tis"];
         };
 

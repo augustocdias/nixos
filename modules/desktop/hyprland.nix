@@ -52,7 +52,7 @@
     "uwsm app -- lotion"
     "uwsm app -- datagrip"
     "uwsm app -- virt-manager"
-    "uwsm app -- firefoxpwa site launch 01KKC8KPKEX5XZPBBK02D5ZM67"
+    "uwsm app -- zapfast"
     "uwsm app -- cider-2 --ozone-platform=wayland"
   ];
 
@@ -287,8 +287,8 @@ in {
               workspace = "4 silent";
             }
             {
-              name = "ws-ffpwa";
-              match.class = "^(FFPWA-01KKC8KPKEX5XZPBBK02D5ZM67)$";
+              name = "ws-zapfast";
+              match.class = "^(zapfast)$";
               workspace = "5 silent";
             }
             {

@@ -148,7 +148,7 @@
             {appNameSubstring = "Music";}
             {appNameSubstring = "Notes";}
             {appNameSubstring = "Messages";}
-            {appNameSubstring = "WhatsApp";}
+            {appNameSubstring = "ZapFast";}
             {appNameSubstring = "QuickTime Player";}
             {
               appNameSubstring = "Safari";

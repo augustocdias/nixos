@@ -271,5 +271,9 @@
       url = "github:nilp0inter/plymouth-theme-win98se-inspired-nixos-theme";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    zapfast = {
+      url = "github:crmne/zapfast";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 }

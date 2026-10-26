@@ -109,6 +109,7 @@ modules/
     stylua.nix              # StyLua config
     thunderbird/            # Thunderbird with extensions
     xdg.nix                 # XDG dirs and MIME associations
+    zapfast.nix             # ZapFast native WhatsApp client (crmne/zapfast flake, built from source; replaced the firefoxpwa site)
     yamllint/               # Yamllint config
     yazi/                   # Yazi file manager with plugins
 
@@ -346,7 +347,7 @@ Wayland tiling compositor with:
 - **Layout**: dwindle (default) + scrolling workspace (plugin)
 - **Monitors**: eDP-1 (laptop, workspaces 1-5) + DP-1 (external, workspaces 6-10)
 - **Keybindings**: `SUPER` as main modifier, written as `"SUPER + SHIFT + K"` key strings. All directional bindings use hjkl (no arrow keys). `binde` is `{ repeating = true }`; `bindm` is just the mouse dispatcher (`hl.dsp.window.drag()` / `hl.dsp.window.resize()`) — there is no `mouse` bind option despite the upstream example using one. The resize submap is `settings.define_submap`.
-- **Auto-start**: Slack, Thunderbird, Firefox, Ghostty, DataGrip (assigned to specific workspaces). The Ghostty window starts a plain shell; the multiplexer is launched by hand.
+- **Auto-start**: Slack, Thunderbird, ZapFast (WhatsApp), Firefox, Ghostty, DataGrip (assigned to specific workspaces). The Ghostty window starts a plain shell; the multiplexer is launched by hand.
 - **Window rules**: Float dialogs, PiP, file pickers. Size constraints for various apps.
 
 ### DankMaterialShell (DMS)

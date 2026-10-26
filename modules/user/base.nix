@@ -21,6 +21,7 @@
       fonts
       development
       applications
+      zapfast
       update-system
     ];
   };
