@@ -10,8 +10,18 @@
   };
 
   den.aspects.zapfast = {
-    homeManager = {pkgs, ...}: {
-      home.packages = [inputs.zapfast.packages.${pkgs.stdenv.hostPlatform.system}.default];
+    homeManager = {
+      imports = [inputs.zapfast.homeManagerModules.default];
+
+      programs.zapfast = {
+        enable = true;
+        settings = {
+          check_for_updates = false;
+          group_sounds = false;
+          message_sound = "none";
+          mention_sound = "none";
+        };
+      };
     };
   };
 }
