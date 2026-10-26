@@ -72,7 +72,8 @@ Pure lua edits are picked up on next Neovim launch (live symlink).
 
 ## Notes
 
-- Neovim runs the **nightly overlay** (currently pinned — see the FIXME in
-  `neovim.nix`).
-- LSP/formatter/linter sets are documented in the repo AGENTS.md; add servers
-  there if the plugin needs one.
+- Neovim uses the rolling **nightly overlay** input declared in
+  `modules/programs/neovim/neovim.nix`; `flake.lock` selects its revision.
+- Read the repository's `docs/neovim.md` before editor, plugin, build, or
+  language-tool changes. Update its LSP/formatter/linter inventory when a
+  plugin changes those sets.

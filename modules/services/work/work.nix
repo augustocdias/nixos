@@ -64,7 +64,7 @@
 
       home.file = {
         ".omp/agent/agents/troubleshoot.md".source = readOnlyAgent "troubleshoot" "Investigates production issues and incidents using Datadog (logs, traces, metrics, RUM, monitors, incidents). Use for \"why is X slow/erroring\", incident triage, latency/error spikes, log/trace analysis, or metric investigation." "";
-        ".omp/agent/agents/tickets.md".source = readOnlyAgent "tickets" "Manages Linear issues and Notion docs — triage, spec writing, status updates, ticket creation, and cross-referencing docs. Writes are approval-gated. Use for ticket workflow, writing/updating specs, or pulling context out of Notion/Linear." ticketsPreamble;
+        ".omp/agent/agents/tickets.md".source = readOnlyAgent "tickets" "Researches Linear/Notion context and identifiers, then returns exact mutation proposals in the parent-supplied shape. Headless writes are prohibited; the parent owns workflow and approval." ticketsPreamble;
         ".omp/agent/skills/datadog-queries".source = ../../programs/claude-code/skills/datadog-queries;
       };
     };

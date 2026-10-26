@@ -16,6 +16,7 @@
       ...
     }: let
       shared = import ../agent-shared/_lib.nix {inherit lib;};
+      devSkills = import ../agent-shared/_dev-skills.nix {inherit lib pkgs;};
       prompt = kind: name: fm:
         shared.withFrontmatter
         ({description = shared.description.${name};} // fm)
@@ -77,6 +78,7 @@
             DISABLE_AUTOUPDATER = "1";
             CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
           };
+          skillListingMaxDescChars = 160;
           editorMode = "vim";
           tui = "fullscreen";
           statusLine = {
@@ -143,25 +145,21 @@
         };
 
         agents = {
-          reviewer = prompt "agents" "reviewer" ({name = "reviewer";} // readOnly);
           test-writer = prompt "agents" "test-writer" {name = "test-writer";};
           troubleshoot = local "troubleshoot" "Investigates production issues and incidents using Datadog (logs, traces, metrics, RUM, monitors, incidents). Use for \"why is X slow/erroring\", incident triage, latency/error spikes, log/trace analysis, or metric investigation." readOnly;
-          tickets = local "tickets" "Manages Linear issues and Notion docs — triage, spec writing, status updates, ticket creation, and cross-referencing docs. Writes are approval-gated. Use for ticket workflow, writing/updating specs, or pulling context out of Notion/Linear." readOnly;
+          tickets = local "tickets" "Researches Linear/Notion identifiers and context through read-only tools. Returns exact mutation proposals in the parent's supplied schema; the parent handles approval and execution." readOnly;
         };
 
         commands = {
           commit = prompt "commands" "commit" {};
-          pr = prompt "commands" "pr" {};
-          review = prompt "commands" "review" {
-            context = "fork";
-            agent = "reviewer";
-          };
         };
 
-        skills = {
-          git-conventions = "${shared.skills}/git-conventions";
-          datadog-queries = ./skills/datadog-queries;
-        };
+        skills =
+          devSkills.skills
+          // {
+            git-conventions = "${shared.skills}/git-conventions";
+            datadog-queries = ./skills/datadog-queries;
+          };
 
         plugins = {
           caveman = inputs.caveman;

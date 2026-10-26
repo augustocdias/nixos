@@ -1,0 +1,59 @@
+# Voice services reference
+
+Read before changing voice routing, models, translation, Laya evaluation, or Open WebUI and its tools. The [macmini host reference](system.md#macos-nix-darwin-host--macmini) owns launchd daemon setup, ollama environment, model loading, and logging failure modes. Source files remain authoritative for current values. Historical measurements below describe their recorded test conditions, not a fresh verification.
+
+## Laya
+
+A local fast path for voice commands, in front of the ollama agent. Two halves:
+
+- **Server** (`modules/services/laya/laya.nix`, macmini): `laya.serve` from the `laya` PyPI wheel, a launchd daemon on `0.0.0.0:8000`, `LAYA_DEVICE=mps`. It speaks TypeSafe's `/v1/systemone` protocol. **No auth, no sops, deliberately**: it is LAN-only and can only score questions, never act. Only the `multilingual` checkpoint (mmBERT, 322M) is loaded. `LAYA_REVISION=reviewed` pins the HF bundle to the SHA that laya release vetted, so weights only move with a package bump; they are fetched into `/var/lib/laya/hf` on first start (~1 GB). No `trust_remote_code`.
+- **Translator** (`modules/services/libretranslate/libretranslate.nix`, macmini): LibreTranslate with only the en\<->pt Argos models (`--load-only en,pt`, ~160 MB, fetched on first start), launchd daemon on `0.0.0.0:5000`, no auth. All argos paths go through `HOME` + `XDG_*_HOME`, every one of them pinned to `/var/lib/libretranslate` (under a systemd user unit `HOME` was overridden and models landed in the real home). ~1 GB resident, ~80 ms per command.
+- **Client** (`modules/services/home-assistant/laya/`, Pi): our own conversation agent, domain `laya`. It does not derive from `allenporter/home-assistant-jev`/`-laya`, whose BM25 retrieval, English stopwords and unit-word regexes break on pt-BR before the model sees anything. Config flow: server URL, translator URL (empty disables it); options: fallback agent, confidence and compound thresholds. Anything it is unsure of, questions, and multi-step requests go **unchanged** to the fallback (ollama) agent via `conversation.async_converse`; laya being down escalates too.
+
+**Laya only chooses among options it is given; it never generates.** That shapes `pipeline.py`:
+
+- Numbers are read from the text (`\d+([.,]\d+)?`, pt decimal comma); the chosen *action* decides the slot (brightness, position, temperature, volume). No unit words, so nothing is language-specific.
+- Round 1: request kind (command / question / other), device kind, compound, portuguese. Round 2 (one request): the kind's *own verbs* (blinds: open / close / set position), asked twice with the options reversed — both must agree; plus the device, only when the text leaves more than one. Measured: a flat 13-way intent choice collapsed (pt requests landed on the vacuum).
+- **Option keys are human text.** Laya renders an option as `"key: description"`, so `HassTurnOn: Turn on` / `light.x: Kitchen Light` fed identifier noise straight into the decision. Keys are now the labels; `Planner._ids` maps answers back.
+- **Which device is grounded in the text, never chosen by the model alone.** The model confidently picked wrong rooms ("open Tobias's blinds" → bedroom at 0.88), and no threshold removes high-confidence errors. Names and aliases of entities and areas are matched as whole phrases (casefolded, accent-free, possessive `'s` dropped; a match inside a longer one is dropped, so "quarto do Tobias" is not the bedroom). A device must be named, or be the only one of its kind in the named room (or the house). A named device must sit in the named room, and settles its own kind. **Aliases are therefore what makes pt-BR work** — an entity with none ("Livia Light") is only reachable in English.
+- **Translation feeds the model, never the grounding.** The model reads LibreTranslate's English; names and numbers are grounded in what was said first, and in the translation only when the original names nothing. Translation loses names ("luz da sala" -> "the room light", "escada" -> "ladder", "depósito" -> "warehouse") but keeps verbs, which is exactly the split. A down translator just passes the original through.
+- **The request language is the pipeline's, not detected.** With one Assist pipeline per language (EN, BR) and conversation language `*`, HA sends the pipeline's STT language as `language` — and that same language overrides whisper's `--language auto` on every request, so a BR request really is Portuguese. It becomes LibreTranslate's `source` (`pt-BR` -> `pt`); `en` skips translation. Only `*`/missing falls back to LibreTranslate's detection, which called "desliga a luz da sala" English at 0 confidence. The fallback LLM always gets the original words.
+- Numbers must fit the action both ways ("dim to 20%" answered "turn on" escalates). Area-wide requests ("all the lights") are not handled; they escalate.
+- **Nouls are badly calibrated on this model** — one yes/no per area answered "yes, HWR" at 0.95 for nearly everything. Use choices for anything that matters.
+- Entities are addressed as name + their own area (two exposed entities are both named "Hallway Light").
+
+**Status: 0 wrong actions on the test set**, laptop CPU, live HA snapshot (with aliases), `cases.json` (45 utterances):
+
+| checkpoint                 | set | ok    | escalated | WRONG | median  |
+| -------------------------- | --- | ----- | --------- | ----- | ------- |
+| multilingual               | en  | 16/22 | 6         | 0     | ~0.35 s |
+| multilingual               | pt  | 7/23  | 16        | 0     | ~0.35 s |
+| english                    | en  | 12/22 | 10        | 0     | ~0.85 s |
+| english                    | pt  | 3/23  | 20        | 0     | ~0.85 s |
+| multilingual + translation | pt  | 10/23 | 13        | 0     | ~0.4 s  |
+| english + translation      | pt  | 8/23  | 15        | 0     | ~0.95 s |
+
+English cases are unchanged by translation (passed through). These numbers used detection; the harness now passes each case's language, as the pipeline does.
+
+Before grounding, the same set gave 7–9 WRONG. Remaining pt escalations are mostly the model's *verb/kind* reading of Portuguese (low confidence), which is what a translation layer would address. 45 cases is a small set: grow `cases.json` before trusting the zero. Re-measure on the macmini with `laya-eval/eval.py --home <snapshot> --url http://macmini.local:8000` before enabling it in an Assist pipeline; `-v` prints the per-question trace, `--translate http://macmini.local:5000` adds the translator, `--model english --head-max-len 384` compares checkpoints (the server must load it; english's window is 512 tokens). The snapshot is dumped fresh from HA into a temp file each time (exposed entities **with their registry aliases** — the first measurements left aliases out and understated both languages); `--selftest` needs none.
+
+## Open WebUI
+
+Self-hosted AI workspace on `macmini`, reusing the ollama instance the voice stack already runs. Aspect `open-webui`, included by `den.aspects.macmini`. **Local-only**: bound to `127.0.0.1:8080`, reached with `ssh -L 8080:127.0.0.1:8080 macmini`. Nothing is exposed to the LAN or the internet.
+
+- **`STATIC_DIR` must be redirected.** It defaults to a directory inside the package's own store path, and open-webui `shutil.copyfile`s the favicon, splash and loader into it on every start (`config.py:111,125,133,141`). Left alone it writes to a read-only store path. Same reasoning for `DATA_DIR`, `HF_HOME` and `SENTENCE_TRANSFORMERS_HOME`; all four live under `/var/lib/open-webui` and are created in `postActivation`.
+- **`HOST`/`PORT` are not environment variables.** `serve` is a typer command whose `host`/`port` are CLI options defaulting to `0.0.0.0:8080`. Setting `env.HOST` is silently ignored and the app listens on every interface — so the bind address is passed as `--host`, not as env.
+- **`ENABLE_PERSISTENT_CONFIG = "False"` is what makes this declarative.** At its default (`True`) the first boot seeds env-derived values into the `config` table and every later read comes from the database, so editing the Nix would silently do nothing. False makes the environment authoritative on every boot. The trade is the same one OmniWM's `settings.toml` makes: **settings changed in the admin UI no longer persist** — declare them in Nix instead.
+- **`WEBUI_AUTH = "False"`** — no login, no signup, single implicit admin. Only safe because the bind is loopback-only; it must flip to `True` before the port is ever exposed. `WEBUI_SECRET_KEY` is supplied regardless (it is only a hard requirement when auth is on, but it also keys OAuth token encryption and keeps sessions stable across restarts).
+- **The secret is fetched by a wrapper, not by launchd.** launchd has no ordering and sops-nix's own `sops-install-secrets` is itself a `RunAtLoad` daemon, so the start script polls for `/run/secrets/open_webui_secret` before exec'ing — the same trick `ollama-model-loader` uses on the ollama socket. Without `WorkingDirectory` the missing-secret fallback would write `.webui_secret_key` into `/`.
+- **First system-level sops on macmini.** The repo's `secrets` aspect is home-manager-only, so this imports `sops-nix.darwinModules.sops` and points `age.keyFile` at `/Users/augusto/.config/sops/age/keys.txt` — the key the HM aspect already provisions, readable by root. No second key to manage, but activation now depends on a path inside the user's home.
+- **No companion services.** `VECTOR_DB` and `RAG_EMBEDDING_ENGINE` stay at their defaults: embedded ChromaDB and local sentence-transformers (`all-MiniLM-L6-v2`) **on CPU**, so embeddings never touch the GPU the voice stack needs. Web search is `duckduckgo` via `ddgs`, already in the closure — no API key, no SearXNG. The embedding model is fetched into `HF_HOME` on first run, so `OFFLINE_MODE` must stay false.
+
+### Tools
+
+Tools are **rows in the `tool` table, not files** — `TOOLS_DIR` does not exist in 0.11.3, so `mkOutOfStoreSymlink` is impossible. `_tools.nix` pins five of them by commit (`fetchurl`), and `import-tools.py` runs as the `open-webui-tools` launchd daemon to push them in over the HTTP API.
+
+- **The attr name in `_tools.nix` is the Open WebUI id**, which is the table's primary key and is caller-supplied — not generated. It must equal the id of the row already installed or a second, functionally-duplicate tool appears. This is why `wiki.py` is declared as `wikipedia_tool`. The id is also lowercased and `.isidentifier()`-checked upstream, so `ask-user` has to be `ask_user`.
+- **Upsert is enforced by the API, not by the script.** `create` refuses an id that exists (400 `ID_TAKEN`) and `update` refuses one that does not (401 `NOT_FOUND`), so listing the ids first and picking the matching call is idempotent. `valves` is a separate column that `update` never writes, so tool configuration survives. `specs` and `meta.manifest` are re-derived from the source on every write, which is why a bare `.py` is a complete representation.
+- **The importer mints its own session token.** The API always demands one — there is no `WEBUI_AUTH = "False"` bypass in `get_current_user`. `create_token` is a plain HS256 JWT over `WEBUI_SECRET_KEY`, and `is_valid_token` only consults Redis for revocation, which is not configured, so the script signs `{id, jti, iat}` itself using the sops secret and the admin id read read-only out of `webui.db`. No API key to provision.
+- **`ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS = "False"`** — a tool's frontmatter `requirements` are otherwise pip-installed at create time into the read-only store, which is what made `osm` fail to install. Its two requirements are supplied through the package's python env instead: `pygments` is already a dependency, `openrouteservice` is added by `overridePythonAttrs`. Both are top-level imports in `osm.py`, so neither is optional.

@@ -21,6 +21,7 @@
       jailed = pkgs.stdenv.hostPlatform.isLinux;
 
       shared = import ../agent-shared/_lib.nix {inherit lib;};
+      devSkills = import ../agent-shared/_dev-skills.nix {inherit lib pkgs;};
       prompt = kind: name: fm:
         pkgs.writeText "${name}.md" (shared.withFrontmatter
           ({description = shared.description.${name};} // fm)
@@ -40,7 +41,7 @@
 
       caveman = import ./_caveman.nix {
         inherit pkgs lib;
-        inherit (inputs) caveman;
+        caveman = inputs.caveman;
       };
 
       codex = model: effort: "openai-codex/${model}:${effort}";
@@ -221,21 +222,22 @@
 
         home.packages = lib.optional (!jailed) package;
 
-        home.file = {
-          ".omp/agent/mcp.json".text = builtins.toJSON {inherit mcpServers;};
-          ".omp/agent/keybindings.yml".source = (pkgs.formats.yaml {}).generate "keybindings.yml" keybindings;
-          ".omp/agent/AGENTS.md".text =
-            builtins.readFile shared.context
-            + lib.optionalString jailed ("\n" + builtins.readFile ../agent-jail/jail-context.md);
+        home.file =
+          (lib.mapAttrs' (name: source: lib.nameValuePair ".omp/agent/skills/${name}" {inherit source;}) devSkills.skills)
+          // {
+            ".omp/agent/mcp.json".text = builtins.toJSON {inherit mcpServers;};
+            ".omp/agent/keybindings.yml".source = (pkgs.formats.yaml {}).generate "keybindings.yml" keybindings;
+            ".omp/agent/AGENTS.md".text =
+              builtins.readFile shared.context
+              + lib.optionalString jailed ("\n" + builtins.readFile ../agent-jail/jail-context.md);
 
-          ".omp/agent/agents/test-writer.md".source = prompt "agents" "test-writer" {name = "test-writer";};
-          ".omp/agent/commands/commit.md".source = command "commit";
-          ".omp/agent/commands/pr.md".source = command "pr";
-          ".omp/agent/skills/git-conventions".source = "${shared.skills}/git-conventions";
+            ".omp/agent/agents/test-writer.md".source = prompt "agents" "test-writer" {name = "test-writer";};
+            ".omp/agent/commands/commit.md".source = command "commit";
+            ".omp/agent/skills/git-conventions".source = "${shared.skills}/git-conventions";
 
-          ".omp/agent/extensions/gate.ts".source = ./extensions/gate.ts;
-          ".omp/agent/extensions/google-calendar.ts".source = ./extensions/google-calendar.ts;
-        };
+            ".omp/agent/extensions/gate.ts".source = ./extensions/gate.ts;
+            ".omp/agent/extensions/google-calendar.ts".source = ./extensions/google-calendar.ts;
+          };
 
         home.activation.omp-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
           mkdir -p "$HOME/.omp" "$HOME/.config/ponytail"

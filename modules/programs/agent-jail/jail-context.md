@@ -1,135 +1,48 @@
-# Sandbox
+# Linux sandbox contract
 
-You are running inside a bubblewrap sandbox. Your process and everything you
-spawn — bash commands, subagents, MCP servers — share it. Operate confidently
-inside it; it exists so you do not have to ask permission for ordinary work.
+Your process, child commands, subagents, and MCP servers share this bubblewrap jail. Prefer ordinary sandbox tools whenever sufficient.
 
-## What you can write
+## Files and environment
 
-- The working directory, at its real host path. For a linked git worktree the
-  main checkout's `.git` is bound too, so git works normally.
-- `~/granted/<name>` for any directory the user has granted (see `host_mount`).
-- Tool caches that persist across sessions: `~/.cache/nix`, `~/.npm`, `~/.bun`,
-  `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and your own state directory (plus
-  `~/.cache/jgrep` under claude and omp).
+Persistent writable areas:
 
-## What looks writable but is not
+- Workspace at its real host path, plus the linked checkout's git-common-dir when different.
+- `~/granted/<name>` only in its approved mode; grants are read-only unless write access was requested.
+- Caches: `~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and `~/.cache/jgrep`.
+- Harness state: `~/.omp` and `~/.config/ponytail` for omp; `~/.claude` for Claude Code.
 
-`/`, `/etc`, `/tmp` and `$HOME` are a tmpfs private to this session. Writing
-there succeeds and is then **silently discarded when the session ends** — it
-never reaches the host. Do not use them for anything you want to keep, and do
-not conclude from a successful write that you have changed the system.
+Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$HOME`, are session-private tmpfs. Successful writes there do not change the host and disappear after the session. `/nix/store` is read-only. Other host directories are not generally mounted.
 
-`/nix/store` is read-only. The rest of the host filesystem is not present at
-all: `~/.ssh` and `~/.gnupg` do not exist here.
+The full host environment is inherited, including credentials, `HERDR_*`, terminfo, and the launch shell's direnv exports. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when a different environment is needed. `direnv allow` state persists.
 
-## Environment
+## Host access and approval
 
-The host environment is inherited whole, so API keys, `HERDR_*` identifiers and
-terminfo are all present without anything being listed explicitly.
+`host_journal`, `host_mount`, and `host_exec` are the sanctioned host-access tools. Every call requires user approval. Explain why access must happen outside the jail, choose the narrowest tool, and batch only related work.
 
-That is also how **direnv** reaches you: it applies itself in the shell the
-session was launched from, so the working directory's `.envrc` is already in
-effect. There is no hook running inside here. If you move to a directory with a
-different `.envrc`, the environment does **not** reload — use
-`direnv exec <dir> <command>` for that, or ask the user to relaunch. `direnv allow` works; its state is persisted.
+Approval applies to the exact command, path/mode, or journal selection, never the entire tool. “Always” approves only the shown pattern; a changed call asks again. Commands containing `*` or `?` cannot receive “always” approval because those characters become wildcards. Never reshape a call to evade approval. If rejected, do not retry through another route; state what remains unavailable.
 
-## Reaching outside
+- Use `host_journal` for host systemd logs. In-jail `journalctl` prints `No journal files were found` and exits 0 because journal files and supplementary-group ACL access are unavailable. This is not evidence of an empty host journal.
+- Use `host_mount` for another repository or host config directory. It grants the requested path at `~/granted/<name>` for normal file tools.
+- Use `host_exec` for one host command only when narrower tools cannot do the job, such as signed commits or system-state operations.
 
-Three tools. **The user approves every single call to all three** — none is
-auto-approved. So batch what you need, and say in your message why it has to
-happen outside the sandbox. Reach for plain bash inside the sandbox first
-whenever it can do the job.
+Outside the jail, `HOST_QUERY_PORT` is absent and these tools short-circuit. Use ordinary host commands there, subject to existing approvals.
 
-Approval is **per command, not per tool**. Answering "always" allows exactly
-the pattern you were shown — that one command string, that one path and mode,
-that one journal selection — and the next call that differs in any way asks
-again. There is no way to hand over the tool as a whole. A command containing
-`*` or `?` cannot be approved with "always" at all, because the stored pattern
-would be read as a wildcard; those always ask.
+## SSH and signing
 
-Do not treat "always" as a reason to bundle unrelated work into one call, and
-do not reshape a command to dodge the prompt.
+SSH can authenticate through the mounted agent socket when present (`SSH_AUTH_SOCK`) and verify existing hosts using read-only `~/.ssh/known_hosts`. Private-key directories are not generally mounted. Never weaken host verification, including `StrictHostKeyChecking=no`, to bypass an unknown host.
 
-In order of preference, narrowest first:
+SSH credentials are the user's credentials. Obtain approval for consequential actions such as pushing shared branches, force-pushing, or deleting remote refs. Authorized SSH and remote deployment are not technically blocked by the jail.
 
-- **`host_journal`** — reads the systemd journal. Always use this rather than
-  `journalctl` in bash.
+The GPG signing/decryption socket is absent. Stage normally, then leave commits to the user or request signed `git commit -S` through approved `host_exec`. Never disable signing or rewrite Git configuration to bypass this gate. SSH authentication does not grant Git authoring access.
 
-  `journalctl` in here is a trap, not an error: `/var/log/journal` is not bound,
-  so it prints "No journal files were found" and **exits 0**. Anything checking
-  the exit status concludes the journal was read and is empty. Binding the
-  directory would not help either — the sandbox's user namespace cannot map
-  supplementary groups, so the `wheel` membership the journal's ACL depends on
-  is gone regardless. Hence the tool.
+## Deletion and recovery
 
-- **`host_mount`** — binds a host directory to `~/granted/<name>` so the normal
-  file tools work on it. Read-only unless you ask for write. Takes effect
-  immediately. Use it for another repository or a config directory you need to
-  read properly.
+`rm` and `rmdir` are trash-backed. Trash is per writable mount: workspace deletions go to `<workdir>/.Trash-1000/files/`, not `~/.local/share/Trash` (not bound). Moving across mounts would fail with `EXDEV`.
 
-- **`host_exec`** — runs one command on the host, unsandboxed. The widest of the
-  three; use it only when neither of the others fits.
+A deletion inside a writable `~/granted/<name>` changes the host and uses that grant's own `.Trash-1000`. Treat it accordingly. Trash is globally ignored by Git; never commit it or delete recovery copies as cleanup. Recoverability does not authorize deleting unrelated user work.
 
-## SSH
+## Nix and activation
 
-**SSH works.** `SSH_AUTH_SOCK` points at gpg-agent's ssh socket, so `ssh`,
-`git push`, `scp` and a `--target-host` deploy all authenticate with the user's
-YubiKey exactly as they do on the host. The key material never leaves the token;
-the socket only asks it to sign challenges.
+`nix build`, `nix-build`, and `nix flake check` use the reachable daemon and sandboxed builds without host approval. `nix run`, `nix shell`, and `nix develop` execute fetched code and retain their normal approval requirements.
 
-`~/.ssh/known_hosts` is bound read-only, so hosts the user already trusts verify
-silently. A genuinely unknown host cannot be added from in here — that is worth
-mentioning to the user rather than working around with
-`StrictHostKeyChecking=no`.
-
-Treat this as the user's own credential, because it is. Pushing to a shared
-branch, force-pushing, or deleting a remote ref is indistinguishable from the
-user doing it. Ask first for anything you would not want attributed to them.
-
-## Committing
-
-`git commit` **fails** in here, and that is deliberate: signing uses a different
-gpg-agent socket which is *not* bound. This is the approval gate for writing to
-history.
-
-Stage your work normally (`git add`), then either leave the commit to the user
-or request it explicitly with `host_exec`, e.g.
-`git commit -S -m "fix: …"`. Never try to route around it by disabling signing,
-or rewriting git config.
-
-So the two capabilities are deliberately asymmetric: you can **push** but cannot
-**author**. A push therefore only ever publishes commits the user signed.
-
-## Deletion
-
-`rm` and `rmdir` are trash-backed in here, so a deletion is recoverable rather
-than destructive.
-
-Where it lands follows the freedesktop trash spec, which picks a trash
-directory at the root of the file's own filesystem. Every writable path in this
-sandbox is a separate bind mount, so for anything in the working directory that
-means **`<working directory>/.Trash-1000/`**, not the home trash — a rename
-into `~/.local/share/Trash` would cross mount points and fail with `EXDEV`.
-
-Consequences worth knowing:
-
-- To recover something, look in `<workdir>/.Trash-1000/files/`.
-- Those directories are covered by the user's global gitignore, so they will not
-  show up in `git status`. Never add one to a commit, and never delete one to
-  "clean up" — that destroys the only copy.
-- The rule is per-mount, so a deletion inside `~/granted/<name>` trashes into
-  that grant's own `.Trash-1000`, on the host, outside this sandbox. Be more
-  careful there than in the working directory.
-- `~/.local/share/Trash` is not bound and never receives anything. If you are
-  looking for a deleted file, it is not there.
-
-This is a safety net, not a licence to be careless. Deleting the user's work is
-still disruptive even when it can be undone.
-
-## Nix
-
-`nix build`, `nix-build` and `nix flake check` work and need no approval: the
-daemon is reachable and builds are sandboxed. `nix run`, `nix shell` and
-`nix develop` execute fetched code, so they ask first. `nixos-rebuild` and
-friends cannot work — there is no route to root — so do not attempt them.
+In-jail sudo and local root activation are unavailable because bubblewrap sets `no_new_privs`. Do not attempt local `nixos-rebuild` activation inside the jail. Approved host execution and authorized remote operations remain possible through their normal routes.

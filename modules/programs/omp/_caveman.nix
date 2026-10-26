@@ -1,4 +1,4 @@
-# Caveman as an omp extension package, rebuilt from the `caveman` input.
+# Caveman as an omp extension package, rebuilt from the pinned upstream source.
 #
 # Reproduces installer/install.js `writeOmpPluginPackage` instead of running
 # `omp plugin install`, which would symlink a mutable ~/.omp/caveman-plugin

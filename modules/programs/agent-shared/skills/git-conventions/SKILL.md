@@ -29,9 +29,8 @@ Personal defaults. A project's own AGENTS.md / CONTRIBUTING.md overrides these.
 ## Pull requests
 
 - Title mirrors the primary commit/change set.
-- Body: **Summary** (what + why) → **Changes** (bullet list) → **Testing**
-  (how it was verified). Follow a repo `.github/pull_request_template.md` if
-  present.
+- Use the contextual `pr` skill for PR-body structure. A real repository PR
+  template takes precedence over its default Summary / Evidence / Merge Danger.
 - Link related issues/tickets.
 - Keep PRs focused and reviewable; split large ones.
 
@@ -40,3 +39,7 @@ Personal defaults. A project's own AGENTS.md / CONTRIBUTING.md overrides these.
 - Never `push --force` to shared branches; use `--force-with-lease` only on your
   own feature branch and only when needed.
 - Rebase local WIP, but don't rewrite already-shared history.
+- Signed commits, pushes, and remote PR changes use existing approval routes.
+  Never bypass signing or claim an unapproved action succeeded.
+- Humans choose branches and checkouts. These conventions do not authorize
+  agents, delegates, or host tools to manage branches or worktrees.

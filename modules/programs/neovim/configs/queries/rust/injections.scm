@@ -61,8 +61,3 @@
  (#set! injection.language "sql")
 )
 
-;; Markdown for docs FIXME: it's not working anymore...
-; ((
-;   (line_comment) @constant
-; ) @injection.content (#set! injection.language "markdown_inline"))
-
