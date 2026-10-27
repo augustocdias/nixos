@@ -6,7 +6,8 @@ over loopback; the agent harness gates every call behind an "ask" permission, so
 the user approves each one in the TUI before it arrives here.
 
 Usage: host-query <port> [grant-root]
-  grant-root enables POST /mount. Without it, mounts are refused.
+  grant-root enables POST /mount and POST /ssh-agent. Without it, both are
+  refused. HOST_SSH_AUTH_SOCK names the host agent socket /ssh-agent relays.
 """
 
 import http.server
@@ -15,8 +16,11 @@ import os
 import re
 import shutil
 import signal
+import socket
+import stat
 import subprocess
 import sys
+import threading
 
 MAX_OUTPUT = 200_000
 TIMEOUT = 30
@@ -26,6 +30,9 @@ GRANT_JAIL_PREFIX = "~/granted"
 MOUNTS = {}
 
 FUSERMOUNT = "/run/wrappers/bin/fusermount3"
+
+SSH_AGENT_NAME = "ssh-agent.sock"
+SSH_AGENT_LISTENER = None
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -45,7 +52,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.rstrip("/") == "/health":
             return self._json(200, {"status": "ok"})
-        self._json(404, {"error": "Use POST /exec, /mount or /journal"})
+        self._json(404, {"error": "Use POST /exec, /mount, /journal or /ssh-agent"})
 
     def do_POST(self):
         route = self.path.rstrip("/")
@@ -53,10 +60,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "/exec": self._exec,
             "/mount": self._mount,
             "/journal": self._journal,
+            "/ssh-agent": self._ssh_agent,
         }
         handler = handlers.get(route)
         if handler is None:
-            return self._json(404, {"error": "Use POST /exec, /mount or /journal"})
+            return self._json(404, {"error": "Use POST /exec, /mount, /journal or /ssh-agent"})
         body = self._body()
         if body is None:
             return self._json(400, {"error": "Invalid JSON body"})
@@ -237,6 +245,55 @@ class Handler(http.server.BaseHTTPRequestHandler):
         MOUNTS[name] = (src, write)
         self._json(200, self._mount_result(src, name, write, remounted))
 
+    def _ssh_agent(self, _body):
+        """Relay the host SSH agent into the jail at ~/granted/ssh-agent.sock.
+
+        Not host_mount: a socket seen through bindfs cannot be connect()ed.
+        The listener lives directly in the grant root, which the jail binds as
+        a plain directory, so the jail sees the same inode. Lasts until
+        host-query exits.
+        """
+        global SSH_AGENT_LISTENER
+        if not GRANT_ROOT:
+            return self._json(503, {"error": "SSH agent relay disabled (no grant root)"})
+        result = {"jail_path": f"{GRANT_JAIL_PREFIX}/{SSH_AGENT_NAME}"}
+        if SSH_AGENT_LISTENER is not None:
+            return self._json(200, result)
+
+        upstream = os.environ.get("HOST_SSH_AUTH_SOCK", "")
+        try:
+            is_sock = stat.S_ISSOCK(os.stat(upstream).st_mode)
+        except OSError:
+            is_sock = False
+        if not is_sock:
+            return self._json(
+                503,
+                {
+                    "error": f"No host SSH agent socket at {upstream or '(unset)'}; "
+                    "is gpg-agent running with enableSshSupport?"
+                },
+            )
+
+        path = os.path.join(GRANT_ROOT, SSH_AGENT_NAME)
+        try:
+            if os.path.lexists(path):
+                os.unlink(path)
+            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            old_umask = os.umask(0o177)
+            try:
+                listener.bind(path)
+            finally:
+                os.umask(old_umask)
+            listener.listen()
+        except OSError as e:
+            return self._json(500, {"error": str(e)})
+
+        SSH_AGENT_LISTENER = (listener, path)
+        threading.Thread(
+            target=_relay_accept, args=(listener, upstream), daemon=True
+        ).start()
+        self._json(200, result)
+
     @staticmethod
     def _mount_result(src, name, write, remounted):
         return {
@@ -274,12 +331,51 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def _relay_accept(listener, upstream):
+    while True:
+        try:
+            client, _ = listener.accept()
+        except OSError:
+            return
+        try:
+            agent = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            agent.connect(upstream)
+        except OSError:
+            client.close()
+            continue
+        for src, dst in ((client, agent), (agent, client)):
+            threading.Thread(target=_pipe, args=(src, dst), daemon=True).start()
+
+
+def _pipe(src, dst):
+    try:
+        while data := src.recv(65536):
+            dst.sendall(data)
+    except OSError:
+        pass
+    try:
+        dst.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+
+
+def _shutdown(*_):
+    if SSH_AGENT_LISTENER is not None:
+        listener, path = SSH_AGENT_LISTENER
+        listener.close()
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 19600
     if len(sys.argv) > 2:
         GRANT_ROOT = sys.argv[2]
         os.makedirs(GRANT_ROOT, exist_ok=True)
-    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    signal.signal(signal.SIGTERM, _shutdown)
     srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
     print(f"host-query: listening on 127.0.0.1:{port}", flush=True)
     srv.serve_forever()

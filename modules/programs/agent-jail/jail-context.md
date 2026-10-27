@@ -17,19 +17,20 @@ The full host environment is inherited, including credentials, `HERDR_*`, termin
 
 ## Host access and approval
 
-`host_journal`, `host_mount`, and `host_exec` are the sanctioned host-access tools. Every call requires user approval. Explain why access must happen outside the jail, choose the narrowest tool, and batch only related work.
+`host_journal`, `host_mount`, `host_ssh_agent`, and `host_exec` are the sanctioned host-access tools. Every call requires user approval. Explain why access must happen outside the jail, choose the narrowest tool, and batch only related work.
 
 Approval applies to the exact command, path/mode, or journal selection, never the entire tool. “Always” approves only the shown pattern; a changed call asks again. Commands containing `*` or `?` cannot receive “always” approval because those characters become wildcards. Never reshape a call to evade approval. If rejected, do not retry through another route; state what remains unavailable.
 
 - Use `host_journal` for host systemd logs. In-jail `journalctl` prints `No journal files were found` and exits 0 because journal files and supplementary-group ACL access are unavailable. This is not evidence of an empty host journal.
 - Use `host_mount` for another repository or host config directory. It grants the requested path at `~/granted/<name>` for normal file tools.
+- Use `host_ssh_agent` to expose the user's SSH agent before SSH work. See below.
 - Use `host_exec` for one host command only when narrower tools cannot do the job, such as signed commits or system-state operations.
 
 Outside the jail, `HOST_QUERY_PORT` is absent and these tools short-circuit. Use ordinary host commands there, subject to existing approvals.
 
 ## SSH and signing
 
-SSH can authenticate through the mounted agent socket when present (`SSH_AUTH_SOCK`) and verify existing hosts using read-only `~/.ssh/known_hosts`. Private-key directories are not generally mounted. Never weaken host verification, including `StrictHostKeyChecking=no`, to bypass an unknown host.
+The SSH agent socket is not mounted in the jail, and `SSH_AUTH_SOCK` is unset. Before `ssh`, Git over SSH, or remote deployment, call `host_ssh_agent` and state which remote action needs it. On approval it relays the host agent at `~/granted/ssh-agent.sock` for the rest of the session; set `SSH_AUTH_SOCK` to that path for SSH commands. If rejected, SSH has no identity; do not retry through `host_exec`. Existing hosts are verified using read-only `~/.ssh/known_hosts`. Private-key directories are not generally mounted. Never weaken host verification, including `StrictHostKeyChecking=no`, to bypass an unknown host.
 
 SSH credentials are the user's credentials. Obtain approval for consequential actions such as pushing shared branches, force-pushing, or deleting remote refs. Authorized SSH and remote deployment are not technically blocked by the jail.
 

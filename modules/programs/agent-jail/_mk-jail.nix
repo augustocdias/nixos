@@ -88,6 +88,7 @@ in
           for stale in "$jail_state"/grants/*; do
             [ -d "$stale" ] || continue
             kill -0 "''${stale##*/}" 2>/dev/null && continue
+            rm -f "$stale/ssh-agent.sock"
             for mnt in "$stale"/*; do
               [ -d "$mnt" ] || continue
               /run/wrappers/bin/fusermount3 -u "$mnt" 2>/dev/null || true
@@ -102,7 +103,9 @@ in
             host_query_port=$((host_query_port + 1))
           done
 
-          ${lib.getExe hostQuery} "$host_query_port" "$grant_root" \
+          # Not bound into the jail: host_ssh_agent relays it on approval.
+          HOST_SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/gnupg/S.gpg-agent.ssh" \
+            ${lib.getExe hostQuery} "$host_query_port" "$grant_root" \
             > "$jail_state/log/host-query.log" 2>&1 &
           HOST_QUERY_PID=$!
 
@@ -116,7 +119,7 @@ in
           done
           if [ -z "$host_query_up" ]; then
             echo "${name}-jail: warning: host-query did not start on port $host_query_port" >&2
-            echo "  host_exec / host_mount / host_journal will be unavailable;" >&2
+            echo "  host_exec / host_mount / host_journal / host_ssh_agent will be unavailable;" >&2
             echo "  see $jail_state/log/host-query.log" >&2
           fi
 
@@ -126,11 +129,14 @@ in
             # tool misbehaves, and it is unreachable if only grants/ is bound.
             --ro-bind "$jail_state/log" "$jail_state/log"
             --setenv HOST_QUERY_PORT "$host_query_port"
+            # The inherited host value points at a socket the jail cannot see.
+            --unsetenv SSH_AUTH_SOCK
           )
         '')
         (add-cleanup ''
           kill "''${HOST_QUERY_PID:-}" 2>/dev/null || true
           if [ -n "''${grant_root:-}" ]; then
+            rm -f "$grant_root/ssh-agent.sock"
             for mnt in "$grant_root"/*; do
               [ -d "$mnt" ] || continue
               /run/wrappers/bin/fusermount3 -u "$mnt" 2>/dev/null || true
@@ -143,18 +149,6 @@ in
         (try-readonly (noescape "\"$HOME/.config/git\""))
         (try-readonly (noescape "\"$HOME/.config/gh\""))
 
-        (add-runtime ''
-          gpg_ssh_sock="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/gnupg/S.gpg-agent.ssh"
-          if [ -S "$gpg_ssh_sock" ]; then
-            RUNTIME_ARGS+=(
-              --bind "$gpg_ssh_sock" "$gpg_ssh_sock"
-              --setenv SSH_AUTH_SOCK "$gpg_ssh_sock"
-            )
-          else
-            echo "${name}-jail: warning: no gpg-agent ssh socket at $gpg_ssh_sock" >&2
-            echo "  ssh will have no identity; is gpg-agent running with enableSshSupport?" >&2
-          fi
-        '')
         (try-ro-bind (noescape "\"$HOME/.ssh/known_hosts\"") (noescape "~/.ssh/known_hosts"))
 
         (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:$PATH\"")))

@@ -1,6 +1,6 @@
 """host_* tools as a stdio MCP server for the jailed harnesses.
 
-Exposes the three tools over JSON-RPC and forwards each call to host-query on
+Exposes the four tools over JSON-RPC and forwards each call to host-query on
 HOST_QUERY_PORT. Approval is the harness's job: Claude Code lists these tools
 under permissions.ask, which prompts on every call even when an allow rule
 also matches.
@@ -76,9 +76,25 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "host_ssh_agent",
+        "description": (
+            "Expose the user's SSH agent inside the sandbox at "
+            "~/granted/ssh-agent.sock for the rest of the session. The sandbox "
+            "has no SSH identity until then. Call it before ssh, git over ssh, "
+            "or remote deploys; the user approves, so say which remote action "
+            "needs it."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
-ROUTES = {"host_exec": "/exec", "host_mount": "/mount", "host_journal": "/journal"}
+ROUTES = {
+    "host_exec": "/exec",
+    "host_mount": "/mount",
+    "host_journal": "/journal",
+    "host_ssh_agent": "/ssh-agent",
+}
 
 
 def call_host(name, args):
@@ -101,6 +117,9 @@ def call_host(name, args):
     except urllib.error.URLError as e:
         raise RuntimeError(f"host-query unreachable: {e.reason}")
 
+    if name == "host_ssh_agent":
+        path = os.path.expanduser(data.get("jail_path", ""))
+        return f"SSH agent available. Prefix SSH commands with SSH_AUTH_SOCK={path}"
     if name == "host_mount":
         mode = "read-write" if data.get("mode") == "rw" else "read-only"
         how = "Remounted" if data.get("remounted") else "Mounted"

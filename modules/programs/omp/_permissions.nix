@@ -31,6 +31,7 @@ in {
       mcp__host_exec = "prompt";
       mcp__host_mount = "prompt";
       mcp__host_journal = "prompt";
+      mcp__host_ssh_agent = "prompt";
     };
   };
 

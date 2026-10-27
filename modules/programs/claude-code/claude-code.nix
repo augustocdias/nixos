@@ -96,7 +96,7 @@
               ++ map (t: mcp "linear" t) ["list_*" "get_*" "search_*"]
               ++ map (t: mcp "Notion" t) ["notion-fetch" "notion-search" "notion-query-*" "notion-get-*"];
             # ask beats allow, so the host tools prompt on every call.
-            ask = perms.ask ++ map (mcp "host") ["host_exec" "host_mount" "host_journal"];
+            ask = perms.ask ++ map (mcp "host") ["host_exec" "host_mount" "host_journal" "host_ssh_agent"];
             inherit (perms) deny;
           };
 
