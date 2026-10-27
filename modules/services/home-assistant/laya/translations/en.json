@@ -8,10 +8,21 @@
           "url": "Server URL",
           "translate_url": "Translator URL (LibreTranslate; empty to disable)"
         }
+      },
+      "reconfigure": {
+        "title": "Laya connection",
+        "description": "Update the local server and translator URLs without replacing this integration.",
+        "data": {
+          "url": "Server URL",
+          "translate_url": "Translator URL (LibreTranslate; empty to disable)"
+        }
       }
     },
     "error": {
       "cannot_connect": "Could not reach the Laya server"
+    },
+    "abort": {
+      "reconfigure_successful": "Connection settings updated."
     }
   },
   "options": {

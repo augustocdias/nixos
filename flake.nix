@@ -53,9 +53,21 @@
       url = "github:vinceliuice/grub2-themes";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.uv2nix.follows = "uv2nix";
+    };
+    hermes-plugin-honcho = {
+      url = "github:plastic-labs/honcho";
+      flake = false;
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+    honcho = {
+      url = "github:plastic-labs/honcho";
+      flake = false;
     };
     hyprland.url = "github:hyprwm/Hyprland";
     import-tree.url = "github:vic/import-tree";
@@ -123,7 +135,7 @@
       flake = false;
     };
     nvim-flash = {
-      url = "github:onion108/flash.nvim/main";
+      url = "github:folke/flash.nvim";
       flake = false;
     };
     nvim-gatekeeper = {
@@ -266,6 +278,13 @@
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs = {
+        nixpkgs.follows = "hermes-agent/nixpkgs";
+        pyproject-nix.follows = "hermes-agent/pyproject-nix";
+      };
     };
     win98se-plymouth = {
       url = "github:nilp0inter/plymouth-theme-win98se-inspired-nixos-theme";

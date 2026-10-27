@@ -56,18 +56,19 @@ def b64url(raw):
     return base64.urlsafe_b64encode(raw).rstrip(b"=")
 
 
-def mint_token(secret, user_id):
-    """Forge the same HS256 session token `create_token` would issue.
-
-    Revocation is only ever checked against Redis, which is not configured, so
-    a self-signed token needs no round trip through the login flow.
-    """
+def mint_token(secret, user_id, session_stamp):
+    """Sign a session token bound to the account's current revocation stamp."""
     header = b64url(
         json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode()
     )
     payload = b64url(
         json.dumps(
-            {"id": user_id, "jti": str(uuid.uuid4()), "iat": int(time.time())},
+            {
+                "id": user_id,
+                "session_stamp": session_stamp,
+                "jti": str(uuid.uuid4()),
+                "iat": int(time.time()),
+            },
             separators=(",", ":"),
         ).encode()
     )
@@ -76,19 +77,15 @@ def mint_token(secret, user_id):
     return (signed + b"." + signature).decode()
 
 
-def owner_id(db_path):
+def owner_auth(db_path):
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        for query in (
-            "SELECT id FROM user WHERE role = 'admin' ORDER BY created_at LIMIT 1",
-            "SELECT id FROM user ORDER BY created_at LIMIT 1",
-        ):
-            row = con.execute(query).fetchone()
-            if row:
-                return row[0]
+        return con.execute(
+            "SELECT u.id, a.session_stamp FROM user u JOIN auth a ON a.id = u.id "
+            "WHERE u.role = 'admin' AND a.active = 1 ORDER BY u.created_at LIMIT 1"
+        ).fetchone()
     finally:
         con.close()
-    return None
 
 
 def api(method, path, token, payload=None):
@@ -117,12 +114,12 @@ def main():
         log(f"database never appeared at {DB_PATH}")
         return 1
 
-    user_id = owner_id(DB_PATH)
-    if user_id is None:
-        log("no user row yet, open the UI once so the account is created")
+    owner = owner_auth(DB_PATH)
+    if owner is None:
+        log("no active administrator credential exists")
         return 1
 
-    token = mint_token(secret, user_id)
+    token = mint_token(secret, *owner)
 
     with open(MANIFEST, encoding="utf-8") as handle:
         manifest = json.load(handle)
@@ -162,4 +159,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

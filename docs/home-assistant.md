@@ -45,7 +45,7 @@ Version coupling worth knowing:
 
 Dropping HACS also dropped its update notifications. Only two things still self-report: the **ha-mcp server**, whose coordinator polls PyPI every `UPDATE_CHECK_INTERVAL` (6h) and is *not* gated on `skip_pip`, so its `update` entity still shows installed-vs-latest (just with no Install button) — which now tells you **nixpkgs** is behind, since the server is no longer a pin of ours; and `component_outdated`, a repair issue raised when the installed server needs a newer `ha_mcp_tools` than is running. Nothing watches the other 12 pins.
 
-`pins.nix` therefore re-exports all 13 as `packages.hass-*` **solely so `nix-update` can reach them** — nothing consumes these outputs, the HA module callPackages the same files itself. `update-system` stage [2/4] drives the whole set; `--skip-pins` opts out (it builds each one).
+`pins.nix` re-exports all 13 HA pins as `packages.hass-*` solely for `nix-update`; the HA module still callPackages the same files directly. `update-system` stage [2/4] updates these alongside `ollama-darwin-source`. `--skip-pins` skips both groups. Every HA pin retains `--build`; Ollama uses a native source-only fetch and builds its binary package only on Darwin.
 
 Three optional `passthru` knobs, read by that stage:
 

@@ -35,13 +35,13 @@ if test $show_help = true
     echo ""
     echo "Update all system components:"
     echo "  - Nix flake inputs (including neovim plugins)"
-    echo "  - Hand-pinned Home Assistant sources (packages.hass-*)"
+    echo "  - Hand-pinned Home Assistant and Ollama sources"
     echo "  - Firefox extensions (if installed)"
     echo "  - Thunderbird extensions (if installed)"
     echo ""
     echo "Options:"
     echo "  -h, --help       Show this help message"
-    echo "      --skip-pins  Skip the Home Assistant pins (each one is built)"
+    echo "      --skip-pins  Skip Home Assistant and Ollama pins"
     exit 0
 end
 
@@ -55,11 +55,9 @@ run nix run ~/nixos#write-flake
 run nix flake update --flake ~/nixos
 echo ""
 
-# The Home Assistant components/cards/themes are pinned by hand with their own
-# hashes (nothing HACS-like watches them any more), so nix-update queries each
-# upstream and rewrites version + hash in place. Failures are per-package and
-# non-fatal: a GitHub rate-limit on one card should not abort the whole run.
-echo -e $YELLOW"[2/4] Updating Home Assistant pins..."$NC
+# Home Assistant sources and the official Ollama archive share per-pin failure
+# handling. Only native Darwin hosts build the binary package after fetching.
+echo -e $YELLOW"[2/4] Updating Home Assistant and Ollama pins..."$NC
 set -l pin_failures
 if test $skip_pins = true
     echo -e $YELLOW"  skipped (--skip-pins)"$NC
@@ -82,7 +80,7 @@ else
                 file = ps.${n}.updateFile or "";
                 regex = ps.${n}.updateVersionRegex or "";
               };
-            }) (builtins.filter (n: builtins.match "hass-.*" n != null) (builtins.attrNames ps))
+            }) (builtins.filter (n: n == "ollama-darwin-source" || builtins.match "hass-.*" n != null) (builtins.attrNames ps))
           )' | jq -r 'to_entries[] | "\(.key)\t\(.value.policy)\t\(.value.file)\t\(.value.regex)"')
 
     for line in $pins
@@ -101,10 +99,21 @@ else
         end
 
         echo "  $pin ($policy)"
-        # --build so a bump that no longer compiles fails here rather than at
-        # the next nixos-rebuild.
-        nix-update -f ~/nixos -F --build --version=$policy $extra $pin
-        or set -a pin_failures $pin
+        if test "$pin" = ollama-darwin-source
+            nix-update -f ~/nixos -F --src-only --version=stable --use-github-releases $extra $pin
+            if test $status -ne 0
+                set -a pin_failures $pin
+            else if string match -q '*-darwin' -- $sys
+                nix build --no-link ~/nixos#ollama-bin
+                or set -a pin_failures $pin
+            else
+                echo "  Ollama source pin updated; Darwin package/runtime verification remains required"
+            end
+        else
+            # Existing HA pins must still build before the next rebuild.
+            nix-update -f ~/nixos -F --build --version=$policy $extra $pin
+            or set -a pin_failures $pin
+        end
     end
 
     if test (count $pin_failures) -gt 0
@@ -130,5 +139,9 @@ end
 echo ""
 
 echo -e $GREEN"══════════════════════════════════════════"$NC
-echo -e $GREEN"       All updates complete!"$NC
+if test (count $pin_failures) -gt 0
+    echo -e $YELLOW"       Updates complete with pin failures: $pin_failures"$NC
+else
+    echo -e $GREEN"       All updates complete!"$NC
+end
 echo -e $GREEN"══════════════════════════════════════════"$NC

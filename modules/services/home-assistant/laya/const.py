@@ -11,7 +11,7 @@ CONF_CONFIDENCE: Final = "confidence_threshold"
 CONF_COMPOUND: Final = "compound_threshold"
 
 DEFAULT_URL: Final = "http://macmini.local:8000"
-DEFAULT_TRANSLATE_URL: Final = "http://macmini.local:5000"
+DEFAULT_TRANSLATE_URL: Final = "http://macmini.local:5001"
 
 # The only checkpoint the server loads; pinned so the router never picks.
 MODEL: Final = "multilingual"

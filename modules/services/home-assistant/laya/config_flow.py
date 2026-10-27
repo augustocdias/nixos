@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -37,24 +37,38 @@ class LayaConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        reconfigure = self.source == SOURCE_RECONFIGURE
+        defaults = (
+            self._get_reconfigure_entry().data
+            if reconfigure
+            else {CONF_URL: DEFAULT_URL, CONF_TRANSLATE_URL: DEFAULT_TRANSLATE_URL}
+        )
         if user_input is not None:
-            client = LayaClient(async_get_clientsession(self.hass), user_input[CONF_URL])
+            client = LayaClient(
+                async_get_clientsession(self.hass), user_input[CONF_URL]
+            )
             try:
                 await client.async_validate()
             except LayaError:
                 errors["base"] = "cannot_connect"
             else:
+                if reconfigure:
+                    return self.async_update_reload_and_abort(
+                        self._get_reconfigure_entry(), data_updates=user_input
+                    )
                 return self.async_create_entry(title="Laya", data=user_input)
 
         return self.async_show_form(
-            step_id="user",
+            step_id="reconfigure" if reconfigure else "user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_URL, default=DEFAULT_URL): selector.TextSelector(
+                    vol.Required(
+                        CONF_URL, default=defaults[CONF_URL]
+                    ): selector.TextSelector(
                         selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
                     ),
                     vol.Optional(
-                        CONF_TRANSLATE_URL, default=DEFAULT_TRANSLATE_URL
+                        CONF_TRANSLATE_URL, default=defaults.get(CONF_TRANSLATE_URL, "")
                     ): selector.TextSelector(
                         selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
                     ),
@@ -62,6 +76,11 @@ class LayaConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        return await self.async_step_user(user_input)
 
     @staticmethod
     @callback
@@ -91,7 +110,9 @@ class LayaOptionsFlow(OptionsFlow):
                 {
                     vol.Optional(
                         CONF_FALLBACK_AGENT,
-                        description={"suggested_value": options.get(CONF_FALLBACK_AGENT)},
+                        description={
+                            "suggested_value": options.get(CONF_FALLBACK_AGENT)
+                        },
                     ): selector.ConversationAgentSelector(),
                     vol.Optional(
                         CONF_CONFIDENCE,

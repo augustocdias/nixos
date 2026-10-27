@@ -9,12 +9,20 @@
   # nixpkgs' services.libretranslate is NixOS-only, hence a launchd daemon.
   den.aspects.libretranslate = {
     darwin = {pkgs, ...}: let
-      port = 5000;
+      port = 5001;
       stateDir = "/var/lib/libretranslate";
+      package = pkgs.libretranslate.override {
+        # flask-swagger-ui 5.32.14 moved its setuptools configuration to pyproject.toml.
+        flask-swagger-ui = pkgs.python3Packages.flask-swagger-ui.overridePythonAttrs {
+          format = null;
+          pyproject = true;
+          build-system = [pkgs.python3Packages.setuptools];
+        };
+      };
     in {
       launchd.daemons.libretranslate = {
         command = lib.concatStringsSep " " [
-          (lib.getExe pkgs.libretranslate)
+          (lib.getExe' package "libretranslate")
           "--host 0.0.0.0"
           "--port ${toString port}"
           "--load-only en,pt"

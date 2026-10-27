@@ -11,6 +11,10 @@
 
   den.aspects.macmini = {
     includes = with den.aspects; [
+      ollama
+      wyoming
+      honcho
+      hermes-agent
       open-webui
       laya
       libretranslate
@@ -37,83 +41,6 @@
           runHook postInstall
         '';
       };
-
-      ollamaHome = "/var/lib/ollama";
-      ollamaPort = 11434;
-
-      ollamaModels = [
-        "gpt-oss:20b"
-      ];
-
-      voiceDaemon = name: {
-        command,
-        environment ? {},
-        keepAlive ? true,
-        home ? null,
-      }: {
-        inherit command;
-        environment = lib.optionalAttrs (home != null) {HOME = home;} // environment;
-        serviceConfig = {
-          KeepAlive = keepAlive;
-          RunAtLoad = true;
-          StandardOutPath = "/var/log/${name}.log";
-          StandardErrorPath = "/var/log/${name}.log";
-        };
-      };
-
-      # launchd has no ordering, so poll the server instead of racing it.
-      ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
-        set -u
-        until ${lib.getExe pkgs.curl} -fsS --max-time 5 \
-          "http://127.0.0.1:${toString ollamaPort}/api/version" >/dev/null; do
-          echo "waiting for ollama on port ${toString ollamaPort}..."
-          sleep 2
-        done
-
-        status=0
-        ${lib.concatMapStringsSep "\n" (model: ''
-            echo "pulling ${model}"
-            ${lib.getExe pkgs.ollama} pull ${lib.escapeShellArg model} || status=1
-          '')
-          ollamaModels}
-        exit "$status"
-      '';
-
-      # Custom piper voices from OpenVoiceOS, deployed into --data-dir on
-      # activation so wyoming-piper auto-discovers them alongside the catalog.
-      # Each entry is { name, onnx, config } — name must match the .onnx stem
-      # that find_voice() looks up.  The config is patched to set dataset and
-      # audio.quality so HA shows a readable name instead of "working (training)".
-      piperVoices = let
-        patchConfig = {
-          src,
-          dataset,
-          quality,
-        }:
-          pkgs.runCommand "piper-config-patched.json" {
-            nativeBuildInputs = [pkgs.jq];
-          } ''
-            jq '.dataset = $d | .audio.quality = $q' \
-              --arg d "${dataset}" --arg q "${quality}" \
-              < ${src} > $out
-          '';
-      in [
-        {
-          name = "dii_pt-BR";
-          onnx = pkgs.fetchurl {
-            url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx";
-            hash = "sha256-+xWkR7p0grki4dL+/qccEDH3YOcr4kzOd5Tib+EdCGs=";
-          };
-          config = patchConfig {
-            src = pkgs.fetchurl {
-              url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx.json";
-              hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
-            };
-            dataset = "Dii pt-BR";
-            quality = "medium";
-          };
-        }
-      ];
     in {
       imports = lib.optionals (inputs ? nix-homebrew) [
         inputs.nix-homebrew.darwinModules.nix-homebrew
@@ -265,18 +192,6 @@
         rm -rf "/Library/Keyboard Layouts/EurKEY-Next.bundle"
         cp -R "${eurkey-next-bundle}/EurKEY-Next.bundle" "/Library/Keyboard Layouts/EurKEY-Next.bundle"
         chmod -R u+w,go+rX "/Library/Keyboard Layouts/EurKEY-Next.bundle"
-
-        mkdir -p ${ollamaHome}/models
-        mkdir -p /var/lib/wyoming/faster-whisper
-        mkdir -p /var/lib/wyoming/piper
-
-        ${lib.concatMapStringsSep "\n" (voice: ''
-            cmp -s "${voice.onnx}" "/var/lib/wyoming/piper/${voice.name}.onnx" \
-              || cp --no-preserve=mode "${voice.onnx}" "/var/lib/wyoming/piper/${voice.name}.onnx"
-            cmp -s "${voice.config}" "/var/lib/wyoming/piper/${voice.name}.onnx.json" \
-              || cp --no-preserve=mode "${voice.config}" "/var/lib/wyoming/piper/${voice.name}.onnx.json"
-          '')
-          piperVoices}
       '';
 
       nix-homebrew = lib.mkIf (inputs ? nix-homebrew) {
@@ -311,55 +226,6 @@
         ];
 
         masApps = {};
-      };
-
-      launchd.daemons = {
-        ollama = voiceDaemon "ollama" {
-          command = "${lib.getExe pkgs.ollama} serve";
-          home = ollamaHome;
-          environment = {
-            OLLAMA_HOST = "[::]:${toString ollamaPort}";
-            OLLAMA_MODELS = "${ollamaHome}/models";
-            OLLAMA_CONTEXT_LENGTH = "131072";
-            OLLAMA_KEEP_ALIVE = "-1";
-            OLLAMA_NUM_PARALLEL = "1";
-            OLLAMA_FLASH_ATTENTION = "1";
-            OLLAMA_NO_CLOUD = "1";
-          };
-        };
-
-        ollama-model-loader = voiceDaemon "ollama-model-loader" {
-          command = "${ollamaModelLoader}";
-          home = ollamaHome;
-          environment = {
-            OLLAMA_HOST = "127.0.0.1:${toString ollamaPort}";
-            OLLAMA_MODELS = "${ollamaHome}/models";
-          };
-          # One-shot: retry on failure, don't respawn after a clean pull.
-          keepAlive = {SuccessfulExit = false;};
-        };
-
-        wyoming-faster-whisper = voiceDaemon "wyoming-faster-whisper" {
-          command = lib.concatStringsSep " " [
-            (lib.getExe pkgs.wyoming-faster-whisper)
-            "--data-dir /var/lib/wyoming/faster-whisper"
-            "--uri tcp://0.0.0.0:10300"
-            "--model small-int8"
-            "--language auto"
-          ];
-          # https://github.com/rhasspy/wyoming-faster-whisper/issues/27
-          environment.HF_HOME = "/tmp";
-        };
-
-        wyoming-piper = voiceDaemon "wyoming-piper" {
-          command = lib.concatStringsSep " " [
-            (lib.getExe pkgs.wyoming-piper)
-            "--data-dir /var/lib/wyoming/piper"
-            "--uri tcp://0.0.0.0:10200"
-            "--voice en_US-libritts-high"
-            "--speaker 0"
-          ];
-        };
       };
 
       programs.fish.enable = true;
