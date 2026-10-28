@@ -9,8 +9,10 @@ else
     end
 end
 
-# Set SSH to use GPG agent
-set -gx SSH_AUTH_SOCK (gpgconf --list-dirs agent-ssh-socket)
+# Set SSH to use GPG agent, unless an SSH session forwarded one
+if not set -q SSH_CONNECTION; or not test -S "$SSH_AUTH_SOCK"
+    set -gx SSH_AUTH_SOCK (gpgconf --list-dirs agent-ssh-socket)
+end
 
 zoxide init fish | source
 
