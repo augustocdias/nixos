@@ -8,7 +8,7 @@ Persistent writable areas:
 
 - Workspace at its real host path, plus the linked checkout's git-common-dir when different.
 - `~/granted/<name>` only in its approved mode; grants are read-only unless write access was requested.
-- Caches: `~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, and `~/.cache/jgrep`.
+- Caches: `~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, `~/.local/share/rtk`, and `~/.cache/jgrep`.
 - Harness state: `~/.omp` and `~/.config/ponytail` for omp; `~/.claude` for Claude Code.
 
 Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$HOME`, are session-private tmpfs. Successful writes there do not change the host and disappear after the session. `/nix/store` is read-only. Other host directories are not generally mounted.

@@ -47,7 +47,7 @@ Wizard GitHub writes require an explicit repository, passed to `gh` independentl
 
 On Linux `omp` and `claude` **are** the jail: `agent-jail/_mk-jail.nix` wraps the package with bubblewrap via the `jail-nix` combinator library and installs it under the original binary name. Darwin has no sandbox and relies on the allowlist alone.
 
-Deny-by-default. Persistent writable areas: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*` (subject to each grant's requested read/write mode), the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`), and the harness's own state (omp: `~/.omp`, `~/.config/ponytail`; claude: `~/.claude`; both: `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
+Deny-by-default. Persistent writable areas: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*` (subject to each grant's requested read/write mode), the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, `~/.local/share/rtk`), and the harness's own state (omp: `~/.omp`, `~/.config/ponytail`; claude: `~/.claude`; both: `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
 
 Things that cost real time to discover:
 
@@ -169,6 +169,17 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 - **Plugins**: `caveman` and `ponytail` load directly from their pinned upstream flake inputs. Their commands, skills, hooks, and band actions remain upstream-owned. No source filtering or runtime installers run.
 - **herdr**: `hooks."herdr-agent-state.sh"` is deployed from `${pkgs.herdr.src}` (version-matched) and registered as a `SessionStart` hook with the **exact** command string herdr's own installer writes, so `herdr integration install claude` is a no-op and `herdr integration status` is clean. Never run the installer: it would try to rewrite the immutable `settings.json`. Sidebar tokens come from our own `claude-activity.py` hooks (see [Agents sidebar](herdr.md#agents-sidebar)); `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` turns on the task tools it reads.
 
+## rtk (shell-output compression)
+
+`modules/programs/rtk.nix` (aspect `rtk`, in `user-base`) installs nixpkgs `rtk`: the full edition, with the BUSL `engine` feature compiled in. No `pipeline.toml` is written, so it runs `rtk:default`: the Bash rewrite plus per-command filters. PostToolUse compression, routing to other models, directives, `rtk-proxy` and telemetry all stay off.
+
+- **Claude**: a `PreToolUse` hook on `Bash` runs `rtk hook claude`. It rewrites supported commands (`git status` to `rtk git status`) through `updatedInput`. rtk returns `allow` only when one of our allow rules matched, and Claude still applies its deny and ask rules over a hook `allow`.
+- **omp**: `~/.omp/agent/extensions/rtk.ts` is upstream's shared Pi/OMP extension, copied from `pkgs.rtk.src`. It rewrites `event.input.command` in place.
+- **Rule twins**: Claude checks permission rules against the *rewritten* command, and omp's order is unverified. So `agent-shared/_bash.nix` gives each pattern not starting with `*` an `rtk <pattern>` twin with the same action. Without the twins, `rtk nix run …` would slip past `nix run*` and land on the jailed `*` allow. rtk 1.0.1 has no nix or herdr rewrites; the twins guard against future ones.
+- **Hermes** (macmini): the `rtk-rewrite` Python plugin, linked per profile by the Hermes bootstrap. See [Voice services](voice-services.md#hermes-agent).
+- **Never run `rtk init`**: it would patch the immutable `settings.json` and the Nix-owned extension.
+- **Stats**: `~/.local/share/rtk` (tracking DB) is bound read-write in the shared jail, so `rtk gain` persists. The home-manager activation creates the directory.
+
 ## Editing guidelines
 
 - **Agent jail**: `agent-jail/_mk-jail.nix` is shared — a change there affects both harnesses. After touching `agent-shared/_bash.nix` or a harness's `_permissions.nix`, verify the rendered ruleset rather than the source.
@@ -178,6 +189,8 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 Caveman and Ponytail use upstream defaults, mode controls, saved state, and subagent behavior. No local patches force activation or reject off requests. Their safety, exact-output, and persisted-document exceptions remain upstream-owned.
 
 omp's existing Caveman wrapper injects the upstream activation rule every turn, including its stop instructions; it has no separate runtime mode tracker. Ponytail uses its upstream `pi-extension/index.js`. Claude uses upstream activation, mode-tracker, subagent hooks, and band controls. The Caveman installer and omp installer hash guard remain unchanged.
+
+Hermes uses upstream's native integrations rather than the omp adapters: Caveman's nine-skill bundle and Ponytail's Python plugin. Profile installation, mode controls, and verification are documented in [Voice services](voice-services.md#hermes-agent). Both use the existing flake inputs; there is no separate runtime installer or source patch.
 
 ## Context ownership and operational safety
 

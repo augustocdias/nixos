@@ -66,6 +66,36 @@ def write_env(path, managed):
         temporary.replace(path)
 
 
+def link_plugin(plugin, target):
+    if plugin.is_symlink():
+        if plugin.resolve() != target:
+            plugin.unlink()
+            plugin.symlink_to(target)
+    elif plugin.exists():
+        raise RuntimeError(
+            f"Refusing to replace an unmanaged directory: {plugin}"
+        )
+    else:
+        plugin.symlink_to(target)
+
+
+def enable_plugins(path, names):
+    # Union, not replace: plugins enabled locally with `hermes plugins` stay on.
+    config = require_readable_config_before_write(path)
+    plugins = config.get("plugins")
+    plugins = plugins if isinstance(plugins, dict) else {}
+    enabled = plugins.get("enabled")
+    enabled = enabled if isinstance(enabled, list) else []
+    missing = [name for name in names if name not in enabled]
+    if missing:
+        atomic_write(
+            path,
+            json.dumps(
+                {**config, "plugins": {**plugins, "enabled": enabled + missing}}
+            ),
+        )
+
+
 def bootstrap(manifest):
     root = Path(os.environ["HERMES_HOME"])
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -153,18 +183,11 @@ def bootstrap(manifest):
             path = home / "memories" / name
             if not path.exists():
                 path.touch(mode=0o600)
-        plugin = home / "plugins" / "honcho"
-        target = Path(manifest["plugin"])
-        if plugin.is_symlink():
-            if plugin.resolve() != target:
-                plugin.unlink()
-                plugin.symlink_to(target)
-        elif plugin.exists():
-            raise RuntimeError(
-                "Refusing to replace an unmanaged Honcho plugin directory"
-            )
-        else:
-            plugin.symlink_to(target)
+        for name, target in manifest["plugins"].items():
+            link_plugin(home / "plugins" / name, Path(target))
+        enable_plugins(home / "config.yaml", manifest["enabled_plugins"])
+        for name, target in manifest["skills"].items():
+            link_plugin(home / "skills" / name, Path(target))
 
 
 if __name__ == "__main__":

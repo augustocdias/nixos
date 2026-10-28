@@ -70,7 +70,18 @@
         HERMES_HOME_ASSISTANT_MCP_URL = config.sops.secrets.hermes_home_assistant_mcp_url.path;
         HERMES_HOME_ASSISTANT_TOKEN = config.sops.secrets.hermes_home_assistant_token.path;
       };
-      plugin = "${inputs.hermes-plugin-honcho}/hermes-plugin-honcho";
+      plugins = {
+        honcho = "${inputs.hermes-plugin-honcho}/hermes-plugin-honcho";
+        ponytail = "${inputs.ponytail}";
+        # Upstream's adapter, version-matched to the binary: rewrites `terminal`
+        # commands through `rtk rewrite`. Hermes's dangerous-command checks run
+        # on the rewritten command.
+        rtk-rewrite = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";
+      };
+      enabled_plugins = ["rtk-rewrite" "ponytail"];
+      skills = {
+        caveman-bundle = "${inputs.caveman}/skills";
+      };
       honcho_keys = "/var/lib/honcho/app/keys";
       honcho_config = {
         baseUrl = "http://127.0.0.1:8001";
@@ -104,7 +115,7 @@
     };
     launchd.daemons.hermes-agent = {
       # launchd must not lend the host gateway ambient cloud credentials.
-      command = "/usr/bin/env -i HOME=${home} HERMES_HOME=${root} PATH=/usr/bin:/bin:/usr/sbin:/sbin ${start}";
+      command = "/usr/bin/env -i HOME=${home} HERMES_HOME=${root} PATH=${pkgs.rtk}/bin:/usr/bin:/bin:/usr/sbin:/sbin ${start}";
       serviceConfig = {
         UserName = "augusto";
         RunAtLoad = true;

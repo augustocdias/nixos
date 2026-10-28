@@ -112,6 +112,20 @@
               ];
             }
           ];
+          # rtk rewrites Bash calls (`git status` -> `rtk git status`); the
+          # `rtk <pattern>` twins in agent-shared/_bash.nix keep the rules
+          # matching the rewritten command.
+          hooks.PreToolUse = [
+            {
+              matcher = "Bash";
+              hooks = [
+                {
+                  type = "command";
+                  command = "${lib.getExe pkgs.rtk} hook claude";
+                }
+              ];
+            }
+          ];
         };
 
         hooks."herdr-agent-state.sh" = "${pkgs.herdr.src}/src/integration/assets/claude/herdr-agent-state.sh";

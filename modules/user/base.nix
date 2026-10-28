@@ -17,6 +17,7 @@
       skim
       neovide
       omp
+      rtk
       cli-tools
       fonts
       development

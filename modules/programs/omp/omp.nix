@@ -237,6 +237,8 @@
 
             ".omp/agent/extensions/gate.ts".source = ./extensions/gate.ts;
             ".omp/agent/extensions/google-calendar.ts".source = ./extensions/google-calendar.ts;
+            # Upstream's shared Pi/OMP extension, version-matched to the binary.
+            ".omp/agent/extensions/rtk.ts".source = "${pkgs.rtk.src}/hooks/pi/rtk.ts";
           };
 
         home.activation.omp-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''

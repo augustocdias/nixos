@@ -291,7 +291,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     zapfast = {
-      url = "github:crmne/zapfast";
+      url = "github:augustocdias/zapfast/home-manager-module";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

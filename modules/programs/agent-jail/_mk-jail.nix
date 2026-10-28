@@ -161,6 +161,7 @@ in
         (try-rw-bind (noescape "\"$HOME/.cargo/registry\"") (noescape "~/.cargo/registry"))
         (try-rw-bind (noescape "\"$HOME/.cargo/git\"") (noescape "~/.cargo/git"))
         (try-rw-bind (noescape "\"$HOME/.local/share/direnv\"") (noescape "~/.local/share/direnv"))
+        (try-rw-bind (noescape "\"$HOME/.local/share/rtk\"") (noescape "~/.local/share/rtk"))
       ]
       ++ extra jail.combinators
       ++ [
