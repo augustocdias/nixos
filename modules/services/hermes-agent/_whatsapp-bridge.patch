@@ -1,0 +1,12 @@
+--- a/gateway/platforms/whatsapp_common.py
++++ b/gateway/platforms/whatsapp_common.py
+@@ -304,6 +304,9 @@ def resolve_whatsapp_bridge_dir() -> Path:
+     try:
+         hermes_home_bridge.parent.mkdir(parents=True, exist_ok=True)
+         shutil.copytree(install_bridge, hermes_home_bridge, dirs_exist_ok=False)
++        # Nix store permissions must not prevent the runtime npm install.
++        for path in [hermes_home_bridge, *hermes_home_bridge.rglob("*")]:
++            path.chmod(path.stat().st_mode | 0o200)
+         return hermes_home_bridge
+     except Exception:
+         return install_bridge
