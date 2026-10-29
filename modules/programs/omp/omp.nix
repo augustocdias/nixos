@@ -69,7 +69,7 @@
         extensions = ["${caveman}" "${inputs.ponytail}"];
 
         modelRoles = {
-          default = "@slow";
+          default = sol "medium";
           plan = astra "high";
           slow = astra "medium";
           task = sol "medium";
@@ -100,7 +100,7 @@
         };
 
         advisor.enabled = true;
-        memory.backend = "mnemopi";
+        memory.backend = "off";
         mnemopi.scoping = "global";
         autolearn.enabled = true;
         lsp.diagnosticsOnEdit = true;

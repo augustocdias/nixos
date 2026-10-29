@@ -74,6 +74,7 @@
           + builtins.readFile ../agent-jail/jail-context.md;
 
         settings = {
+          autoMemoryEnabled = false;
           env = {
             DISABLE_AUTOUPDATER = "1";
             CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
