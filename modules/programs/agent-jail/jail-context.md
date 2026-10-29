@@ -13,7 +13,7 @@ Persistent writable areas:
 
 Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$HOME`, are session-private tmpfs. Successful writes there do not change the host and disappear after the session. `/nix/store` is read-only. Other host directories are not generally mounted.
 
-The full host environment is inherited, including credentials, `HERDR_*`, terminfo, and the launch shell's direnv exports. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when a different environment is needed. `direnv allow` state persists.
+The host environment is inherited, including credentials, `HERDR_*`, terminfo and direnv exports, except `GPG_TTY`: the launcher removes it before starting the host-command helper and unsets it in the final sandbox arguments, after overlays. Existing sessions/helpers need restart. DISPLAY/WAYLAND_DISPLAY remain intact; absence of GPG_TTY alone does not prove GUI pinentry because gpg-agent retains terminal/display state. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when needed. `direnv allow` state persists.
 
 ## Host access and approval
 

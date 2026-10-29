@@ -18,7 +18,7 @@ Show this to the user, then immediately proceed to Step 2. The user reads and th
 
 ### 2. Spawn sub-agents
 
-Subject to the harness delegation rules, spawn 3+ read-only design sub-agents in parallel. These are alternative designs, not coding tasks. Pass the resolved absolute workspace and relevant authoritative domain documents explicitly. They must not edit source, create worktrees, or change branches. Each must produce a **radically different** interface for the deepened module.
+Subject to the harness delegation rules, spawn 3+ read-only design sub-agents in parallel, each with fresh context. These are alternative designs, not coding tasks. Pass the resolved absolute workspace and relevant authoritative domain documents explicitly. They must not edit source, create worktrees, or change branches. Each must produce a **radically different** interface for the deepened module.
 
 Prompt each sub-agent with a separate technical brief (file paths, coupling details, dependency category from [DEEPENING.md](DEEPENING.md), what sits behind the seam). The brief is independent of the user-facing problem-space explanation in Step 1. Give each agent a different design constraint:
 

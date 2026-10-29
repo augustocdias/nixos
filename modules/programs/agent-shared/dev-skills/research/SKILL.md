@@ -6,7 +6,7 @@ description: Investigate a question against high-trust primary sources and captu
 [Shared workflow](WORKFLOW.md)
 
 
-For bounded research substantial enough to delegate under the harness rules, use a **background read-only research agent**, so you keep working while it reads. Handle a trivial lookup inline. Pass the precise question, source constraints, and resolved absolute workspace explicitly. No research branches, worktrees, or checkout changes.
+For bounded research substantial enough to delegate under the harness rules, use a **background research agent with fresh context**, so you keep working while it reads. Handle a trivial lookup inline. Pass the precise question, source constraints, and resolved absolute workspace explicitly. Research is read-only by default; if the requested investigation needs a research branch or worktree, follow `git-conventions` ownership and parent approvals before mutations. Keep findings in the workspace, never an artifact branch for publication.
 
 Its job:
 

@@ -21,7 +21,7 @@ Before writing code, write down what state model and what question you're protot
 
 ### 2. Isolate the logic in a portable module
 
-Put the actual logic (the bit that's answering the question) in a single `<script>` block written as a small, pure module that could be lifted out and dropped into the real codebase later. The page around it is throwaway; the module may inform separately approved production implementation. Keep both in `<absolute-workspace>/prototypes/<slug>/`. Do not copy logic into production during prototyping.
+Put the actual logic (the bit that's answering the question) in a single `<script>` block written as a small, pure module that could be lifted out and dropped into the real codebase later. The page around it is throwaway; this module isn't. Keep the prototype in `<absolute-workspace>/prototypes/<slug>/`; the validated module can become production code within the requested implementation scope.
 
 The right shape depends on the question:
 
@@ -55,7 +55,7 @@ Send them the file, or open it for them. They'll click through the walkthroughs 
 
 ### 5. Capture the answer and the prototype
 
-Once the prototype has answered its question, write `result.md` in `<absolute-workspace>/prototypes/<slug>/` as the [SKILL](SKILL.md) describes. Retain the HTML and portable logic there as a re-runnable primary source. Record observed guided-case outcomes and the user’s verdict. Do not create a throwaway branch or change production code; separately approved production work may later use the validated design.
+Once the prototype has answered its question, write `result.md` in `<absolute-workspace>/prototypes/<slug>/` as the [SKILL](SKILL.md) describes. Retain the HTML and portable logic there as a re-runnable primary source. Record observed guided-case outcomes and the user's verdict. Within the requested implementation scope, lift the validated reducer / machine / function set into the real module with production tests and review. The HTML shell remains local; remove experimental wiring before committing only intended production paths through the agreed owner.
 
 ## Anti-patterns
 

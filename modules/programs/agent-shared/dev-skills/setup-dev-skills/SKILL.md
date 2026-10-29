@@ -37,11 +37,15 @@ Use existing tracker configuration first. A GitHub remote suggests GitHub; a Git
 - Local Markdown: use [issue-tracker-local.md](issue-tracker-local.md).
 - Linear or another tracker: discover operation schemas and actual teams, projects, labels, statuses, and relationship support. Record concrete identifiers and verified operations for reading, creating, commenting, labeling/status changes, closing, parent links, blockers, and wayfinding claim/resolution. Return proposed remote mutations through the normal approval path. Do not include token values.
 
+A selected GitHub or GitLab tracker needs a reachable project. Verify the intended destination with `gh repo view` or `glab repo view`, using explicit repository targeting where needed. If no matching remote exists, discover the intended URL or ask only when unavailable. Propose `git init` or `git remote add` as needed, obtaining specific approval for repository initialization/configuration rather than assuming routine ownership covers them. Follow `git-conventions` for any branch/worktree operations; headless workers return exact proposals to the parent. After initialization, complete the exclusion safeguards above before writing artifacts. Stop affected tracker setup if access or approval is missing; do not claim it is configured.
+
 Keep upstream's PR/MR request-surface flag off by default. Do not raise an unnecessary choice; users can explicitly change it later.
 
 ### B. Triage vocabulary
 
 Map `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix` to actual labels/statuses using [triage-labels.md](triage-labels.md). Prefer existing equivalents over duplicate labels. For local Markdown, these strings can be local statuses without creating anything remotely. Missing remote labels are proposals until approved and successfully created. Record that distinction honestly.
+
+When `triage` is not installed, skip triage vocabulary configuration. When it is installed and the choice is unresolved, recommend the default five-role mapping and ask whether to keep it. Collect overrides only when needed. Create missing selected remote labels through the approved parent route; preserve unapplied proposals when approval is absent.
 
 ### C. Domain and standards
 

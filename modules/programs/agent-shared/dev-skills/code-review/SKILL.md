@@ -13,7 +13,7 @@ Two-axis review of the actual requested diff (committed changes, work in progres
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
+Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Start every reviewer with fresh context.
 
 Read the resolved workspace’s `issue-tracker.md` when tracker access is needed. Stateless review may proceed without setup if no configuration or supporting artifact is needed. If setup is required, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills` manually; do not invoke manual setup automatically.
 

@@ -21,4 +21,4 @@ Use `code-review` for configured diff review, `pr` for PR bodies, and explicitly
 
 Read each skill's packaged `WORKFLOW.md` for the workspace contract. Shared setup and new supporting artifacts live in locally excluded `.dev-skills/`; keep existing authoritative tracked documents intact. Local exclusion is neither encryption nor backup; sharing requires an explicit action.
 
-Humans choose branches and checkouts. Do not automate branch or worktree management, including through delegates or host tools. Existing approvals, signed-commit routes, and project rules retain precedence.
+Git mutations follow the upfront five-category ownership agreement in `git-conventions`; read-only work needs none. Delegates inherit that run's scope, while the parent owns approval-dependent actions. A delegated checkout may use only its parent's explicitly supplied absolute `.dev-skills/` workspace outside its Git root. Existing approvals, signed-commit routes, and project rules retain precedence.

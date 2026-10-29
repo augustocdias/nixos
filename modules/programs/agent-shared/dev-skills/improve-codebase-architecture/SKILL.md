@@ -27,7 +27,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Read workspace `domain.md`, the authoritative domain glossary, and relevant ADRs first. Keep existing tracked documents intact.
 
-When exploration warrants delegation under the harness rules, use a read-only research sub-agent to walk the scoped codebase. Pass the resolved absolute workspace and relevant domain inputs explicitly. Do not create worktrees, change branches, or apply refactors before user selection. Don't follow rigid heuristics; explore organically and note where you experience friction:
+When exploration warrants delegation under the harness rules, use a read-only research sub-agent with fresh context to walk the scoped codebase. Pass the resolved absolute workspace and relevant domain inputs explicitly. Do not create worktrees, change branches, or apply refactors before user selection. Don't follow rigid heuristics; explore organically and note where you experience friction:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow**, with an interface nearly as complex as the implementation?

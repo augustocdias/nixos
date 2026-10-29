@@ -18,6 +18,8 @@ Accept the user’s reported failure and supplied output as ground truth. Do not
 
 Place generated scripts, minimized fixtures, redacted traces, profiles, and retained evidence under `<absolute-workspace>/debug/<slug>/`. Run diagnostic subprocesses with explicit absolute input/output paths so changing cwd does not relocate evidence. Permanent regression tests belong at the agreed project seam.
 
+Before branch switching, bisection, or worktree use, load `git-conventions` through Claude's native Skill mechanism or omp's `read skill://git-conventions` and establish the upfront ownership agreement. Use an authorized diagnostic checkout; preserve user changes and unrelated worktrees. Headless workers return approval-dependent Git and remote actions to the parent rather than attempting host prompts. Keep supporting evidence local and outside production commits.
+
 ## Redact
 
 This skill has you show commands, outputs and captured artifacts. **Redact every secret first**: write `<REDACTED>` in its place. Build loops against env vars, so the credential stays in the environment rather than in what you show. Captured artifacts carry auth headers: quote only the lines that carry the signal.
@@ -39,7 +41,7 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 5. **Replay a captured trace.** Save a real network request / payload / event log to disk; replay it through the code path in isolation.
 6. **Throwaway harness.** Spin up a minimal subset of the system (one service, mocked deps) that exercises the bug code path with a single function call.
 7. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
-8. **Controlled comparison harness.** Compare already available versions, datasets, or configurations using explicit immutable inputs under the debug directory. Do not use branch-switching Git bisection, resets, worktree creation, or checkout changes. Ask the human to supply unavailable historical states; do not alter their checkout to obtain them.
+8. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it. Use the agreed diagnostic checkout/worktree and absolute debug paths. Preserve the initial ref, narrow the first bad state with the tight causal loop, then leave the checkout at its agreed final ref without discarding user work. If ownership or historical inputs are unavailable, report the missing action and use immutable-state comparisons where possible.
 9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
 10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
 
@@ -118,7 +120,7 @@ Tool preference:
 
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 
-**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then compare one controlled input at a time without changing branches or checkouts. Measure first, fix second.
+**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect using the agreed diagnostic checkout and one controlled input at a time. Measure first, fix second.
 
 ## Phase 5: Fix + regression test
 

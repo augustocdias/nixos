@@ -69,6 +69,7 @@ in
         mount-cwd
 
         (add-runtime ''
+          unset GPG_TTY
           if git_common=$(${git} rev-parse --git-common-dir 2>/dev/null) \
             && git_dir=$(${git} rev-parse --git-dir 2>/dev/null) \
             && [ "$git_common" != "$git_dir" ]; then
@@ -176,6 +177,7 @@ in
           fi
         '')
         (add-runtime ''
+          RUNTIME_ARGS+=(--unsetenv GPG_TTY)
           if [ "''${HERDR_ENV:-}" = 1 ]; then
             if [ -z "''${HERDR_PANE_ID:-}" ] \
               || [[ "''${HERDR_SOCKET_PATH:-}" != /* ]] \

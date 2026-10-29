@@ -16,7 +16,7 @@ Resolve and retain the absolute `.dev-skills/` workspace path according to the s
 
 Read the real repository PR template first and follow it when present. Otherwise use this template for writing the PR body. Preserve the Summary / Evidence / Merge Danger content in the repository’s required shape where compatible. Read `git-conventions` for commit/title/branch conventions and issue references; this skill owns PR-body structure, not competing conventions.
 
-Drafting does not authorize committing, pushing, PR creation, or remote updates. Each action uses the existing explicit approval and signed-commit routes; never bypass them or change branches/worktrees. Use the actual current branch and accurate issue references.
+Drafting alone does not authorize committing, pushing, PR creation, or remote updates. When the requested workflow needs Git or publication actions, load `git-conventions` and follow its upfront five-category ownership agreement and parent-owned approval route. Use the actual assigned branch, explicit PR base/head, and accurate issue references. Supporting artifacts stay outside staging and publication.
 
 Use this default template:
 

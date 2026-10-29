@@ -56,7 +56,7 @@
         symbolPreset = "nerd";
         title.icons = "boring";
         composer.shape = "box";
-        plan.defaultOnStartup = true;
+        plan.defaultOnStartup = false;
         startup.checkUpdate = false;
         # Everything the first-run wizard asks is declared here.
         startup.setupWizard = false;
@@ -69,20 +69,20 @@
         extensions = ["${caveman}" "${inputs.ponytail}"];
 
         modelRoles = {
-          default = sol "medium";
+          default = "@slow";
           plan = astra "high";
-          slow = astra "high";
+          slow = astra "medium";
           task = sol "medium";
           advisor = sol "medium";
           memory = sol "medium";
           commit = luna "low";
           tiny = luna "low";
           widget = luna "low";
-          smol = luna "low";
+          smol = luna "medium";
         };
 
         task = {
-          # herdr owns worktrees.
+          # Snapshot isolation is not explicit, permission-controlled Git worktrees.
           isolation.enabled = false;
           # Wins over agent frontmatter. Work agents are harmless where absent.
           agentModelOverrides = {
@@ -101,15 +101,11 @@
 
         advisor.enabled = true;
         memory.backend = "mnemopi";
-        # One bank: per-project keys on the absolute cwd, so every herdr
-        # worktree would start with an empty memory.
         mnemopi.scoping = "global";
         autolearn.enabled = true;
         lsp.diagnosticsOnEdit = true;
         github.enabled = true;
-        # Blocks stash, reset --hard and checkout/switch/restore, which would
-        # pull the rug from under herdr's worktrees.
-        bash.gitGuard = true;
+        bash.gitGuard = false;
         retry.usageAwareFallback = true;
         edit.autoRepair.enabled = true;
         checkpoint.enabled = true;
