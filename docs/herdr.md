@@ -102,7 +102,7 @@ The repo half of the label comes from `git remote get-url origin` (basename minu
 | `$sub1`, `$sub2`, `$sub3` | running subagents: type + description                  | `explore: audit the bash allowlist`  |
 | `$submore`                | the overflow beyond three slots, subagent types joined | `test-writer, tickets`               |
 
-For omp, `$title` subscribes to `sessionManager.onSessionNameChanged`, covering asynchronous automatic titles and idle `/rename` changes. Session navigation replaces the listener; shutdown removes it. Run `node --test modules/programs/herdr/omp-activity.test.mjs` to check delayed titles, renames, and session isolation.
+For omp, a `task` subagent's lifecycle `started` event carries no description; the title shown in omp's UI is generated afterwards and arrives on `task:subagent:progress` (`progress.description`), which updates the tracked slot. `$title` subscribes to `sessionManager.onSessionNameChanged`, covering asynchronous automatic titles and idle `/rename` changes. Session navigation replaces the listener; shutdown removes it. Run `node --test modules/programs/herdr/omp-activity.test.mjs` to check delayed titles, renames, and session isolation.
 
 Both reporters refresh `seq` from wall time on every write, retaining a monotonic increment for same-tick reports. A counter based only on process startup lets a newer reporter permanently suppress an older live reporter's updates, including final todo completion. Run `node --test modules/programs/herdr/activity-sequence.test.mjs` for the overlapping-reporter regression.
 

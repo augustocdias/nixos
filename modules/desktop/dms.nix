@@ -186,54 +186,148 @@
 
           controlCenterWidgets = [
             {
+              id = "user";
+              enabled = true;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 0;
+            }
+            {
+              id = "edit";
+              enabled = true;
+              w = 1;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 0;
+            }
+            {
+              id = "settings";
+              enabled = true;
+              w = 1;
+              h = 1;
+              small = true;
+              col = 5;
+              row = 0;
+            }
+            {
+              id = "lock";
+              enabled = true;
+              w = 1;
+              h = 1;
+              small = true;
+              col = 6;
+              row = 0;
+            }
+            {
+              id = "power";
+              enabled = true;
+              w = 1;
+              h = 1;
+              small = true;
+              col = 7;
+              row = 0;
+            }
+            {
+              enabled = true;
               id = "volumeSlider";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 1;
             }
             {
+              enabled = true;
               id = "brightnessSlider";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 1;
             }
             {
+              enabled = true;
               id = "wifi";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 2;
             }
             {
+              enabled = true;
               id = "bluetooth";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 2;
             }
             {
+              enabled = true;
               id = "audioInput";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 3;
             }
             {
+              enabled = true;
               id = "audioOutput";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 3;
             }
             {
+              enabled = true;
               id = "doNotDisturb";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 4;
             }
             {
+              enabled = true;
               id = "idleInhibitor";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 4;
             }
             {
+              enabled = true;
               id = "builtin_vpn";
-              enabled = true;
-              width = 50;
+              w = 4;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 5;
             }
             {
-              id = "plugin_dankKDEConnect";
               enabled = true;
-              width = 50;
+              id = "plugin_dankKDEConnect";
+              w = 4;
+              h = 1;
+              small = true;
+              col = 4;
+              row = 5;
+            }
+            {
+              id = "runningApps";
+              enabled = true;
+              w = 8;
+              h = 1;
+              small = true;
+              col = 0;
+              row = 6;
             }
           ];
 
@@ -366,6 +460,7 @@
           qtThemingEnabled = true;
           syncModeWithPortal = true;
           terminalsAlwaysDark = false;
+          muxType = "herdr";
           runDmsMatugenTemplates = true;
 
           matugenTemplateGtk = true;

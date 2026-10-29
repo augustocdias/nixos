@@ -240,4 +240,15 @@ export default function (pi: ExtensionAPI) {
     }
     void publish();
   });
+
+  // `task` spawns carry no description at start: omp generates the title
+  // afterwards and only publishes it on progress frames.
+  pi.events.on("task:subagent:progress", (data: any) => {
+    const id = data?.progress?.id;
+    const entry = typeof id === "string" ? subagents.get(id) : undefined;
+    const description = clean(data?.progress?.description ?? "");
+    if (!entry || !description || description === entry.description) return;
+    entry.description = description;
+    void publish();
+  });
 }
