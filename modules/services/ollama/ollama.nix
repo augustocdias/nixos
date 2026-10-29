@@ -8,11 +8,15 @@
         ollama-bin = release.package;
       };
   };
-  den.aspects.ollama.darwin = {pkgs, ...}: let
+  den.aspects.ollama.darwin = {
+    config,
+    pkgs,
+    ...
+  }: let
     ollama = (pkgs.callPackage ./_package.nix {}).package;
     ollamaHome = "/var/lib/ollama";
     ollamaPort = 11434;
-    ollamaModels = ["gemma4:12b-mlx" "qwen3-embedding:0.6b"];
+    ollamaModels = [config.services.ollama.model "qwen3-embedding:0.6b"];
     # launchd has no ordering, so poll the server instead of racing it.
     ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
       set -u
@@ -31,42 +35,49 @@
       exit "$status"
     '';
   in {
-    launchd.daemons.ollama = {
-      command = "${lib.getExe ollama} serve";
-      environment = {
-        HOME = ollamaHome;
-        OLLAMA_HOST = "[::]:${toString ollamaPort}";
-        OLLAMA_MODELS = "${ollamaHome}/models";
-        OLLAMA_CONTEXT_LENGTH = "65536";
-        OLLAMA_KEEP_ALIVE = "-1";
-        OLLAMA_NUM_PARALLEL = "3";
-        OLLAMA_FLASH_ATTENTION = "1";
-        OLLAMA_NO_CLOUD = "1";
-      };
-      serviceConfig = {
-        KeepAlive = true;
-        RunAtLoad = true;
-        StandardOutPath = "/var/log/ollama.log";
-        StandardErrorPath = "/var/log/ollama.log";
-      };
+    options.services.ollama.model = lib.mkOption {
+      type = lib.types.str;
+      default = "gpt-oss:20b";
+      description = "Ollama generation model shared by Hermes and Honcho.";
     };
-    launchd.daemons.ollama-model-loader = {
-      command = "${ollamaModelLoader}";
-      environment = {
-        HOME = ollamaHome;
-        OLLAMA_HOST = "127.0.0.1:${toString ollamaPort}";
-        OLLAMA_MODELS = "${ollamaHome}/models";
+    config = {
+      launchd.daemons.ollama = {
+        command = "${lib.getExe ollama} serve";
+        environment = {
+          HOME = ollamaHome;
+          OLLAMA_HOST = "[::]:${toString ollamaPort}";
+          OLLAMA_MODELS = "${ollamaHome}/models";
+          OLLAMA_CONTEXT_LENGTH = "65536";
+          OLLAMA_KEEP_ALIVE = "-1";
+          OLLAMA_NUM_PARALLEL = "3";
+          OLLAMA_FLASH_ATTENTION = "1";
+          OLLAMA_NO_CLOUD = "1";
+        };
+        serviceConfig = {
+          KeepAlive = true;
+          RunAtLoad = true;
+          StandardOutPath = "/var/log/ollama.log";
+          StandardErrorPath = "/var/log/ollama.log";
+        };
       };
-      serviceConfig = {
-        # One-shot: retry on failure, don't respawn after a clean pull.
-        KeepAlive = {SuccessfulExit = false;};
-        RunAtLoad = true;
-        StandardOutPath = "/var/log/ollama-model-loader.log";
-        StandardErrorPath = "/var/log/ollama-model-loader.log";
+      launchd.daemons.ollama-model-loader = {
+        command = "${ollamaModelLoader}";
+        environment = {
+          HOME = ollamaHome;
+          OLLAMA_HOST = "127.0.0.1:${toString ollamaPort}";
+          OLLAMA_MODELS = "${ollamaHome}/models";
+        };
+        serviceConfig = {
+          # One-shot: retry on failure, don't respawn after a clean pull.
+          KeepAlive = {SuccessfulExit = false;};
+          RunAtLoad = true;
+          StandardOutPath = "/var/log/ollama-model-loader.log";
+          StandardErrorPath = "/var/log/ollama-model-loader.log";
+        };
       };
+      system.activationScripts.postActivation.text = ''
+        mkdir -p ${ollamaHome}/models
+      '';
     };
-    system.activationScripts.postActivation.text = ''
-      mkdir -p ${ollamaHome}/models
-    '';
   };
 }

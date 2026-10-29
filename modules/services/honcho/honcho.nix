@@ -124,7 +124,7 @@
           }
           {
             name = "${prefix}__MODEL";
-            value = "gemma4:12b-mlx";
+            value = config.services.ollama.model;
           }
           {
             name = "${prefix}__OVERRIDES__BASE_URL";

@@ -33,7 +33,7 @@
     localModel = {
       model = {
         provider = "custom";
-        default = "gemma4:12b-mlx";
+        default = config.services.ollama.model;
         base_url = "http://127.0.0.1:11434/v1";
         context_length = 65536;
       };
