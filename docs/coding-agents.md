@@ -13,11 +13,11 @@ Read before changing harness prompts, settings, extensions, skills, models, MCPs
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `agent-shared/_lib.nix`               | descriptions + `withFrontmatter`: prompt bodies are frontmatter-free, each harness renders its own frontmatter keys  |
 | `agent-shared/context.md`             | global instructions (both harnesses' `context`)                                                                      |
+| `agent-shared/style/`                 | chat-style and engineering rules adapted from Caveman/Ponytail, appended to the context; credits in `third-party/`  |
 | `agent-shared/agents/`                | shared `test-writer` body                                                                                            |
 | `agent-shared/commands/`              | shared `/commit` body                                                                                                |
-| `agent-shared/skills/git-conventions` | shared skill                                                                                                         |
-| `agent-shared/dev-skills/`            | 26 locally curated Matt Pocock skills, companions, license, provenance, and shared workflow                          |
-| `agent-shared/_dev-skills.nix`        | one source bundle; copies the shared contract and attribution into every installed skill root                        |
+| `agent-shared/skills/`                | all shared skills: 26 curated Matt Pocock skills plus local `git-conventions`, companions, license, provenance, workflow |
+| `agent-shared/_skills.nix`            | one source bundle; copies the shared `WORKFLOW.md` into every installed skill root                                      |
 | `agent-shared/_bash.nix`              | `{jailed}:` bash ruleset (pattern → allow/ask/deny), translated by each harness's `_permissions.nix`                 |
 | `agent-jail/_mk-jail.nix`             | `mkJail {name, package, pre, extra}` — the bubblewrap jail; `pre`/`extra` are functions of jail-nix's combinator set |
 | `agent-jail/jail-context.md`          | instructions loaded **only** inside the sandbox (both harnesses)                                                     |
@@ -29,13 +29,13 @@ Read before changing harness prompts, settings, extensions, skills, models, MCPs
 
 ### Development skills
 
-Both harnesses install the same 26 curated skills from `mattpocock/skills` revision `a496f5513d4a4cf889bc48e189e579f4b0bdf6aa`, without a new flake input. The original baseline was `5beb35b040e3de97e54fa9e386d7e42d15c295c2`; the `v1.3.1` tag is not either immutable revision. Excluded skills remain excluded; setup is renamed `setup-dev-skills`. Updates are deliberate copy-and-review operations recorded in `dev-skills/UPSTREAM.md`.
+Both harnesses install the same 26 curated skills from `mattpocock/skills` revision `a496f5513d4a4cf889bc48e189e579f4b0bdf6aa`, without a new flake input. The original baseline was `5beb35b040e3de97e54fa9e386d7e42d15c295c2`; the `v1.3.1` tag is not either immutable revision. Excluded skills remain excluded; setup is renamed `setup-dev-skills`. Updates are deliberate copy-and-review operations recorded in `third-party/mattpocock-skills/UPSTREAM.md`. The same folder holds the local `git-conventions` skill.
 
 Manual-only (14): `grill-me`, `grill-with-docs`, `setup-dev-skills`, `implement-spec`, `improve-codebase-architecture`, `retro`, `to-spec`, `to-tickets`, `triage`, `wayfinder`, `handoff`, `teach`, `to-questionnaire`, `wait-what`.
 
 Contextual and manually invocable (12): `implement`, `code-review`, `codebase-design`, `diagnosing-bugs`, `domain-modeling`, `pr`, `prototype`, `research`, `tdd`, `wizard`, `grilling`, `writing-for-agents`. Invoke `implement` manually with Claude `/implement` or omp `/skill:implement`, or contextually for user-requested implementation and explicit orchestrator assignments.
 
-Claude uses native Skill invocation and `/name`; omp uses `read skill://name` and explicit `/skill:name`. Manual flags constrain invocation, not approvals. Each installed root includes `WORKFLOW.md`, `LICENSE`, and `UPSTREAM.md`, so companion reads require no parent traversal.
+Claude uses native Skill invocation and `/name`; omp uses `read skill://name` and explicit `/skill:name`. Manual flags constrain invocation, not approvals. Each installed root includes `WORKFLOW.md`, so companion reads require no parent traversal. Licenses and attribution live only in `third-party/` and are not installed.
 
 Setup initializes `.dev-skills/` in the invocation directory, writes shared tracker/domain/standards prerequisites, and adds one local `info/exclude` rule. Other skills reuse the nearest initialized workspace within the current checkout. New supporting artifacts stay there; existing authoritative tracked documents remain intact. Ignoring is not encryption or backup, and local documents need explicit sharing.
 
@@ -47,13 +47,13 @@ Default run worktrees live under the parent's absolute `.dev-skills/worktrees/<r
 
 Supporting artifacts, local progress and temporary prototype wiring never enter implementation commits or pushes. Stage explicit production paths; tracked/staged `.dev-skills/` artifacts block publication without automatic untracking/discard. Authorized remote summaries contain concise evidence, not uploaded files or inaccessible local links. Prototype variants may use real routes and promote the selected design within scope, while sources/captures remain local. Workspace glossary updates happen inline; existing tracked domain documents remain authoritative unless their edits are explicitly requested. Generated wizards remain human-run on the host.
 
-Wizard GitHub writes require an explicit repository, passed to `gh` independently of the caller's cwd or shell export state. Run `node --test modules/programs/agent-shared/dev-skills-wizard.test.mjs` for the harmless targeting regression.
+Wizard GitHub writes require an explicit repository, passed to `gh` independently of the caller's cwd or shell export state. Run `node --test modules/programs/agent-shared/skills-wizard.test.mjs` for the harmless targeting regression.
 
 ## Agent sandbox (Linux only)
 
 On Linux `omp` and `claude` **are** the jail: `agent-jail/_mk-jail.nix` wraps the package with bubblewrap via the `jail-nix` combinator library and installs it under the original binary name. Darwin has no sandbox and relies on the allowlist alone.
 
-Deny-by-default. Persistent writable areas: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*` (subject to each grant's requested read/write mode), the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, `~/.local/share/rtk`), and the harness's own state (omp: `~/.omp`, `~/.config/ponytail`; claude: `~/.claude`; both: `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
+Deny-by-default. Persistent writable areas: the working directory **at its real host path** (plus `git rev-parse --git-common-dir` when it differs, or git breaks outright in a linked worktree), `~/granted/*` (subject to each grant's requested read/write mode), the persistent caches (`~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/{registry,git}`, `~/.local/share/direnv`, `~/.local/share/rtk`), and the harness's own state (omp: `~/.omp`; claude: `~/.claude`; both: `~/.cache/jgrep`). Everything else — `/`, `/etc`, `/tmp`, `$HOME` — is a per-session tmpfs that is silently discarded, so a successful write there proves nothing. State dirs are per-harness: `~/.local/share/<name>-jail/{grants,log}`.
 
 Things that cost real time to discover:
 
@@ -81,17 +81,14 @@ Things that cost real time to discover:
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `omp.nix`                       | flake input (tag-pinned), wrapped package, settings, `mcp.json`, keys, prompts   |
 | `_permissions.nix`              | `tools.approval*` + `bash.patterns`, built from `agent-shared/_bash.nix`         |
-| `_caveman.nix`                  | caveman's omp plugin package, rebuilt from the `caveman` input with a hash guard |
-| `jail/jail.nix`                 | `mkJail` binding `~/.omp`, `~/.config/ponytail`, `~/.cache/jgrep`                |
+| `jail/jail.nix`                 | `mkJail` binding `~/.omp`, `~/.cache/jgrep`                                      |
 | `extensions/gate.ts`            | approval for the work MCPs (see below)                                           |
-| `extensions/google-calendar.ts` | read-only `google_calendar` tool via `gcalcli` (`approval: "read"`)              |
 
 - **Not the upstream HM module**: its `package` is not nullable (the jail installs `omp`) and it only writes `config.yml`.
-- **Settings go through `PI_CONFIG_FILES`**, set by `wrapProgram`. omp rewrites `~/.omp/agent/config.yml` from `/settings` and migrations, so that file cannot be a store symlink. The env overlay is per-process, ranks above global *and project* config, and is never written back. Nix owns theme, `tui.vimMode`, update/telemetry switches, `extensions` and approvals; the rest of `config.yml` stays omp's. Overlays replace arrays rather than merging them, so a project `extensions:` cannot drop caveman/ponytail.
+- **Settings go through `PI_CONFIG_FILES`**, set by `wrapProgram`. omp rewrites `~/.omp/agent/config.yml` from `/settings` and migrations, so that file cannot be a store symlink. The env overlay is per-process, ranks above global *and project* config, and is never written back. Nix owns theme, `tui.vimMode`, update/telemetry switches, `extensions` and approvals; the rest of `config.yml` stays omp's. Overlays replace arrays rather than merging them, so the pinned empty `extensions` keeps a project from adding packages.
 - **Everything else is `home.file`** under `~/.omp/agent/`: `mcp.json`, `keybindings.yml`, `AGENTS.md` (`context.md` + `jail-context.md` on Linux), `agents/`, `commands/`, `skills/`, `extensions/`. Read-only symlinks are fine because these files are only rewritten by `/mcp add|enable|disable`, which we don't use. Extensions load from store symlinks: the loader resolves realpath and Bun imports `.ts` directly; `@oh-my-pi/*` imports are redirected to the bundled copies, so no `node_modules`.
 - **All runtime state is under `~/.omp`** (credentials and MCP OAuth tokens in `agent.db`, sessions, worktrees, extracted natives), hence the single rw bind. **No D-Bus in the jail**: the session bus reaches `systemd --user`, which can start units outside it. So omp's desktop notifications (`notify-send`/`gdbus`) are dead; it still emits in-band OSC 9/99 when it recognises the terminal (unverified under herdr), else a bare BEL. herdr's own state toasts are what actually signal completion and `blocked`.
 - **Provider**: OpenAI, logged in at runtime (`/login openai-codex`). **Do not use `/login anthropic`**: it works by impersonating Claude Code's client.
-- **caveman/ponytail** load as extension *packages* via `extensions:` — the package's `omp`/`pi` entry plus sibling `skills/ commands/ agents/ rules/`. Ponytail loads directly from its pinned upstream source. Caveman's Nix adapter reproduces `writeOmpPluginPackage` (`installer/install.js`) with its installer hash guard intact and includes the full upstream skill/command inventory. Neither upstream source tree is patched. The namespaced `caveman-review` and `ponytail-review` workflows coexist with personal `code-review`; Ponytail's Claude band retains its upstream Review action.
 - **Task isolation is pinned off** (`task.isolation.enabled = false`). omp's automatic per-task snapshots are not explicit permission-controlled Git worktrees. `implement-spec` assigns approved persistent worktrees itself; unrelated tasks do not enable automatic isolation.
 - **Shared prompts**: `test-writer`, `/commit`, `git-conventions`, and the development skills above. omp has no `` !`cmd` `` injection, so command markers are stripped and the command is told to run them. No custom `/pr`, `reviewer`, or `/review` is installed; native omp `/review` and its schema-bound reviewer remain untouched.
 
@@ -110,7 +107,7 @@ All OpenAI Codex; no local profile, no `models.yml`, no presets. Effort is the `
 | where                      | entries                                                                                                                                                                                                 |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `modelRoles`               | `default`/`task`/`advisor`/`memory` sol:medium; `plan` astra:high; `slow` astra:medium; `commit`/`tiny`/`widget` luna:low; `smol` luna:medium |
-| `task.agentModelOverrides` | `task`, `cavecrew-builder`, `tickets` sol:medium; `test-writer` sol:high; `reviewer`, `security-reviewer`, `cavecrew-reviewer`, `troubleshoot` astra:high; `scout`, `cavecrew-investigator` luna:medium |
+| `task.agentModelOverrides` | `task`, `tickets` sol:medium; `test-writer` sol:high; `reviewer`, `security-reviewer`, `troubleshoot` astra:high; `scout` luna:medium |
 
 Session titles use the default `title.generator = fork`: a side turn on the session's main model names the initial title. `tiny` handles fallback generation and replan refreshes; `smol` also drives `edit.autoRepair`. `title.icons = boring` disables the icon and short-code prefix for newly generated or explicitly renamed titles; existing stored titles keep their prefix until renamed. Overrides win over agent frontmatter. The ids come from the bundled catalog, which Codex replaces with its live `/models` list after login, so a missing id surfaces as a role fallback in `/models`. Copilot is planned as `retry.fallbackChains.default`.
 
@@ -124,7 +121,7 @@ Memory is disabled with `memory.backend = "off"`: no memory backend runs. Existi
 
 ### Status line
 
-`statusLine.preset = custom`: left `pi vim model mode path git pr`, right `status usage context_pct session_name` (omp's `default` minus `collab`/`stream`/`cost`, plus extension statuses and the ChatGPT plan quota). `showHookStatus = false` so the extension stamps show only in the bar, not under the prompt. Ponytail's stamp (`○ 🐴 ponytail: ⚡ FULL`; the circle fills while a turn runs) is upstream's, unpatched. Caveman's `🪨 caveman` is ours: the generated `index.cjs` replaces upstream's `CAVEMAN`.
+`statusLine.preset = custom`: left `pi vim model mode path git pr`, right `status usage context_pct` (omp's `default` minus `collab`/`stream`/`cost`, plus extension statuses and the ChatGPT plan quota). `showHookStatus = false` so extension stamps show only in the bar, not under the prompt.
 
 ### Keybindings (`keybindings.yml`)
 
@@ -149,7 +146,7 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 
 ### Work (`modules/services/work/work.nix`)
 
-`omp.mcpServers` (an option `omp.nix` declares and merges into `mcp.json`) adds Notion, Linear and Datadog as `type: http`. OAuth is `/mcp reauth <name>`; the callback listens on `:3000` inside the jail, which shares the host network. Datadog uses `/v1/mcp` (Claude's config still points at the deprecated `/api/unstable/mcp-server/mcp`). Also `troubleshoot`/`tickets` agents (tools = `omp.readOnlyTools`) and the `datadog-queries`/`jgrep` skills. The omp `tickets` prompt gets a preamble: as a headless subagent it cannot write (the gate blocks without a UI), so it returns each mutation as a proposal — tool name plus arguments — for the parent session to perform behind the prompt.
+`omp.mcpServers` (an option `omp.nix` declares and merges into `mcp.json`) adds Notion, Linear and Datadog as `type: http`. OAuth is `/mcp reauth <name>`; the callback listens on `:3000` inside the jail, which shares the host network. Datadog uses `/v1/mcp` in both harnesses. Notion and Datadog set `instructions = false` (see [Context budget](#context-budget)). Also `troubleshoot`/`tickets` agents (tools = `omp.readOnlyTools`) and the `datadog-queries`/`jgrep` skills. The omp `tickets` prompt gets a preamble: as a headless subagent it cannot write (the gate blocks without a UI), so it returns each mutation as a proposal — tool name plus arguments — for the parent session to perform behind the prompt.
 
 ## Claude Code
 
@@ -166,14 +163,14 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 - **`CLAUDE_CONFIG_DIR=$HOME/.claude`** is set inside the jail so `.claude.json` lives *inside* the bound dir — Claude rewrites it by rename, which fails on a bind-mounted single file.
 - **`package = null`**: the jail installs `claude`. **`settings.json` is immutable** (store symlink, `mutableSettings = false`); changes made from the UI do not persist — declare them in Nix.
 - **Auto memory is disabled** with `settings.autoMemoryEnabled = false`. Existing memory files are preserved; explicit project/user instruction files still load.
-- **Permissions**: `defaultMode = "plan"`. Bash rules come from the jailed `agent-shared/_bash.nix` (`"*"` → plain `Bash`). The translation is only lossless because every override in that set narrows toward ask/deny: Claude resolves by **deny > ask > allow**, so an override that *widens* would silently stop working. MCP rules use `mcp__plugin_hm_<server>__<tool>` — the HM module bundles all servers into a generated plugin named `hm`. Allow-rule globs need the literal `mcp__<server>__` prefix.
+- **Permissions**: `defaultMode = "auto"`. Bash rules come from the jailed `agent-shared/_bash.nix` (`"*"` → plain `Bash`). The translation is only lossless because every override in that set narrows toward ask/deny: Claude resolves by **deny > ask > allow**, so an override that *widens* would silently stop working. MCP rules use `mcp__plugin_hm_<server>__<tool>` — the HM module bundles all servers into a generated plugin named `hm`. Allow-rule globs need the literal `mcp__<server>__` prefix.
 - **MCP**: context7, nixos, `host` (the `host-mcp.py` shim — `host_*` are in `ask`, which prompts even when an allow also matches), Notion, Linear, Datadog (`type = "http"`, OAuth via `/mcp`). Linear/Notion reads are allowed; writes fall through to a prompt. Datadog is fully allowed. They are global, not scoped to the subagents — subagent-only inline servers would not appear in `/mcp` for the OAuth login.
 - **Agents**: `test-writer` (shared), `troubleshoot`, and `tickets` (Linear/Notion research plus exact mutation proposals in the parent-supplied shape). `tickets` does not impose another spec/ticket schema or write headlessly. Read-only agents use `disallowedTools: Write, Edit, NotebookEdit`.
 - **Status line**: `claude-statusline` (`statusline.jq` + a shell wrapper adding the git branch, `*` when tracked files are dirty). Shows model + effort, active agent, dir + branch, context %, the 5h/7d plan limits (and `$` spend limit behind a gateway) with time to reset, and lines +/-. Percentages go green/yellow/red at 70/90%. Limits only appear after the first response in a session.
 - **Prompt input**: `editorMode = "vim"`. Vim motions are not remappable; only `vimInsertModeRemaps` exists.
 - **Commands**: shared `/commit` only. Configured review/PR workflows are skills, without forwarding aliases or a custom reviewer.
 - **Skills**: the 26 shared development skills above, `git-conventions`, `datadog-queries`, plus `herdr` (from `herdr.nix`) and `jgrep` (from `work/jgrep.nix`) via `programs.claude-code.skills`, which is a no-op when the module is disabled.
-- **Plugins**: `caveman` and `ponytail` load directly from their pinned upstream flake inputs. Their commands, skills, hooks, and band actions remain upstream-owned. No source filtering or runtime installers run.
+- **Plugins**: none. Caveman/Ponytail were replaced by `agent-shared/style/` (see [Context budget](#context-budget)).
 - **herdr**: `hooks."herdr-agent-state.sh"` is deployed from `${pkgs.herdr.src}` (version-matched) and registered as a `SessionStart` hook with the **exact** command string herdr's own installer writes, so `herdr integration install claude` is a no-op and `herdr integration status` is clean. Never run the installer: it would try to rewrite the immutable `settings.json`. Sidebar tokens come from our own `claude-activity.py` hooks (see [Agents sidebar](herdr.md#agents-sidebar)); `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` turns on the task tools it reads.
 
 ## rtk (shell-output compression)
@@ -191,13 +188,14 @@ Only omp's change. herdr owns `ctrl+g`, `ctrl+h/j/k/l`, `alt+m`, `alt+r`, `alt+d
 
 - **Agent jail**: `agent-jail/_mk-jail.nix` is shared — a change there affects both harnesses. After touching `agent-shared/_bash.nix` or a harness's `_permissions.nix`, verify the rendered ruleset rather than the source.
 
-## Style plugins
+## Context budget
 
-Caveman and Ponytail use upstream defaults, mode controls, saved state, and subagent behavior. No local patches force activation or reject off requests. Their safety, exact-output, and persisted-document exceptions remain upstream-owned.
+Trimmed after [aihero's bloat article](https://www.aihero.dev/how-to-kill-the-bloat-in-claude-codes-system-prompt). Measure with `/context` in either harness (omp also has `/dump` for the raw request and `/tools`).
 
-omp's existing Caveman wrapper injects the upstream activation rule every turn, including its stop instructions; it has no separate runtime mode tracker. Ponytail uses its upstream `pi-extension/index.js`. Claude uses upstream activation, mode-tracker, subagent hooks, and band controls. The Caveman installer and omp installer hash guard remain unchanged.
-
-Hermes uses upstream's native integrations rather than the omp adapters: Caveman's nine-skill bundle and Ponytail's Python plugin. Profile installation, mode controls, and verification are documented in [Voice services](voice-services.md#hermes-agent). Both use the existing flake inputs; there is no separate runtime installer or source patch.
+- **Style rules**: Caveman (default intensity) and Ponytail (`full`) are local adapted copies in `agent-shared/style/`, appended to both harnesses' global context through `shared.contextText`. No plugins, extensions, hooks, mode trackers, bands or statusline stamps. "stop caveman"/"stop ponytail"/"normal mode" are plain instructions in the text. The caveman-commit rules live in `git-conventions`; the caveman-review format and ponytail-review checklist live in `code-review`. Credits and licenses: `third-party/README.md`. Hermes keeps the upstream integrations through the `caveman`/`ponytail` flake inputs.
+- **Claude Code**: `disableBundledSkills` and `disableWorkflows`. `permissions.deny` holds bare tool names (`unusedTools`), which drop the definitions from the context, and server-level `mcp__claude_ai_<Name>` rules for every unused claude.ai connector (`unusedConnectors`). Slack and Claude Docs stay. Plan mode, AskUserQuestion, Monitor, task tools and Artifact stay. Check `/skills` after changes: if `disableBundledSkills` hides the `artifact-*` skills, switch to per-skill `skillOverrides`.
+- **omp**: `extensions = []`; no Google Calendar tool; `instructions = false` on context7, nixos, Notion and Datadog in `mcp.json`, because AGENTS.md already routes them. omp subagents share the parent's MCP manager, so MCP servers cannot be scoped to a single agent. Every MCP tool still costs one `xd://` catalog line.
+- **Kept global by choice**: Slack, Notion, Linear and Datadog, including in non-work repos.
 
 ## Context ownership and operational safety
 

@@ -1,6 +1,5 @@
 {
   den,
-  inputs,
   lib,
   ...
 }: {
@@ -16,7 +15,7 @@
       ...
     }: let
       shared = import ../agent-shared/_lib.nix {inherit lib;};
-      devSkills = import ../agent-shared/_dev-skills.nix {inherit lib pkgs;};
+      skills = import ../agent-shared/_skills.nix {inherit lib pkgs;};
       prompt = kind: name: fm:
         shared.withFrontmatter
         ({description = shared.description.${name};} // fm)
@@ -27,6 +26,62 @@
       readOnly = {disallowedTools = "Write, Edit, NotebookEdit";};
 
       mcp = server: tool: "mcp__plugin_hm_${server}__${tool}";
+
+      # Unused claude.ai connectors. A server-level rule removes every tool of
+      # that connector from the context. Slack and Claude_Docs stay.
+      unusedConnectors = [
+        "Ashby"
+        "Atlassian"
+        "Canva"
+        "Chargebee"
+        "Context7"
+        "Docusign"
+        "ElevenLabs"
+        "Exa"
+        "Facebook_Ads"
+        "Figma"
+        "GitHub_MCP"
+        "Gmail"
+        "Google_Calendar"
+        "Google_Docs"
+        "Google_Drive"
+        "Google_Sheets"
+        "Google_Slides"
+        "Granola"
+        "Higgsfield_AI"
+        "HubSpot"
+        "Intercom"
+        "Leapsome"
+        "Menti"
+        "Microsoft_365"
+        "Miro"
+        "Mixpanel"
+        "Personio"
+        "Salesforce"
+        "Swat_io"
+        "TaskRay"
+        "Vantage"
+        "Webflow"
+        "Wispr_Flow"
+        "moss"
+        "n8n"
+        "vibiz_ai"
+      ];
+
+      # Bare tool names in deny drop the definition from the context.
+      unusedTools = [
+        "DesignSync"
+        "NotebookEdit"
+        "RemoteTrigger"
+        "CronCreate"
+        "CronDelete"
+        "CronList"
+        "ScheduleWakeup"
+        "PushNotification"
+        "ShareOnboardingGuide"
+        "SendFeedback"
+        "ReportFindings"
+      ];
 
       perms = import ./_permissions.nix {
         baseBash = import ../agent-shared/_bash.nix {jailed = true;};
@@ -69,7 +124,7 @@
         package = null;
 
         context =
-          builtins.readFile shared.context
+          shared.contextText
           + "\n"
           + builtins.readFile ../agent-jail/jail-context.md;
 
@@ -80,6 +135,9 @@
             CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";
           };
           skillListingMaxDescChars = 160;
+          # Context budget: bundled skills and workflows are unused.
+          disableBundledSkills = true;
+          disableWorkflows = true;
           editorMode = "vim";
           tui = "fullscreen";
           statusLine = {
@@ -88,7 +146,7 @@
             padding = 0;
           };
           permissions = {
-            defaultMode = "plan";
+            defaultMode = "auto";
             allow =
               perms.allow
               ++ map (t: mcp "context7" t) ["*"]
@@ -98,7 +156,10 @@
               ++ map (t: mcp "Notion" t) ["notion-fetch" "notion-search" "notion-query-*" "notion-get-*"];
             # ask beats allow, so the host tools prompt on every call.
             ask = perms.ask ++ map (mcp "host") ["host_exec" "host_mount" "host_journal" "host_ssh_agent"];
-            inherit (perms) deny;
+            deny =
+              perms.deny
+              ++ unusedTools
+              ++ map (c: "mcp__claude_ai_${c}") unusedConnectors;
           };
 
           hooks.SessionStart = [
@@ -155,7 +216,7 @@
           };
           datadog = {
             type = "http";
-            url = "https://mcp.datadoghq.eu/api/unstable/mcp-server/mcp";
+            url = "https://mcp.datadoghq.eu/v1/mcp";
           };
         };
 
@@ -170,16 +231,10 @@
         };
 
         skills =
-          devSkills.skills
+          skills.skills
           // {
-            git-conventions = "${shared.skills}/git-conventions";
             datadog-queries = ./skills/datadog-queries;
           };
-
-        plugins = {
-          caveman = inputs.caveman;
-          ponytail = inputs.ponytail;
-        };
       };
     };
   };

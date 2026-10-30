@@ -43,9 +43,14 @@ Before staging/publication, inspect tracked/staged `.dev-skills/` artifacts; any
   Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `build`,
   `ci`, `style`, `revert`.
 - Subject: imperative mood, lowercase after the colon, no trailing period,
-  aim for ≤ 50 chars.
+  aim for ≤ 50 chars, hard cap 72.
 - Body (optional, only when the change isn't self-explanatory): explain **why**,
-  not what. Wrap at ~72 chars. Separate from subject with a blank line.
+  not what. Wrap at ~72 chars. Separate from subject with a blank line. Use `-`
+  bullets; put issue references (`Closes #42`, `Refs #17`) last.
+- Always include a body for breaking changes (`type(scope)!:` plus a
+  `BREAKING CHANGE:` footer), security fixes, data migrations and reverts.
+- Never write "this commit does", "I", "we", "now" or "currently"; the diff
+  says what. No emoji unless the repo uses them.
 - One logical change per commit. Don't bundle unrelated changes.
 - Never commit secrets, generated artifacts, or debug leftovers.
 - Match the repo's existing style first — inspect `git log --oneline -15`

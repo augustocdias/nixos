@@ -13,7 +13,7 @@ Commands already start in the workspace. Use relative paths and the tool's cwd/d
 
 ## Instruction ownership
 
-Caveman owns chat style; Ponytail owns minimal-but-complete engineering discipline while their modes are active. Follow each plugin's mode controls and safety, exact-output, and persisted-document exceptions. Neither changes approvals or sandbox boundaries. Linux sandbox operations are governed by the separately loaded sandbox contract.
+The chat-style section owns how replies read; the engineering section owns minimal-but-complete changes. Both appear below and stay active until the user turns them off. Follow their safety, exact-output, and persisted-document exceptions. Neither changes approvals or sandbox boundaries. Linux sandbox operations are governed by the separately loaded sandbox contract.
 
 ## Development skills
 

@@ -21,7 +21,7 @@
       jailed = pkgs.stdenv.hostPlatform.isLinux;
 
       shared = import ../agent-shared/_lib.nix {inherit lib;};
-      devSkills = import ../agent-shared/_dev-skills.nix {inherit lib pkgs;};
+      skills = import ../agent-shared/_skills.nix {inherit lib pkgs;};
       prompt = kind: name: fm:
         pkgs.writeText "${name}.md" (shared.withFrontmatter
           ({description = shared.description.${name};} // fm)
@@ -38,11 +38,6 @@
         pkgs.writeText "${name}.md" (shared.withFrontmatterText
           {description = shared.description.${name};}
           (lead + builtins.replaceStrings ["!`"] ["`"] body));
-
-      caveman = import ./_caveman.nix {
-        inherit pkgs lib;
-        caveman = inputs.caveman;
-      };
 
       codex = model: effort: "openai-codex/${model}:${effort}";
       sol = codex "gpt-6.1-sol";
@@ -64,9 +59,9 @@
         telemetry.otlpExportEnabled = false;
         astGrep.enabled = true;
         error.notify = "on";
-        # Extension packages: their package.json entry plus sibling skills/,
-        # commands/, agents/ and rules/ load as if plugin-installed.
-        extensions = ["${caveman}" "${inputs.ponytail}"];
+        # Pinned empty so a project `extensions:` cannot add packages; the
+        # style rules live in AGENTS.md (agent-shared/style).
+        extensions = [];
 
         modelRoles = {
           default = sol "medium";
@@ -91,9 +86,6 @@
             reviewer = astra "high";
             security-reviewer = astra "high";
             scout = luna "medium";
-            cavecrew-investigator = luna "medium";
-            cavecrew-builder = sol "medium";
-            cavecrew-reviewer = astra "high";
             troubleshoot = astra "high";
             tickets = sol "medium";
           };
@@ -149,16 +141,20 @@
 
       mcpServers =
         {
+          # AGENTS.md already routes these; their server instructions are
+          # dropped from the system prompt.
           context7 = {
             type = "stdio";
             command = "npx";
             args = ["-y" "@upstash/context7-mcp"];
             env.DEFAULT_MINIMUM_TOKENS = "64000";
+            instructions = false;
           };
           nixos = {
             type = "stdio";
             command = "nix";
             args = ["run" "github:utensils/mcp-nixos" "--"];
+            instructions = false;
           };
         }
         // lib.optionalAttrs jailed {
@@ -219,26 +215,24 @@
         home.packages = lib.optional (!jailed) package;
 
         home.file =
-          (lib.mapAttrs' (name: source: lib.nameValuePair ".omp/agent/skills/${name}" {inherit source;}) devSkills.skills)
+          (lib.mapAttrs' (name: source: lib.nameValuePair ".omp/agent/skills/${name}" {inherit source;}) skills.skills)
           // {
             ".omp/agent/mcp.json".text = builtins.toJSON {inherit mcpServers;};
             ".omp/agent/keybindings.yml".source = (pkgs.formats.yaml {}).generate "keybindings.yml" keybindings;
             ".omp/agent/AGENTS.md".text =
-              builtins.readFile shared.context
+              shared.contextText
               + lib.optionalString jailed ("\n" + builtins.readFile ../agent-jail/jail-context.md);
 
             ".omp/agent/agents/test-writer.md".source = prompt "agents" "test-writer" {name = "test-writer";};
             ".omp/agent/commands/commit.md".source = command "commit";
-            ".omp/agent/skills/git-conventions".source = "${shared.skills}/git-conventions";
 
             ".omp/agent/extensions/gate.ts".source = ./extensions/gate.ts;
-            ".omp/agent/extensions/google-calendar.ts".source = ./extensions/google-calendar.ts;
             # Upstream's shared Pi/OMP extension, version-matched to the binary.
             ".omp/agent/extensions/rtk.ts".source = "${pkgs.rtk.src}/hooks/pi/rtk.ts";
           };
 
         home.activation.omp-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
-          mkdir -p "$HOME/.omp" "$HOME/.config/ponytail"
+          mkdir -p "$HOME/.omp"
         '';
       };
     };

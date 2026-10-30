@@ -8,7 +8,7 @@ Claude Code loads skills through its native Skill mechanism and `/name`. omp loa
 
 Manual-only skills are `grill-me`, `grill-with-docs`, `setup-dev-skills`, `implement-spec`, `improve-codebase-architecture`, `retro`, `to-spec`, `to-tickets`, `triage`, `wayfinder`, `handoff`, `teach`, `to-questionnaire`, and `wait-what`. Their `disable-model-invocation: true` flag controls discovery and invocation, not permission. Suggest the user's manual command instead of automatically invoking them. Contextual skills also remain manually invocable. In particular, `implement` supports Claude `/implement`, omp `/skill:implement`, contextual user-requested implementation and explicit orchestrator assignments.
 
-Caveman compresses chat, not meaning, files, comments, specifications, or lessons. Ponytail requires the smallest complete change, not shortened workflows or skipped verification. Keep its skipped-work/risk note outside any requested exact document format. Reuse agreed test seams and project conventions; do not manufacture abstractions, tests of implementation wording, or speculative scope.
+The chat style compresses chat, not meaning, files, comments, specifications, or lessons. The engineering rules require the smallest complete change, not shortened workflows or skipped verification. Keep their skipped-work/risk note outside any requested exact document format. Reuse agreed test seams and project conventions; do not manufacture abstractions, tests of implementation wording, or speculative scope.
 
 ## Workspace resolution
 

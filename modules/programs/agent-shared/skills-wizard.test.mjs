@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
-const template = readFileSync(new URL('./dev-skills/wizard/template.sh', import.meta.url), 'utf8');
+const template = readFileSync(new URL('./skills/wizard/template.sh', import.meta.url), 'utf8');
 
 for (const configured of [true, false]) {
   test(`wizard GitHub writes ${configured ? 'target explicit repository' : 'skip without a repository'}`, () => {

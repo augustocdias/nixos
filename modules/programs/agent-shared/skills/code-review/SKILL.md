@@ -60,6 +60,17 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
+The Standards axis also carries the **quality checklist** below, in order of importance. Read the code the diff touches, not only the diff: callers of every changed function, what it calls, its tests. When a signature, return value or behavior changes, grep every caller. Judge scale against the load the repo implies (README, deploy config) and say which load you assumed.
+
+1. **Bug**: wrong result, crash, missed edge case (empty, zero, last item, rounding, time zones), a caller broken by the change, a fix applied in one caller while the shared function stays broken.
+2. **Risk**: security holes (injection, weak randomness, secrets, unchecked user input), data loss (swallowed errors, writes in the wrong order, no transaction).
+3. **Scale**: check-then-write races, the same work done by every process, memory or lists that only grow, a query per item, O(n²) on big input, per-process state that must be shared.
+4. **Missing test**: risky new logic (a branch, a parser, money, security, data writes, a bug fix) with no test that fails when it breaks. One good test, not coverage.
+5. **Speed**: big slowdowns are findings; small wins are suggestions.
+6. **Lean**: delete (dead code, unused options, speculative features), reuse (name the existing helper's path), stdlib/native, yagni, merge near-copies, split a function doing unrelated jobs (by job, never by line count).
+
+Every checklist finding needs a concrete case: "this input or situation leads to this wrong result". No case, no finding. Re-read the lines before reporting. A `shortcut:` comment that names its limit is a decision, not a finding, unless the expected load already crosses it. Propose the smallest fix; prefer fixes that delete code.
+
 ### 4. Spawn both sub-agents in parallel
 
 When a specification exists, issue both independent review tasks together and aggregate their returned reports. Use generic bounded, read-only tasks with the report instructions below, not a custom reviewer agent with a competing report schema. No agent may edit files, run mutations, switch branches, manage worktrees, or run checks without explicit assignment. Give each the exact reviewed diff, source pointers, and resolved absolute workspace path when applicable. If no spec exists, run only Standards; do not spawn an empty Spec task.
@@ -67,8 +78,9 @@ When a specification exists, issue both independent review tasks together and ag
 **Standards sub-agent prompt** should include:
 
 - The exact diff command/snapshot, requested scope, and commit list, plus any separately included untracked files.
-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
-- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
+- The list of standards-source files you found in step 3, **plus the smell baseline and quality checklist from step 3** pasted in full (the sub-agent has no other access to them).
+- The finding format: one line per finding, `<file>:L<line>: <severity>: <problem>. <fix>.`, with severity `bug`, `risk`, `nit` or `q` (genuine question). No hedging or restating what the line does; the *why* only when the fix isn't obvious. Security findings and architectural disagreements get a short full paragraph instead.
+- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); (b) any baseline smell you spot: name it and quote the hunk; and (c) any quality-checklist finding, with its concrete failing case. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 
 **Spec sub-agent prompt** should include:
 

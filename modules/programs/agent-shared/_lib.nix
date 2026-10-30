@@ -18,6 +18,11 @@
 
   agents = ./agents;
   commands = ./commands;
-  skills = ./skills;
   context = ./context.md;
+  # Global context plus the adapted style rules.
+  contextText = lib.concatMapStringsSep "\n" builtins.readFile [
+    ./context.md
+    ./style/caveman.md
+    ./style/ponytail.md
+  ];
 }

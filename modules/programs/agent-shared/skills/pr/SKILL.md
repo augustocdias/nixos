@@ -1,12 +1,6 @@
 ---
 name: pr
 description: "Use when writing a PR body."
-metadata:
-  credits:
-    skill: show-me
-    author: Dex Horthy
-    organisation: Humanlayer
-    url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
 [Shared workflow](WORKFLOW.md)
@@ -179,4 +173,4 @@ Describe whether it's a one-way or two-way door. You can walk back through two-w
 The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
 
 
-Use the actual diff and verification record, not expected outcomes. Include enough evidence in a remote PR body or approved accessible attachments; do not use local `.dev-skills/` links as the only evidence. If a durable local draft is requested, save it under the resolved `.dev-skills/reviews/<slug>.md`. Preserve the visual menu and attribution in [CREDITS.md](CREDITS.md).
+Use the actual diff and verification record, not expected outcomes. Include enough evidence in a remote PR body or approved accessible attachments; do not use local `.dev-skills/` links as the only evidence. If a durable local draft is requested, save it under the resolved `.dev-skills/reviews/<slug>.md`. Preserve the visual menu.

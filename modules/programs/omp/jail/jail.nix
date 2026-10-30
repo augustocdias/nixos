@@ -21,7 +21,6 @@
         extra = c:
           with c; [
             (try-rw-bind (noescape "\"$HOME/.omp\"") (noescape "~/.omp"))
-            (try-rw-bind (noescape "\"$HOME/.config/ponytail\"") (noescape "~/.config/ponytail"))
             (try-rw-bind (noescape "\"$HOME/.cache/jgrep\"") (noescape "~/.cache/jgrep"))
           ];
       };

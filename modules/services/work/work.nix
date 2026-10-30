@@ -47,10 +47,12 @@
 
       # Work MCPs for omp. OAuth runs in-app (`/mcp reauth <name>`); tokens land
       # in ~/.omp/agent/agent.db. Writes are gated by omp's extensions/gate.ts.
+      # Notion and Datadog server instructions are long and dropped.
       omp.mcpServers = {
         notion = {
           type = "http";
           url = "https://mcp.notion.com/mcp";
+          instructions = false;
         };
         linear = {
           type = "http";
@@ -59,6 +61,7 @@
         datadog = {
           type = "http";
           url = "https://mcp.datadoghq.eu/v1/mcp";
+          instructions = false;
         };
       };
 
