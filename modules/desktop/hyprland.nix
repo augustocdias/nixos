@@ -484,7 +484,6 @@ in {
         mpvpaper
 
         hyprland-qt-support
-        hyprland-qtutils
         hyprpwcenter
 
         libsForQt5.qt5ct

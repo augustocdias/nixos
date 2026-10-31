@@ -4,8 +4,9 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
 
 ## Credits
 
-- **Matt Pocock**: [mattpocock/skills](https://github.com/mattpocock/skills). The curated skills in `modules/programs/agent-shared/skills/` (all except `git-conventions`). MIT, see `mattpocock-skills/LICENSE`; provenance and local adaptations are in `mattpocock-skills/UPSTREAM.md`.
+- **Matt Pocock**: [mattpocock/skills](https://github.com/mattpocock/skills). The curated skills in `modules/programs/agent-shared/skills/` (all except `git-conventions` and `unslop`). MIT, see `mattpocock-skills/LICENSE`; provenance and local adaptations are in `mattpocock-skills/UPSTREAM.md`.
 - **Dex Horthy**: the `show-me` skill from [humanlayer](https://github.com/humanlayer/humanlayer). The visual menu in the `pr` skill, see `mattpocock-skills/pr-CREDITS.md`.
+- **Lauren Tan**: [pstack](https://github.com/cursor/plugins/tree/main/pstack). The `unslop` skill in `modules/programs/agent-shared/skills/`. MIT, see `pstack/LICENSE`.
 - **Julius Brussee**: [Caveman](https://github.com/JuliusBrussee/caveman). The chat-style rules (`agent-shared/style/caveman.md`), the one-line finding format in `skills/code-review`, and the commit rules in `skills/git-conventions`. Apache-2.0, see `caveman/`.
 - **Dietrich Gebert**: [Ponytail](https://github.com/DietrichGebert/ponytail). The engineering rules (`agent-shared/style/ponytail.md`) and the quality checklist in `skills/code-review`. MIT, see `ponytail/LICENSE`.
 
@@ -20,6 +21,17 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
   - Removed the frontmatter, the `/caveman` level switching, the ultra/wenyan aliases, status reporting and hook-based activation. The rules load as always-on context instead.
   - Folded the caveman-review one-line finding format into `skills/code-review`.
   - Folded the caveman-commit rules into `skills/git-conventions`.
+  - Pointed persisted prose to the `unslop` skill.
+
+## pstack
+
+- Source revision: `c742dd61706fbacc1b95f1a20b7b988cf096ce6c` of [cursor/plugins](https://github.com/cursor/plugins).
+- Copyright (c) 2026 Lauren Tan.
+- License: MIT (`pstack/LICENSE`).
+- Copied from: `pstack/skills/unslop/SKILL.md`, into `agent-shared/skills/unslop/SKILL.md`.
+- Modifications:
+  - Removed `disable-model-invocation` and rewrote the description so the skill loads for saved prose.
+  - Added a scope line: chat replies follow Caveman, and rule 33 does not apply to them.
 
 ## Ponytail
 

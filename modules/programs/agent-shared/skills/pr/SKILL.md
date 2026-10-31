@@ -37,7 +37,7 @@ Use this default template:
 
 ## Sections
 
-Skip all preambles and keep prose brief. Use the user's domain language from the workspace `GLOSSARY.md` or authoritative glossary referenced by `domain.md`. Keep persisted PR prose normal even when chat uses Caveman.
+Skip all preambles and keep prose brief. Use the user's domain language from the workspace `GLOSSARY.md` or authoritative glossary referenced by `domain.md`. Keep persisted PR prose normal even when chat uses Caveman, and write it by the `unslop` skill.
 
 ### Summary
 

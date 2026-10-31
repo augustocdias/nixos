@@ -51,6 +51,7 @@ Before staging/publication, inspect tracked/staged `.dev-skills/` artifacts; any
   `BREAKING CHANGE:` footer), security fixes, data migrations and reverts.
 - Never write "this commit does", "I", "we", "now" or "currently"; the diff
   says what. No emoji unless the repo uses them.
+- Write the body by the `unslop` skill.
 - One logical change per commit. Don't bundle unrelated changes.
 - Never commit secrets, generated artifacts, or debug leftovers.
 - Match the repo's existing style first — inspect `git log --oneline -15`

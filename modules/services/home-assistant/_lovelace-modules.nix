@@ -110,11 +110,11 @@ in {
 
   status-card = stdenvNoCC.mkDerivation rec {
     pname = "status-card";
-    version = "3.4.0b2";
+    version = "3.4.0";
 
     src = fetchurl {
       url = "https://github.com/xBourner/status-card/releases/download/v${version}/status-card.js";
-      hash = "sha256-BMuCdElfMJqGpGvM8E9G2jroRed2e2BliUCWil9d7aA=";
+      hash = "sha256-m2wfDNR2jZ24qclPUaz25yp5KB5z3/V4kHJ0EC4EUBU=";
     };
 
     dontUnpack = true;
