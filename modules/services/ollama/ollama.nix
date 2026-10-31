@@ -16,7 +16,7 @@
     ollama = (pkgs.callPackage ./_package.nix {}).package;
     ollamaHome = "/var/lib/ollama";
     ollamaPort = 11434;
-    ollamaModels = [config.services.ollama.model "qwen3-embedding:0.6b"];
+    ollamaModels = with config.services.ollama; [model memoryModel "qwen3-embedding:0.6b"];
     # launchd has no ordering, so poll the server instead of racing it.
     ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
       set -u
@@ -37,8 +37,13 @@
   in {
     options.services.ollama.model = lib.mkOption {
       type = lib.types.str;
-      default = "gpt-oss:20b";
-      description = "Ollama generation model shared by Hermes and Honcho.";
+      default = "deepseek-v4-pro:cloud";
+      description = "Ollama generation model for Hermes.";
+    };
+    options.services.ollama.memoryModel = lib.mkOption {
+      type = lib.types.str;
+      default = "deepseek-v4.1-flash:cloud";
+      description = "Ollama generation model for every Honcho role.";
     };
     config = {
       launchd.daemons.ollama = {
@@ -47,11 +52,9 @@
           HOME = ollamaHome;
           OLLAMA_HOST = "[::]:${toString ollamaPort}";
           OLLAMA_MODELS = "${ollamaHome}/models";
-          OLLAMA_CONTEXT_LENGTH = "65536";
           OLLAMA_KEEP_ALIVE = "-1";
           OLLAMA_NUM_PARALLEL = "3";
           OLLAMA_FLASH_ATTENTION = "1";
-          OLLAMA_NO_CLOUD = "1";
         };
         serviceConfig = {
           KeepAlive = true;

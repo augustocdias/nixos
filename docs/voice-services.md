@@ -2,7 +2,7 @@
 
 The [macmini host reference](system.md#macos-nix-darwin-host--macmini) owns launchd daemon setup, model loading, and logging failure modes.
 
-All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Generation for Hermes and Honcho goes to loopback Ollama using `services.ollama.model` from `modules/services/ollama/ollama.nix`. Change the model there, not in each consumer.
+All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Generation for Hermes and Honcho goes to loopback Ollama, using `services.ollama.model` and `services.ollama.memoryModel` from `modules/services/ollama/ollama.nix`. Change the models there, not in each consumer.
 
 ## Laya
 
@@ -110,4 +110,4 @@ Both servers use `trust: untrusted`, so tools without a read-only annotation nee
 
 ### Latency
 
-Separate startup, memory retrieval, model scheduling, prompt processing, and output generation. A Hermes request carries a large prompt, so prompt processing alone is slow on this host. Honcho's background dialectic and derivation cycles also call the model, and the MLX runner serializes requests, so background memory work delays foreground chat. See [MLX scheduling](system.md#macos-nix-darwin-host--macmini). Collect metadata-only timing; raw prompts, messages, credentials, and Honcho request URLs can contain private data.
+Separate startup, memory retrieval, model scheduling, prompt processing, and output generation. With cloud generation models, prompt processing and output run on ollama.com, and Hermes and Honcho no longer share a local runner. If either model is switched back to a local one, a large Hermes prompt is slow to process on this host, and the MLX runner serializes requests, so background Honcho work delays foreground chat. See [MLX scheduling](system.md#macos-nix-darwin-host--macmini). Collect metadata-only timing; raw prompts, messages, credentials, and Honcho request URLs can contain private data.

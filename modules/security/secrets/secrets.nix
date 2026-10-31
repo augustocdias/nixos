@@ -23,6 +23,7 @@
           dd_app_key = {};
           dd_api_key = {};
           github_token = {};
+          ollama_api_key = {};
         };
 
         templates = {
@@ -36,6 +37,7 @@
               set -gx DD_API_KEY ${config.sops.placeholder.dd_api_key}
               set -gx GH_TOKEN ${config.sops.placeholder.github_token}
               set -gx TYPESAFE_API_KEY ${config.sops.placeholder.typesafe_api_key}
+              set -gx OLLAMA_CLOUD_API_KEY ${config.sops.placeholder.ollama_api_key}
             '';
           };
           # TODO: migrate sops to nixos level so the nix daemon can use this token.

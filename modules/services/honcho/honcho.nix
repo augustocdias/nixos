@@ -124,7 +124,7 @@
           }
           {
             name = "${prefix}__MODEL";
-            value = config.services.ollama.model;
+            value = config.services.ollama.memoryModel;
           }
           {
             name = "${prefix}__OVERRIDES__BASE_URL";
