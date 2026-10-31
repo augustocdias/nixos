@@ -1,100 +1,68 @@
 # Desktop reference
 
-Read before changing compositors, greeters, window managers, keyboard bindings, desktop sessions, or shell configuration. Source files remain authoritative for current values.
+Linux desktop wiring lives in `modules/desktop/hyprland.nix` and `modules/desktop/dms.nix`; macOS window management lives in `modules/desktop/omniwm.nix`.
 
-## Desktop Environment
+## Hyprland (laptop)
 
-### Hyprland
+### Lua config
 
-Wayland tiling compositor with:
+Hyprland 0.56 parses only Lua, so any hyprlang `.conf` is a syntax error. Home Manager writes `~/.config/hypr/hyprland.lua` because `wayland.windowManager.hyprland.configType` defaults to `"lua"` for `home.stateVersion` 26.05 and later. A config error drops Hyprland into emergency mode, where no configured binds exist (only `SUPER+Q` terminal, `SUPER+R` run, `SUPER+M` exit).
 
-- **Config format: Lua, not hyprlang.** Hyprland 0.56 deleted the hyprlang parser — `Config::initConfigManager` constructs `Lua::CConfigManager` on both branches and `typeToString` only knows `CONFIG_LUA`, so *any* `.conf` is now a Lua syntax error. `wayland.windowManager.hyprland.configType = "lua"` makes home-manager write `~/.config/hypr/hyprland.lua`. A config error trips Hyprland's **emergency mode** (no binds registered; only `SUPER+Q` terminal, `SUPER+R` `hyprland-run`, `SUPER+M` exit).
-- **How `settings` maps to Lua**: each attribute becomes `hl.<name>(...)`, one call per list element. `_args` renders a multi-argument call, `_var` a `local`, and `lib.generators.mkLuaInline` a raw Lua expression (needed for `hl.dsp.*`, which are function calls, not data). Note the whole tree moves under `hl.config({...})` — there is no `hl.general`, so a bare `configType` flip yields syntactically valid Lua that dies on a nil call.
-- **Session is uwsm-managed, so `wayland.windowManager.hyprland.systemd.enable` must be explicitly `false`.** It defaults to `true`, and merely deleting the option re-enables it. HM's start hook runs `systemctl --user stop hyprland-session.target`, whose `PropagatesStopTo=graphical-session.target` is `BindsTo`'d by uwsm's `wayland-session@` target → the compositor is stopped, exits 0, and its `OnSuccess=wayland-session-shutdown.target` (`replace-irreversibly`) tears the session down — an endless greeter loop, while the plain non-uwsm session entry still works. uwsm owns `graphical-session.target` plus both the systemd and D-Bus activation environments, and `dms.service`/`wl-clip-persist` hang off `graphical-session.target`, so nothing is lost. Documented at <https://wiki.hypr.land/Useful-Utilities/Systemd-start/>. Consequence: the plain "Hyprland" session entry (which the hyprland package puts in the system path regardless) starts without DMS — always pick **Hyprland (uwsm-managed)**.
-- **Window rules match Wayland app-ids via RE2 `FullMatch`, case-sensitively.** Native-Wayland Electron apps report lowercase (`slack`, `cider`, not `Slack`/`Cider`), so those rules use `(?i)` inline flags. Check real classes with `hyprctl -j clients | jq '.[].class'` rather than trusting the old hyprlang rules. `workspace = "N silent"` keeps working as one string.
-- **Don't prefix autostart entries with `hyprctl dispatch workspace N &&`.** `hl.exec_cmd` does run via `/bin/sh -c`, so the `&&` is fine, but every entry is spawned at once and the active workspace races the window actually mapping. Place windows with `window_rule` instead — and note a class rule captures *every* window of that app, which is why firefox has none.
-- **API reference**: Hyprland ships LuaLS stubs at `<hyprland>/share/hypr/stubs/hl.meta.lua` (home-manager points `.luarc.json` at them). Use those rather than guessing dispatcher names; `/tmp` scratch validation can mock `hl` from the stubs and execute the generated file to catch unknown `hl.*` calls.
-- **Layout**: dwindle (default) + scrolling workspace (plugin)
-- **Monitors**: eDP-1 (laptop, workspaces 1-5) + DP-1 (external, workspaces 6-10)
-- **Keybindings**: `SUPER` as main modifier, written as `"SUPER + SHIFT + K"` key strings. All directional bindings use hjkl (no arrow keys). `binde` is `{ repeating = true }`; `bindm` is just the mouse dispatcher (`hl.dsp.window.drag()` / `hl.dsp.window.resize()`) — there is no `mouse` bind option despite the upstream example using one. The resize submap is `settings.define_submap`.
-- **Auto-start**: Slack, Thunderbird, ZapFast (WhatsApp), Firefox, Ghostty, DataGrip (assigned to specific workspaces). The Ghostty window starts a plain shell; the multiplexer is launched by hand.
-- **Window rules**: Float dialogs, PiP, file pickers. Size constraints for various apps.
+How `settings` renders:
 
-### DankMaterialShell (DMS)
+- Each attribute becomes `hl.<name>(...)`, one call per list element.
+- `_args` renders a multi-argument call, and `_var` renders a `local`.
+- `lib.generators.mkLuaInline` emits raw Lua. Dispatchers (`hl.dsp.*`) are function calls, so they need it.
+- Option sections go under `settings.config`, which renders `hl.config({...})`. There is no `hl.general`.
 
-DMS is a **comprehensive Wayland desktop shell** built on [Quickshell](https://git.outfoxxed.me/quickshell/quickshell) (Qt/QML). It replaces the entire typical Wayland desktop toolkit stack:
+Look up `hl.*` names in the LuaLS stubs at `<hyprland>/share/hypr/stubs/hl.meta.lua`; Home Manager points `~/.config/hypr/.luarc.json` at them. To validate a change, mock `hl` from the stubs in a scratch directory and execute the generated file to catch unknown calls.
 
-| DMS replaces      | Traditional tool           |
-| ----------------- | -------------------------- |
-| Top bar/panel     | Waybar, Polybar            |
-| App launcher      | Rofi, Wofi, Fuzzel         |
-| Lock screen       | Swaylock, Hyprlock         |
-| Login greeter     | greetd + tuigreet/gtkgreet |
-| Notifications     | dunst, mako                |
-| Clipboard manager | cliphist, clipman          |
-| Screenshot tool   | grim + slurp               |
-| Screen recorder   | wf-recorder                |
-| Idle management   | swayidle, hypridle         |
-| Power menu        | wlogout                    |
-| System tray       | (built-in)                 |
+### Bindings
 
-#### Architecture
+- `SUPER` is the modifier, interpolated from the Nix `mod` variable. Key strings look like `"SUPER + SHIFT + K"`.
+- Directional bindings use hjkl only.
+- `binde` is `{ repeating = true }`. Mouse binds are the `hl.dsp.window.drag()` and `hl.dsp.window.resize()` dispatchers; Hyprland has no `mouse` bind option, despite the upstream example.
+- The resize submap is `settings.define_submap`.
 
-DMS runs as a **systemd user service** and communicates with Hyprland through:
+### Window rules and autostart
 
-- **IPC**: `dms ipc call <target> <method>` (e.g., `dms ipc call launcher toggle`)
-- **CLI**: `dms screenshot [full] [--no-file] [--no-clipboard] [-d <dir>]`
-- **Hyprland keybindings** that invoke `dms` commands (SUPER+SPACE for launcher, SUPER+SHIFT+L for lock, etc.)
+Rules match Wayland app-ids with RE2 full match, case-sensitively. Native-Wayland Electron apps report lowercase ids, so their rules use `(?i)`. Check real classes with `hyprctl -j clients | jq '.[].class'`. A class rule captures every window of that app.
 
-#### Key IPC commands
+Autostart entries run together through `/bin/sh -c`, so the active workspace races window mapping. Place autostarted apps with `window_rule` and `workspace = "N silent"`, not with a `hyprctl dispatch workspace N &&` prefix.
 
-| Command                                      | Action           |
-| -------------------------------------------- | ---------------- |
-| `dms ipc call launcher toggle`               | App launcher     |
-| `dms ipc call powermenu toggle`              | Power menu       |
-| `dms ipc call lock lock`                     | Lock screen      |
-| `dms ipc call plugins toggle aiAssistant`    | AI assistant     |
-| `dms ipc call screenRecorder startRecording` | Screen recording |
-| `dms ipc call screenRecorder stopRecording`  | Stop recording   |
-| `dms ipc call mpris playPause/previous/next` | Media control    |
+### Session
 
-#### Features configured in this repo
+The session is uwsm-managed, so `wayland.windowManager.hyprland.systemd.enable` must stay explicitly `false`. It defaults to `true`, and removing the line re-enables it. Home Manager's start hook would then stop `hyprland-session.target`, which propagates through uwsm's `wayland-session@` target and tears the session down: an endless greeter loop. uwsm owns `graphical-session.target` and both activation environments, and DMS hangs off that target. See <https://wiki.hypr.land/Useful-Utilities/Systemd-start/>.
 
-- **Bar**: top position, 50% transparency, Catppuccin theme, widgets: launcher, workspaces, window title, apps, MPRIS, clock, weather, tray, recorder, notifications, clipboard, CPU/RAM/battery, control center, session power
-- **Launcher**: list view, compact, recent-first sorting, DuckDuckGo web search, emoji (`:` trigger), calculator
-- **Lock screen**: password + fingerprint + FIDO2/U2F parallel auth, video wallpaper from `~/media/animated/`
-- **Greeter**: the greeter now ships as a **separate flake** (`duxlabs-dev/dux-greeter`, input `dank-greeter`), driven by `programs.dms-greeter` (Hyprland compositor). It syncs the user's DMS theme/wallpaper/settings into its cache dir `/var/lib/dms-greeter` (copied from `~/.config/DankMaterialShell/` etc. via `configHome`) before greetd starts.
-- **Control center**: volume, brightness, WiFi, Bluetooth, audio I/O, DND, idle inhibitor, VPN, KDE Connect
-- **Notifications**: 5s timeout (normal), persistent (critical), 50 history items, 7-day retention
-- **Desktop widgets**: system monitor (CPU/RAM/network/disk) + weather forecast
-- **Wallpaper**: cycling every 300s from `~/media/wallpapers/`
-- **Power management**: AC: 10min screen off, 3min lock, 30min suspend. Battery: power-saver profile, 20min suspend.
-- **Dynamic theming**: not enabled. only active to make dank set colors for gtk and qt apps.
-- **Plugins**: dankbarPinentry, dankBatteryAlerts, dankKDEConnect, dankHyprlandWindows, dankDesktopWeather, displaySettings, developerUtilities, wallpaperCarousel, sessionPower, aiAssistant (Anthropic Claude)
-- **AI assistant**: built-in, uses Anthropic Claude Opus 4
+Always pick the **Hyprland (uwsm-managed)** session. The plain "Hyprland" entry still exists and starts without DMS.
 
-#### DMS Nix structure
+## DankMaterialShell (DMS)
 
-- Greeter (`dank-greeter` flake input, `nixosModules.default` → `programs.dms-greeter`): greetd-based greeter with Hyprland as compositor, cache dir `/var/lib/dms-greeter`. Lives in its own repo now, not the DMS flake.
-- Home Manager module (`homeModules.dank-material-shell`): 700+ lines of declarative config
-- Plugin registry: separate flake input (`dms-plugins`)
-- Pinentry (`dank-pinentry` flake input, `homeModules.default` → `programs.dank-pinentry`): the gpg-agent pinentry. Prompts in the terminal when one is usable, otherwise inside DankBar via the `dankbarPinentry` plugin (widget first in the right section, hidden when idle). The DMS aspect sets `services.gpg-agent.pinentry.package` to it; `security.nix` keeps pinentry-bemenu (Linux) / pinentry_mac as the `mkDefault`.
+DMS is the whole desktop shell, built on Quickshell: bar, launcher, lock screen, notifications, clipboard, screenshots, recording, idle and power management, tray, and plugins. Add these features through DMS settings in `dms.nix`, not separate tools.
 
-### Window management — `omniwm`
+DMS runs as a systemd user service. Hyprland binds call it through `dms ipc call <target> <method>` (for example `dms ipc call launcher toggle`) and `dms screenshot`. The binds in `hyprland.nix` show the targets in use.
 
-`modules/desktop/omniwm.nix` (aspect `omniwm`, included by `user-macos` since `programs.omniwm` is home-manager). Replaced yabai+skhd, which needed the scripting addition and therefore SIP disabled.
+Flake inputs: `dms` (Home Manager module), `dms-plugins` (plugin registry), `dank-greeter`, and `dank-pinentry`.
 
-- **SIP stays enabled**; OmniWM is Developer ID signed and notarized, and nixpkgs unpacks the release artifact with `bsdtar` to keep that signature valid.
-- **Hotkeys are built in**, so there is no skhd. Each hotkey id holds exactly **one** binding, so setting `focus.left = "Option+H"` *moves* it rather than adding an alias.
-- `general.defaultLayoutType = "dwindle"` (closest to Hyprland), 8px gaps.
-- Float rules use `appNameSubstring`/`titleRegex` rather than bundle IDs; `bundleId` may be `""` as long as another matcher is set. Each rule needs an explicit `id` UUID.
-- **`settings.toml` is Nix-owned and the GUI fights it**: OmniWM rewrites the file from its Settings window and on version migration, replacing the symlink; `force = true` relinks ours on every switch. Any GUI change worth keeping must be mirrored into Nix, and new hotkey ids added by an upgrade need adding by hand.
-- Requires macOS 26+, Accessibility + Input Monitoring, and `Displays have separate Spaces` **ON** (the default; OmniWM pauses until it is).
-- No exec/launch command exists, so `alt+return` is `toggleQuakeTerminal` (Ghostty via libghostty) and 1Password moved to a Raycast hotkey. There is also no close-window command — `Cmd+W` covers it.
+### Greeter
 
-## Editing guidelines
+The greeter comes from the `dank-greeter` flake (`programs.dms-greeter`), with greetd and Hyprland as its compositor. It copies the user's DMS theme, wallpaper, and settings into `/var/lib/dms-greeter` via `configHome` before greetd starts.
 
-- **Hyprland config**: Lua (`configType = "lua"`), never hyprlang — 0.56 removed that parser. All directional bindings use hjkl, no arrow keys; the modifier is `SUPER`, interpolated in Nix rather than a `$mainMod` variable. Verify new `hl.*` calls against `<hyprland>/share/hypr/stubs/hl.meta.lua`.
-- **DMS greeter compositor config**: `programs.dms-greeter.compositor.customConfig` must also be Lua. dms-greeter picks its own appended launch snippet via `launcher.isHyprlandLuaConfig`, which sniffs the custom config for `hl.` (or a `.lua` suffix); without a match it appends a hyprlang `exec-once` line and the greeter dies before quickshell starts.
+`programs.dms-greeter.compositor.customConfig` must be Lua. dms-greeter chooses its appended launch snippet by sniffing the custom config for `hl.` (or a `.lua` suffix). Without a match it appends a hyprlang `exec-once` line, and the greeter dies before Quickshell starts.
 
-OmniWM bindings use hjkl with `Option` as the modifier, without arrow keys.
+### Pinentry
+
+`security.nix` sets the gpg-agent pinentry: `dank-pinentry` on Linux and `pinentry_mac` on Darwin. dank-pinentry prompts in the terminal when one is usable, otherwise inside DankBar through the `dankbarPinentry` plugin, which is hidden when idle.
+
+<a id="window-management--omniwm"></a>
+
+## Window management with OmniWM (macmini)
+
+The `omniwm` aspect is Home Manager (`programs.omniwm`) and is included by `user-macos`. It keeps SIP enabled; OmniWM is signed and notarized.
+
+- Hotkeys are built in. Each hotkey id holds exactly one binding, so assigning a new key to an id moves it rather than adding an alias.
+- Bindings use `Option` as the modifier and hjkl for direction.
+- OmniWM has no launch command and no close-window command. `Option+Return` is `toggleQuakeTerminal` (Ghostty), 1Password opens from a Raycast hotkey, and `Cmd+W` closes windows.
+- Float rules may set `bundleId = ""` when another matcher is set. Each rule needs an explicit `id` UUID; `mkFloat` generates them.
+- `settings.toml` is Nix-owned, and the GUI fights it. OmniWM rewrites the file from its Settings window and on version migration; the Home Manager module relinks it with `force = true` on every switch. Mirror any GUI change worth keeping into Nix. Add hotkey ids introduced by an upgrade by hand.
+- OmniWM requires macOS 26+, Accessibility and Input Monitoring permissions, and "Displays have separate Spaces" on. It pauses until that setting is on.

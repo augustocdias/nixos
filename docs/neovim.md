@@ -1,72 +1,53 @@
 # Neovim reference
 
-Read before changing the editor, plugins, builds, LSP servers, formatters, or linters. Use the `nvim-plugin` skill for plugin wiring. Source files remain authoritative for current values.
+Use the `nvim-plugin` skill for plugin wiring. The aspect is `modules/programs/neovim/neovim.nix`.
 
 ## Neovim
 
 ### Architecture
 
-- **Nightly build** via the rolling `neovim-nightly-overlay` input, resolved by `flake.lock`
-- **50+ plugins** managed as flake inputs with `nvim-` prefix and built with nix
-- **Plugin loader**: `lze` (BirdeeHub/lze) — lazy.nvim alternative focused only on lazy loading instead of package management
-- **Config location**: `modules/programs/neovim/configs/` symlinked to `~/.config/nvim` via `mkOutOfStoreSymlink` for live editing without rebuild
-- **Plugin build**: `_plugins.nix` provides `buildPlugin` with three strategies: source-only (most plugins), flake package (lze, blink-cmp, rustaceanvim), custom Rust build (codesnap)
+- Neovim is the nightly build from the `neovim-nightly-overlay` input.
+- `modules/programs/neovim/configs/` is symlinked to `~/.config/nvim` with `mkOutOfStoreSymlink`. Lua edits take effect on restart, without a rebuild.
+- Plugins load lazily through `lze` (BirdeeHub/lze), a lazy-loading library without package management. Plugin specs live in `configs/lua/plugins/<name>.lua` and use `lze` fields (`event`, `cmd`, `keys`, `ft`).
 
-### Plugin management
+### Plugins
 
-Two helper functions declare flake inputs:
+Every plugin is a flake input named `nvim-<name>`, declared in `neovim.nix` with one of two helpers:
 
-- `mkPlugin "github:author/repo"` — source-only (`flake = false`), built via `vimUtils.buildVimPlugin`
-- `mkFlakePlugin "github:author/repo"` — full flake, uses pre-built `packages.${system}.default`
+- `mkPlugin "github:author/repo"` is source-only (`flake = false`) and builds with `vimUtils.buildVimPlugin`.
+- `mkFlakePlugin "github:author/repo"` uses the flake's `packages.${system}.default`.
 
-To update all neovim plugins: `nix flake update nvim-*` or run the `update-nvim` script.
+A plugin also needs an entry in `pluginMeta` in `_plugins.nix`, keyed by `<name>`. Set `useFlakePackage = true` there to use the flake's package, and `lazy = false` for plugins loaded eagerly.
 
-### LSP servers
+Update all plugins with `update-nvim`, which runs `nix flake update` on every `nvim-*` input. Agent bash rules deny `update-nvim`, so ask the user to run it.
 
-| Server        | Language      | Notes                                                                                                       |
-| ------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| rust-analyzer | Rust          | Via rustaceanvim, clippy on save, nightly rustfmt                                                           |
-| tsc           | TypeScript/JS | Go-based native LSP (`typescript` 7.x, formerly `typescript-go`), formatting disabled (prettier handles it) |
-| nixd          | Nix           |                                                                                                             |
-| emmylua_ls    | Lua           | Workspace includes all plugin paths                                                                         |
-| bashls        | Bash          |                                                                                                             |
-| yamlls        | YAML          | SchemaStore integration                                                                                     |
-| jsonls        | JSON          | SchemaStore integration                                                                                     |
-| eslint        | JS/TS         | Also used as linter                                                                                         |
-| taplo         | TOML          |                                                                                                             |
-| harper_ls     | Grammar       | Checks prose in comments                                                                                    |
-| docker LSPs   | Docker        | dockerfile + compose                                                                                        |
-| qmlls         | QML           | For Quickshell/DMS development                                                                              |
-| gdscript      | GDScript      | Godot engine                                                                                                |
+### LSP, formatters, and linters
 
-### Formatters (conform.nvim)
+Each tool needs its binary in `extraPackages` in `neovim.nix` and its setup in Lua:
 
-CSS/HTML/JS/TS/JSON/YAML: prettier | Lua: stylua | Nix: alejandra | Python: black | Shell: shfmt | SQL: sqlfluff | Markdown: markdownlint | Rust: rustfmt (via rust-analyzer, nightly)
-
-### Linters (nvim-lint)
-
-Dockerfile: hadolint | JS/TS: eslint | Lua: selene | Markdown: markdownlint + write_good + codespell | Nix: statix + deadnix | YAML: yamllint + actionlint
+- LSP servers: `configs/lua/plugins/lspconfig.lua`. Rust goes through rustaceanvim in `rustacean.lua`.
+- Formatters: `conform.lua`. TypeScript formatting comes from prettier, so the `tsc` server has formatting disabled.
+- Linters: `nvim-lint.lua`.
 
 ### Keybinding philosophy
 
-- **Leader**: Space. **Local leader**: `\`
-- **Vim-centric**: modal editing, motions enhanced (flash, treesitter textobjects)
-- **Mnemonic groups**: `<leader>l` LSP, `<leader>g` Git, `<leader>h` Gitsigns, `<leader>r` Rust, `<leader>t` Trouble, `<leader>p` search/grep, `<leader>v` Vim internals, `<leader>a` AI
-- **Herdr integration**: `<C-h/j/k/l>` moves between Neovim splits and falls through to herdr panes at edges. Hand-rolled in `utils/keymaps.lua` (`mux_move`), not a plugin: it runs `wincmd <dir>` and, when the window did not change, calls `herdr pane focus --direction <dir> --pane $HERDR_PANE_ID`. Outside herdr the fallthrough is a no-op.
-- **No arrow key dependency**: `<C-h/j/k/l>` provides cursor movement in insert/command mode
-- **Clipboard isolation**: system clipboard NOT synced by default; `<leader>c` in visual mode copies explicitly
+- Leader is Space; local leader is `\`.
+- Mappings live in `configs/lua/utils/keymaps.lua` and group by mnemonic prefix (for example `<leader>l` LSP, `<leader>g` Git, `<leader>a` AI). Follow an existing group when adding a mapping.
+- Directional mappings use hjkl.
+- `<C-h/j/k/l>` in normal and insert mode runs `mux_move`: it moves between splits and, at an edge, runs `herdr pane focus --direction <dir> --pane $HERDR_PANE_ID`. Outside herdr it is a plain `wincmd`.
+- The system clipboard is not synced (`clipboard = ''`). Visual-mode `<leader>c` copies to it explicitly.
 
-### AI integration
+### Agents and the editor
 
-The agent harness (omp for personal work; Claude Code or omp for work) runs in its own herdr pane next to Neovim. There is no editor MCP any more (the nvim-mcp server was removed), and the agent jail does not bind Neovim's socket (`~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`), so agents cannot reach the editor.
+The agent harness runs in its own herdr pane beside Neovim. Neovim listens on `~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`, but the agent jail does not bind that socket, so agents cannot drive the editor.
 
-### Notable custom features
+### Custom features
 
-- **Plugin Update Checker** (`plugin-updates.lua`): 569-line module that parses `flake.lock`, queries GitHub for each `nvim-*` input, shows a live-updating dashboard with commit diffs at startup
-- **Gatekeeper** (`augustocdias/gatekeeper.nvim`): author's own plugin that makes buffers outside CWD readonly
-- **Treesitter-aware fold text**: custom fold rendering preserving syntax highlighting
-- **Dual theme support**: Catppuccin (default) and Tokyo Night, switchable via one line in `init.lua`
+- `plugins/plugin-updates.lua` parses `flake.lock`, queries GitHub for each `nvim-*` input, and shows a startup dashboard of pending commits.
+- `gatekeeper.nvim` (the author's plugin) makes buffers outside the working directory read-only.
+- `utils/custom_fold.lua` renders fold text with treesitter highlighting.
+- The theme is chosen by `vim.g.theme` in `init.lua` (Catppuccin or Tokyo Night).
 
 ## Editing guidelines
 
-- **Lua files**: Format with `stylua`. Follow `plugins/<name>.lua` pattern for new plugin configs. Use `lze` spec format (event, cmd, keys, ft for lazy loading).
+Format Lua with `stylua`.
