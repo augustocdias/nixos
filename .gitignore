@@ -3,3 +3,4 @@ result
 .direnv/
 .Trash-1000
 __pycache__
+.omp

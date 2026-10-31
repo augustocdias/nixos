@@ -63,33 +63,7 @@
         # style rules live in AGENTS.md (agent-shared/style).
         extensions = [];
 
-        modelRoles = {
-          default = sol "medium";
-          plan = astra "high";
-          slow = astra "medium";
-          task = sol "medium";
-          advisor = sol "medium";
-          memory = sol "medium";
-          commit = luna "low";
-          tiny = luna "low";
-          widget = luna "low";
-          smol = luna "medium";
-        };
-
-        task = {
-          # Snapshot isolation is not explicit, permission-controlled Git worktrees.
-          isolation.enabled = false;
-          # Wins over agent frontmatter. Work agents are harmless where absent.
-          agentModelOverrides = {
-            task = sol "medium";
-            test-writer = sol "high";
-            reviewer = astra "high";
-            security-reviewer = astra "high";
-            scout = luna "medium";
-            troubleshoot = astra "high";
-            tickets = sol "medium";
-          };
-        };
+        task.isolation.enabled = false;
 
         advisor.enabled = true;
         memory.backend = "off";
@@ -122,6 +96,30 @@
           };
           # The `status` segment shows them; this would repeat them in the footer.
           showHookStatus = false;
+        };
+      };
+
+      models = {
+        modelRoles = {
+          default = sol "medium";
+          plan = astra "high";
+          slow = astra "medium";
+          task = sol "medium";
+          advisor = sol "medium";
+          memory = sol "medium";
+          commit = luna "low";
+          tiny = luna "low";
+          widget = luna "low";
+          smol = luna "medium";
+        };
+        task.agentModelOverrides = {
+          task = sol "medium";
+          test-writer = sol "high";
+          reviewer = astra "high";
+          security-reviewer = astra "high";
+          scout = luna "medium";
+          troubleshoot = astra "high";
+          tickets = sol "medium";
         };
       };
 
@@ -233,6 +231,14 @@
 
         home.activation.omp-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
           mkdir -p "$HOME/.omp"
+        '';
+
+        # omp owns config.yml, so the Nix-declared models are merged in, not linked.
+        home.activation.omp-models = lib.hm.dag.entryAfter ["omp-dirs"] ''
+          omp_config="$HOME/.omp/agent/config.yml"
+          run mkdir -p "$HOME/.omp/agent"
+          [ -e "$omp_config" ] || run install -m 644 /dev/null "$omp_config"
+          run ${lib.getExe pkgs.yq-go} -i '. *= load("${(pkgs.formats.yaml {}).generate "omp-models.yml" models}")' "$omp_config"
         '';
       };
     };
