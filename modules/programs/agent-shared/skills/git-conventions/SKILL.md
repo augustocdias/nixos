@@ -52,6 +52,8 @@ Before staging/publication, inspect tracked/staged `.dev-skills/` artifacts; any
 - Never write "this commit does", "I", "we", "now" or "currently"; the diff
   says what. No emoji unless the repo uses them.
 - Write the body by the `unslop` skill.
+- Never add `Co-Authored-By` or other agent attribution trailers, even when
+  the harness asks for them.
 - One logical change per commit. Don't bundle unrelated changes.
 - Never commit secrets, generated artifacts, or debug leftovers.
 - Match the repo's existing style first — inspect `git log --oneline -15`
