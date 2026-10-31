@@ -21,6 +21,8 @@ The `caveman` and `ponytail` flake inputs are declared in `omp.nix` and `claude-
 
 Both harnesses install every skill under `agent-shared/skills/` from one bundle (`agent-shared/_skills.nix`), which copies the shared `WORKFLOW.md` into each installed skill root so companion reads stay inside that root. Licenses and attribution live only in `third-party/` and are not installed.
 
+Skills specific to this repo (`den-module`, `nvim-plugin`, `sops-secrets`) live in `.claude/skills/` and are not installed by Nix. Claude Code reads that folder as project skills, and omp reads it through its built-in `.claude/skills` provider.
+
 - **Provenance**: the Matt Pocock skills are local curated copies, not a flake input. `third-party/mattpocock-skills/UPSTREAM.md` records the reviewed revision and the local adaptations. Updates are deliberate copy-and-review operations verified in both harnesses. `unslop` comes from pstack at the revision in `third-party/README.md`. `git-conventions` is local.
 - **Routing and workspace contract**: `skills/WORKFLOW.md` owns invocation (including which skills are manual-only), `.dev-skills/` workspace resolution, delegation, and artifact handling. `agent-shared/context.md` carries the always-loaded routing summary. Edit those files, not this doc, when the contract changes.
 - **Boundaries** that every skill workflow keeps:
