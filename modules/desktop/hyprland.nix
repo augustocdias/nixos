@@ -422,8 +422,6 @@ in {
 
             (bind "${mod} + mouse_down" (focusWs "e+1"))
             (bind "${mod} + mouse_up" (focusWs "e-1"))
-            (bind "${mod} + L" (focusWs "e+1"))
-            (bind "${mod} + H" (focusWs "e-1"))
 
             (bind "${mod} + grave" ''hl.dsp.workspace.toggle_special("scratchpad")'')
             (bind "${mod} + SHIFT + grave" (moveWs "special:scratchpad"))

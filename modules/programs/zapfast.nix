@@ -5,9 +5,7 @@
   ...
 }: {
   flake-file.inputs.zapfast = {
-    # url = lib.mkDefault "github:crmne/zapfast";
-    # FIXME: go back to upstream once it gets merged
-    url = lib.mkDefault "github:augustocdias/zapfast/home-manager-module";
+    url = lib.mkDefault "github:crmne/zapfast";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
