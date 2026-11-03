@@ -1,4 +1,4 @@
-# Opens a worktree as a herdr workspace labelled after its branch, creating the
+# Opens a worktree as a Herdr App space labelled after its branch, creating the
 # checkout when needed — a sibling folder inside the repo folder, the same
 # <repo folder>/<branch> convention as the `git wa` alias.
 #
@@ -8,20 +8,14 @@
 #
 # usage: herdr-worktree [branch]
 #
-# Without an argument it prompts, which is how prefix+shift+g uses it: a popup
-# is the only custom command type that owns a terminal. With an argument it
+# Without an argument it prompts in the current terminal. With an argument it
 # runs unattended, so it is also usable from a shell or a script.
 
-set -l herdr $HERDR_BIN_PATH
-test -z "$herdr"; and set herdr @herdr@
-
-set -l start $HERDR_ACTIVE_PANE_CWD
-test -z "$start"; and set start $PWD
+set -l start $PWD
 
 set -l branch $argv[1]
 
-# A popup closes the moment the command exits, so errors need a keypress to
-# stay readable. A branch passed on the command line means nobody is watching.
+# Keep interactive errors visible until the person dismisses them.
 set -g herdr_worktree_interactive 0
 test -z "$branch"; and set -g herdr_worktree_interactive 1
 
@@ -36,8 +30,7 @@ end
 set -l common (@git@ -C $start rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
 test -z "$common"; and _herdr_worktree_fail "$start is not inside a git work tree"
 
-# herdr refuses worktree actions from a linked worktree, so always address the
-# repo's main checkout.
+# Resolve the main checkout so linked worktrees keep the same sibling convention.
 set -l main_checkout (path dirname $common)
 set -l repo_folder (path dirname $main_checkout)
 
@@ -91,16 +84,6 @@ else
     or _herdr_worktree_fail "could not locate the new checkout for $branch"
 end
 
-# Trust the environment before herdr spawns the workspace's first shell.
-if test -f $checkout/.envrc
-    @direnv@ allow $checkout 2>/dev/null
-end
-
-# The sidebar nests worktree workspaces under their repo, so the branch name
-# alone is enough. Passed explicitly rather than left to herdr's auto-label,
-# which would use the checkout's directory name and lose the "feature/" in a
-# slashed branch.
-$herdr worktree open --cwd $main_checkout --path $checkout --label $branch --focus >/dev/null
-or _herdr_worktree_fail "herdr could not open $checkout"
-
+# The workspace helper trusts direnv before opening the App terminal and keeps
+# an explicit branch label intact, including slashes.
 @workspace@ $checkout $branch

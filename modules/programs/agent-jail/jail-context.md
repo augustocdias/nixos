@@ -15,6 +15,10 @@ Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$H
 
 The host environment is inherited, including credentials, `HERDR_*`, terminfo and direnv exports, except `GPG_TTY`: the launcher removes it before starting the host-command helper and unsets it in the final sandbox arguments, after overlays. Existing sessions/helpers need restart. DISPLAY/WAYLAND_DISPLAY remain intact; absence of GPG_TTY alone does not prove GUI pinentry because gpg-agent retains terminal/display state. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when needed. `direnv allow` state persists.
 
+`hc` controls a session-owned Core inside the Linux jail, with no additional command approval. Keep `HC_SOCKET` pointed at that sandbox. Core starts on demand; its programs share the jail's mounts and network and end when the jail closes, even with `--outlive-parent`. The root harness has no Core terminal ID; Core assigns IDs to the workers it starts. In App terminals, `HERDR_ACTIVITY_SOCKET` remains a separate report-only bridge for the host sidebar.
+
+`herdr-app` talks to a session App proxy, with no additional command approval. Programs started through it run in this jail's Core and appear in the user's App as `herdr-core-view` panes; the proxy refuses commands that would reach host programs. Read the `herdr-app` skill before changing the window. Host terminals and the App itself remain outside the jail.
+
 ## Host access and approval
 
 `host_journal`, `host_mount`, `host_ssh_agent`, and `host_exec` are the sanctioned host-access tools. Every call requires user approval. Explain why access must happen outside the jail, choose the narrowest tool, and batch only related work.
@@ -26,7 +30,7 @@ Approval applies to the exact command, path/mode, or journal selection, never th
 - Use `host_ssh_agent` to expose the user's SSH agent before SSH work. See below.
 - Use `host_exec` for one host command only when narrower tools cannot do the job, such as signed commits or system-state operations.
 
-Outside the jail, `HOST_QUERY_PORT` is absent and these tools short-circuit. Use ordinary host commands there, subject to existing approvals.
+Outside the jail, `HOST_QUERY_SOCKET` is absent and these tools short-circuit. Use ordinary host commands there, subject to existing approvals.
 
 ## SSH and signing
 

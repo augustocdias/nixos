@@ -1,44 +1,24 @@
-local wincmd_to_direction = { ['j'] = 'down', ['k'] = 'up', ['h'] = 'left', ['l'] = 'right' }
-
-local function herdr_focus(direction)
-    if not vim.env.HERDR_PANE_ID or vim.env.HERDR_PANE_ID == '' then
-        return
-    end
-
-    return {
-        vim.env.HERDR_BIN_PATH ~= '' and vim.env.HERDR_BIN_PATH or 'herdr',
-        'pane',
-        'focus',
-        '--direction',
-        direction,
-        '--pane',
-        vim.env.HERDR_PANE_ID,
-    }
-end
-
--- Move between splits, and cross into the surrounding herdr pane when already
--- at an edge. Outside herdr this is a plain wincmd.
-local mux_move = function(direction)
-    local cur_winnr = vim.fn.winnr()
+-- always check :help tui-input before mapping
+local function move_window(direction)
+    local before = vim.api.nvim_get_current_win()
     vim.cmd.wincmd(direction)
-    local new_winnr = vim.fn.winnr()
-
-    if cur_winnr ~= new_winnr then
+    local terminal = vim.env.HC_TERMINAL_ID
+    if vim.api.nvim_get_current_win() ~= before or not terminal or vim.fn.executable('herdr-app') == 0 then
         return
     end
 
-    local cmd = herdr_focus(wincmd_to_direction[direction])
-    if not cmd then
-        return
-    end
-
-    vim.system(cmd, function(result)
+    local directions = { h = 'left', j = 'down', k = 'up', l = 'right' }
+    vim.system({ 'herdr-app', 'do', 'pane.navigate', '--direction', directions[direction], '--terminal', terminal }, {
+        text = true,
+    }, function(result)
         if result.code ~= 0 then
-            error(result.stderr)
+            vim.schedule(function()
+                vim.notify('Herdr navigation: ' .. vim.trim(result.stderr), vim.log.levels.WARN)
+            end)
         end
     end)
 end
--- always check :help tui-input before mapping
+
 local keymap_table = {
     {
         shortcut = 'k',
@@ -224,7 +204,7 @@ local keymap_table = {
     {
         shortcut = '<C-h>',
         cmd = function()
-            mux_move('h')
+            move_window('h')
         end,
         mode = { 'n', 'i' },
         desc = 'Focus on window to the left',
@@ -233,7 +213,7 @@ local keymap_table = {
     {
         shortcut = '<C-l>',
         cmd = function()
-            mux_move('l')
+            move_window('l')
         end,
         mode = { 'n', 'i' },
         desc = 'Focus on window to the right',
@@ -242,7 +222,7 @@ local keymap_table = {
     {
         shortcut = '<C-k>',
         cmd = function()
-            mux_move('k')
+            move_window('k')
         end,
         mode = { 'n', 'i' },
         desc = 'Focus on window up',
@@ -251,7 +231,7 @@ local keymap_table = {
     {
         shortcut = '<C-j>',
         cmd = function()
-            mux_move('j')
+            move_window('j')
         end,
         mode = { 'n', 'i' },
         desc = 'Focus on window down',

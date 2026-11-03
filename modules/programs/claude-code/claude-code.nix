@@ -9,11 +9,7 @@
   };
 
   den.aspects.claude-code = {
-    homeManager = {
-      pkgs,
-      config,
-      ...
-    }: let
+    homeManager = {pkgs, ...}: let
       shared = import ../agent-shared/_lib.nix {inherit lib;};
       skills = import ../agent-shared/_skills.nix {inherit lib pkgs;};
       prompt = kind: name: fm:
@@ -101,8 +97,6 @@
           jq -r --arg branch "$branch" -f ${./statusline.jq} <<<"$input"
         '';
       };
-
-      herdrHook = "${config.programs.claude-code.configDir}/hooks/herdr-agent-state.sh";
     in {
       home.file.".claude/keybindings.json".text = builtins.toJSON {
         "$schema" = "https://www.schemastore.org/claude-code-keybindings.json";
@@ -162,18 +156,6 @@
               ++ map (c: "mcp__claude_ai_${c}") unusedConnectors;
           };
 
-          hooks.SessionStart = [
-            {
-              matcher = "^(startup|resume|clear|compact|fork)$";
-              hooks = [
-                {
-                  type = "command";
-                  command = "bash '${herdrHook}' session";
-                  timeout = 10;
-                }
-              ];
-            }
-          ];
           # rtk rewrites Bash calls (`git status` -> `rtk git status`); the
           # `rtk <pattern>` twins in agent-shared/_bash.nix keep the rules
           # matching the rewritten command.
@@ -189,8 +171,6 @@
             }
           ];
         };
-
-        hooks."herdr-agent-state.sh" = "${pkgs.herdr.src}/src/integration/assets/claude/herdr-agent-state.sh";
 
         mcpServers = {
           context7 = {

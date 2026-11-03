@@ -45,22 +45,12 @@ export default function (pi: ExtensionAPI) {
       };
     }
 
-    // herdr's omp integration listens on this channel, so the pane shows as
-    // blocked while the dialog waits.
-    pi.events.emit("herdr:blocked", {
-      active: true,
-      label: `${event.toolName} approval`,
-    });
-    try {
-      const approved = await ctx.ui.confirm(
-        `Allow ${event.toolName}?`,
-        JSON.stringify(event.input, null, 2).slice(0, 2000),
-      );
-      if (!approved) {
-        return { block: true, reason: "Denied by the user" };
-      }
-    } finally {
-      pi.events.emit("herdr:blocked", { active: false });
+    const approved = await ctx.ui.confirm(
+      `Allow ${event.toolName}?`,
+      JSON.stringify(event.input, null, 2).slice(0, 2000),
+    );
+    if (!approved) {
+      return { block: true, reason: "Denied by the user" };
     }
   });
 }

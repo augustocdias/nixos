@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Relay only the current agent's sidebar and built-in resume reports to Herdr."""
+"""Publish only the current agent's display metadata to its Herdr Core terminal."""
 
 import argparse
+import fcntl
 import json
 import math
 import os
@@ -12,14 +13,12 @@ import stat
 import sys
 import time
 import unicodedata
+import uuid
 
 
 MAX_FRAME = 65_536
 IO_TIMEOUT = 1.0
 TOKEN_KEYS = {"agent", "title", "todo", "sub1", "sub2", "sub3", "submore"}
-STATES = {"idle", "working", "blocked", "unknown"}
-START_SOURCES = {"startup", "resume", "clear", "compact", "branch", "new", "fork", "select"}
-SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*", re.ASCII)
 
 
 class RelayError(Exception):
@@ -118,119 +117,111 @@ def text(value, maximum, field, allowed_controls=()):
         invalid("invalid " + field)
 
 
-def validate_request(request, pane_id, agent):
-    if not isinstance(request, dict):
-        invalid("request must be an object")
-    if set(request) - {"id", "method", "params"}:
-        denied("unknown request field")
-    if set(request) != {"id", "method", "params"} or not valid_id(request.get("id")):
-        invalid("request requires id, method and params")
-    method = request["method"]
-    params = request["params"]
-    if not isinstance(method, str) or not isinstance(params, dict):
-        invalid("invalid method or params")
-    required = {"pane_id", "source"}
-    optional = {"seq"}
-    if method == "pane.report_metadata":
-        required |= {"tokens"}
-        optional |= {"ttl_ms"}
-        source = "user:" + agent + "-activity"
-    elif method == "pane.report_agent" and agent == "omp":
-        required |= {"agent", "state"}
-        optional |= {"message", "agent_session_id", "agent_session_path"}
-        source = "herdr:" + agent
-    elif method == "pane.report_agent_session":
-        required |= {"agent"}
-        optional |= {"agent_session_id", "agent_session_path", "session_start_source"}
-        source = "herdr:" + agent
-    else:
-        denied("method is not allowed")
-    if set(params) - required - optional:
-        denied("report field is not allowed")
-    if not required <= set(params):
-        invalid("missing required report field")
-    if params["pane_id"] != pane_id or params["source"] != source:
-        denied("report identity does not match this relay")
-    if "agent" in required and params["agent"] != agent:
-        denied("report agent does not match this relay")
+class CoreActivity:
+    """One locked launch owns one display-only label, never Core lifecycle state."""
 
-    # Fresh dictionaries prevent unvalidated fields and optional nulls crossing the boundary.
-    clean = {key: value for key, value in params.items() if value is not None}
-    if "seq" in clean:
-        integer(clean["seq"], 0, (1 << 64) - 1, "seq")
-    if method == "pane.report_metadata":
-        tokens = params["tokens"]
-        if not isinstance(tokens, dict):
-            invalid("tokens must be an object")
-        if set(tokens) - TOKEN_KEYS:
-            denied("metadata token is not allowed")
+    def __init__(self, args):
+        self.upstream = args.upstream
+        self.terminal = args.terminal
+        self.agent = args.agent
+        self.parent = os.getppid()
+        self.lock = open(args.lock_file, "a", encoding="utf-8")
+        fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.owner = uuid.uuid4().hex
+        self.epoch = self.seq = -1
+        self.session = None
+        self.snapshot = None
+        self.updated = self.renewed = 0
+        record = self.rpc("terminal.get")
+        if record.get("state") != "live" or type(record.get("created_ms")) is not int:
+            raise RelayError("invalid_terminal", "Core terminal is not live")
+        self.created = record["created_ms"]
+        self.pid = record.get("pid")
+        self.publish(None, 0)
+
+    def rpc(self, method, **params):
+        request = {"jsonrpc": "2.0", "id": self.owner, "method": method,
+                   "params": {"terminal": self.terminal, **params}}
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.settimeout(IO_TIMEOUT)
+                connection.connect(self.upstream)
+                connection.sendall(encode(request))
+                reply = decode(receive_line(connection))
+            if (not isinstance(reply, dict) or reply.get("jsonrpc") != "2.0"
+                    or reply.get("id") != self.owner or "error" in reply
+                    or not isinstance(reply.get("result"), dict)):
+                raise ValueError("invalid Core reply")
+            return reply["result"]
+        except (OSError, ValueError, RelayError):
+            raise RelayError("upstream_unavailable", "Core reporting failed") from None
+
+    def report(self, request):
+        if not isinstance(request, dict) or set(request) != {"id", "method", "params"}:
+            denied("unknown request field")
+        if not valid_id(request["id"]) or request["method"] != "activity.report":
+            denied("only activity.report is allowed")
+        p = request["params"]
+        if not isinstance(p, dict) or set(p) != {"seq", "epoch", "session", "tokens"}:
+            denied("unknown metadata field")
+        for field in ("seq", "epoch"):
+            integer(p[field], 0, (1 << 64) - 1, field)
+        text(p["session"], 512, "session")
+        if not p["session"]:
+            invalid("empty session")
+        if (p["epoch"] < self.epoch or
+                (p["epoch"] == self.epoch and (p["session"] != self.session or p["seq"] <= self.seq))):
+            denied("stale session or sequence")
+        tokens = p["tokens"]
+        if not isinstance(tokens, dict) or set(tokens) != TOKEN_KEYS:
+            denied("metadata requires the complete token set")
         for value in tokens.values():
-            if value is not None and (not isinstance(value, str) or len(value) > 80):
-                invalid("invalid metadata token")
-        clean["tokens"] = dict(tokens)
-        if "ttl_ms" in clean:
-            integer(clean["ttl_ms"], 1, 86_400_000, "ttl_ms")
-    else:
-        if "state" in required:
-            if not isinstance(params["state"], str) or params["state"] not in STATES:
-                invalid("invalid state")
-        if "message" in clean:
-            text(clean["message"], 4096, "message", ("\t", "\n"))
-        if "session_start_source" in clean:
-            start = clean["session_start_source"]
-            if not isinstance(start, str) or start not in START_SOURCES:
-                invalid("invalid session_start_source")
-        if "agent_session_id" in clean:
-            session_id = clean["agent_session_id"]
-            if not isinstance(session_id, str) or len(session_id) > 512 or SESSION_ID.fullmatch(session_id) is None:
-                invalid("invalid agent_session_id")
-        if "agent_session_path" in clean:
-            path = clean["agent_session_path"]
-            text(path, 4096, "agent_session_path")
-            if not os.path.isabs(path):
-                invalid("agent_session_path must be absolute")
-            if agent == "claude":
-                del clean["agent_session_path"]
-        if method == "pane.report_agent_session":
-            if "agent_session_id" not in clean and not (agent == "omp" and "agent_session_path" in clean):
-                invalid("report requires a usable session reference")
-    return {"id": request["id"], "method": method, "params": clean}
+            text(value, 320, "token")
+            if len(value) > 80:
+                invalid("token exceeds 80 characters")
+        snapshot = {"version": 1, "owner": self.owner, "agent": self.agent,
+                    "session": p["session"], "tokens": tokens}
+        now = int(time.time() * 1000)
+        self.publish(snapshot if any(tokens.values()) else None, now)
+        self.snapshot = snapshot if any(tokens.values()) else None
+        self.updated = now
+        self.epoch, self.seq, self.session = p["epoch"], p["seq"], p["session"]
+        return {"id": request["id"], "result": {"accepted": True}}
+
+    def publish(self, snapshot, updated):
+        record = self.rpc("terminal.get")
+        if (record.get("state") != "live" or record.get("created_ms") != self.created
+                or record.get("pid") != self.pid):
+            raise RelayError("terminal_replaced", "Core terminal incarnation changed")
+        now = int(time.time() * 1000)
+        value = json.dumps({**snapshot, "updated": updated, "expires": min(now + 60_000, updated + 43_200_000)},
+                           ensure_ascii=False) if snapshot else ""
+        self.rpc("terminal.label", labels={"nix.activity": value})
+        self.renewed = time.monotonic()
+
+    def tick(self):
+        if os.getppid() != self.parent:
+            raise SystemExit(0)
+        if self.snapshot is not None and time.monotonic() - self.renewed >= 20:
+            self.publish(self.snapshot, self.updated)
+
+    def close(self):
+        try:
+            if self.snapshot is not None:
+                self.publish(None, 0)
+        except RelayError:
+            pass
+        finally:
+            self.lock.close()
 
 
-def forward(request, upstream):
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-            connection.settimeout(IO_TIMEOUT)
-            connection.connect(upstream)
-            connection.settimeout(IO_TIMEOUT)
-            connection.sendall(encode(request))
-            response = decode(receive_line(connection))
-        if not isinstance(response, dict) or response.get("id") != request["id"]:
-            raise ValueError("invalid response identity")
-        if set(response) == {"id", "result"}:
-            if not isinstance(response["result"], dict):
-                raise ValueError("invalid result")
-        elif set(response) == {"id", "error"}:
-            error = response["error"]
-            if not isinstance(error, dict) or not isinstance(error.get("code"), str) or not isinstance(error.get("message"), str):
-                raise ValueError("invalid error")
-        else:
-            raise ValueError("invalid response fields")
-        if len(encode(response)) > MAX_FRAME:
-            raise ValueError("response exceeds frame limit")
-        return response
-    except (OSError, RelayError, ValueError, RecursionError, OverflowError):
-        raise RelayError("upstream_unavailable", "upstream transport or response failed") from None
-
-
-def handle(connection, upstream, pane_id, agent):
+def handle(connection, core):
     request_id = None
     try:
         request = decode(receive_line(connection))
         if isinstance(request, dict) and valid_id(request.get("id")):
             request_id = request["id"]
-        request = validate_request(request, pane_id, agent)
-        response = forward(request, upstream)
+        response = core.report(request)
     except RelayError as error:
         response = {"id": request_id, "error": {"code": error.code, "message": str(error)}}
     except OSError:
@@ -246,7 +237,7 @@ def stop(signum, frame):
     raise SystemExit(0)
 
 
-def serve(listen, upstream, pane_id, agent):
+def serve(listen, core):
     owned = None
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
@@ -256,10 +247,18 @@ def serve(listen, upstream, pane_id, agent):
             owned = (created.st_dev, created.st_ino)
             os.chmod(listen, 0o600)
             listener.listen(16)
+            listener.settimeout(1)
             while True:
-                connection, _ = listener.accept()
+                try:
+                    core.tick()
+                except RelayError:
+                    pass
+                try:
+                    connection, _ = listener.accept()
+                except TimeoutError:
+                    continue
                 with connection:
-                    handle(connection, upstream, pane_id, agent)
+                    handle(connection, core)
     finally:
         if owned is not None:
             try:
@@ -274,21 +273,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--listen", required=True)
     parser.add_argument("--upstream", required=True)
-    parser.add_argument("--pane-id", required=True)
+    parser.add_argument("--terminal", required=True)
     parser.add_argument("--agent", choices=("omp", "claude"), required=True)
+    parser.add_argument("--lock-file", required=True)
     args = parser.parse_args()
     if not os.path.isabs(args.listen) or not os.path.isabs(args.upstream):
         parser.error("listen and upstream socket paths must be absolute")
-    if not args.pane_id:
-        parser.error("pane ID must not be empty")
+    if not os.path.isabs(args.lock_file) or not re.fullmatch(r"t[0-9a-z]+", args.terminal):
+        parser.error("Core requires an absolute lock file and local terminal ID")
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     os.umask(0o077)
+    core = None
     try:
-        serve(args.listen, args.upstream, args.pane_id, args.agent)
-    except OSError:
+        core = CoreActivity(args)
+        serve(args.listen, core)
+    except (OSError, RelayError):
         print("herdr relay: listener failed", file=sys.stderr)
         return 1
+    finally:
+        if core is not None:
+            core.close()
     return 0
 
 

@@ -34,12 +34,12 @@ Each tool needs its binary in `extraPackages` in `neovim.nix` and its setup in L
 - Leader is Space; local leader is `\`.
 - Mappings live in `configs/lua/utils/keymaps.lua` and group by mnemonic prefix (for example `<leader>l` LSP, `<leader>g` Git, `<leader>a` AI). Follow an existing group when adding a mapping.
 - Directional mappings use hjkl.
-- `<C-h/j/k/l>` in normal and insert mode runs `mux_move`: it moves between splits and, at an edge, runs `herdr pane focus --direction <dir> --pane $HERDR_PANE_ID`. Outside herdr it is a plain `wincmd`.
+- `<C-h/j/k/l>` in normal and insert mode moves between Neovim windows. At an edge, a Core-launched Neovim calls Herdr App's `pane.navigate` with its terminal ID. The App verifies focus before moving to a neighboring pane. Outside Core, movement remains within Neovim. Failed App requests produce a warning.
 - The system clipboard is not synced (`clipboard = ''`). Visual-mode `<leader>c` copies to it explicitly.
 
 ### Agents and the editor
 
-The agent harness runs in its own herdr pane beside Neovim. Neovim listens on `~/.cache/nvim/server-<HERDR_WORKSPACE_ID>.pipe`, but the agent jail does not bind that socket, so agents cannot drive the editor.
+`configs/init.lua` gives each Neovim process a PID-named server socket; Godot projects retain their fixed socket name. The agent jail does not bind these sockets, so agents cannot drive the editor.
 
 ### Custom features
 

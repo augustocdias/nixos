@@ -26,10 +26,18 @@
   inherit (config.home) username;
 
   git = lib.getExe pkgs.git;
-  curl = lib.getExe pkgs.curl;
 
   hostQuery = pkgs.callPackage ./_host-query {};
   herdrRelay = pkgs.callPackage ./_herdr-relay {};
+  herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
+  coreClient = pkgs.writeShellScriptBin "hc" ''
+    # A worker must not inherit its launcher's host-sidebar identity.
+    unset HERDR_ACTIVITY_SOCKET
+    export XDG_RUNTIME_DIR=/tmp/agent-core/runtime
+    export XDG_STATE_HOME=/tmp/agent-core/state
+    export XDG_CONFIG_HOME=/tmp/agent-core/config
+    exec ${lib.getExe herdrCore} "$@"
+  '';
 
   rmSafe = pkgs.symlinkJoin {
     name = "agent-jail-rm-safe";
@@ -98,28 +106,28 @@ in
             rmdir "$stale" 2>/dev/null || true
           done
 
-          host_query_port=19600
-          while [ "$host_query_port" -lt 19800 ]; do
-            (exec 3<>/dev/tcp/127.0.0.1/"$host_query_port") 2>/dev/null || break
-            host_query_port=$((host_query_port + 1))
-          done
+          # Bound only into this jail.
+          host_query_dir=$(mktemp -d /tmp/agent-host-query.XXXXXXXX)
+          host_query_sock="$host_query_dir/host-query.sock"
 
           # Not bound into the jail: host_ssh_agent relays it on approval.
           HOST_SSH_AUTH_SOCK="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/gnupg/S.gpg-agent.ssh" \
-            ${lib.getExe hostQuery} "$host_query_port" "$grant_root" \
+            ${lib.getExe hostQuery} "$host_query_sock" "$grant_root" \
             > "$jail_state/log/host-query.log" 2>&1 &
           HOST_QUERY_PID=$!
 
           host_query_up=
           for _ in $(seq 1 20); do
-            if ${curl} -sf "http://127.0.0.1:$host_query_port/health" >/dev/null 2>&1; then
+            if [ -S "$host_query_sock" ]; then
               host_query_up=1
               break
             fi
             sleep 0.25
           done
-          if [ -z "$host_query_up" ]; then
-            echo "${name}-jail: warning: host-query did not start on port $host_query_port" >&2
+          if [ -n "$host_query_up" ]; then
+            RUNTIME_ARGS+=(--bind "$host_query_sock" /tmp/host-query.sock)
+          else
+            echo "${name}-jail: warning: host-query did not start on $host_query_sock" >&2
             echo "  host_exec / host_mount / host_journal / host_ssh_agent will be unavailable;" >&2
             echo "  see $jail_state/log/host-query.log" >&2
           fi
@@ -129,13 +137,17 @@ in
             # Read-only: the log is the first thing to check when a host_*
             # tool misbehaves, and it is unreachable if only grants/ is bound.
             --ro-bind "$jail_state/log" "$jail_state/log"
-            --setenv HOST_QUERY_PORT "$host_query_port"
+            --setenv HOST_QUERY_SOCKET /tmp/host-query.sock
             # The inherited host value points at a socket the jail cannot see.
             --unsetenv SSH_AUTH_SOCK
           )
         '')
         (add-cleanup ''
           kill "''${HOST_QUERY_PID:-}" 2>/dev/null || true
+          if [ -n "''${host_query_dir:-}" ]; then
+            ${lib.getExe' pkgs.coreutils "rm"} -f "$host_query_dir/host-query.sock"
+            ${lib.getExe' pkgs.coreutils "rmdir"} "$host_query_dir" 2>/dev/null || true
+          fi
           if [ -n "''${grant_root:-}" ]; then
             rm -f "$grant_root/ssh-agent.sock"
             for mnt in "$grant_root"/*; do
@@ -152,7 +164,7 @@ in
 
         (try-ro-bind (noescape "\"$HOME/.ssh/known_hosts\"") (noescape "~/.ssh/known_hosts"))
 
-        (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:$PATH\"")))
+        (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:${coreClient}/bin:$PATH\"")))
 
         (try-readonly (noescape "\"$HOME/.config/direnv\""))
 
@@ -167,65 +179,117 @@ in
       ++ extra jail.combinators
       ++ [
         (add-cleanup ''
-          if [ -n "''${HERDR_RELAY_PID:-}" ]; then
-            kill "$HERDR_RELAY_PID" 2>/dev/null || true
-            wait "$HERDR_RELAY_PID" 2>/dev/null || true
+          if [ -n "''${APP_PROXY_PID:-}" ]; then
+            kill "$APP_PROXY_PID" 2>/dev/null || true
+            wait "$APP_PROXY_PID" 2>/dev/null || true
           fi
-          if [ -n "''${herdr_relay_dir:-}" ]; then
-            ${lib.getExe' pkgs.coreutils "rm"} -f "$herdr_relay_dir/relay.sock"
-            ${lib.getExe' pkgs.coreutils "rmdir"} "$herdr_relay_dir" 2>/dev/null || true
+          if [ -n "''${app_proxy_dir:-}" ]; then
+            ${lib.getExe' pkgs.coreutils "rm"} -f "$app_proxy_dir/app.sock"
+            ${lib.getExe' pkgs.coreutils "rmdir"} "$app_proxy_dir" 2>/dev/null || true
+          fi
+          if [ -n "''${core_runtime_dir:-}" ]; then
+            ${lib.getExe' pkgs.coreutils "rm"} -rf -- "$core_runtime_dir"
+          fi
+          if [ -n "''${CORE_ACTIVITY_PID:-}" ]; then
+            kill "$CORE_ACTIVITY_PID" 2>/dev/null || true
+            wait "$CORE_ACTIVITY_PID" 2>/dev/null || true
+          fi
+          if [ -n "''${core_activity_dir:-}" ]; then
+            ${lib.getExe' pkgs.coreutils "rm"} -f "$core_activity_dir/report.sock"
+            ${lib.getExe' pkgs.coreutils "rmdir"} "$core_activity_dir" 2>/dev/null || true
           fi
         '')
         (add-runtime ''
-          RUNTIME_ARGS+=(--unsetenv GPG_TTY)
-          if [ "''${HERDR_ENV:-}" = 1 ]; then
-            if [ -z "''${HERDR_PANE_ID:-}" ] \
-              || [[ "''${HERDR_SOCKET_PATH:-}" != /* ]] \
-              || [ ! -S "$HERDR_SOCKET_PATH" ]; then
-              echo "herdr relay: missing pane ID or absolute live socket path" >&2
+          RUNTIME_ARGS+=(--unsetenv GPG_TTY --unsetenv HERDR_ENV --unsetenv HERDR_PANE_ID --unsetenv HERDR_SOCKET_PATH)
+          if [ -n "''${HC_TERMINAL_ID:-}" ]; then
+            if [[ "''${HC_TERMINAL_SOCKET:-}" != /* ]] || [ ! -S "$HC_TERMINAL_SOCKET" ]; then
+              echo "Core activity: missing absolute live terminal socket" >&2
               exit 1
             fi
-            herdr_upstream=$(realpath "$HERDR_SOCKET_PATH")
-            herdr_socket_parent=$(dirname "$herdr_upstream")
-            herdr_cwd=$(realpath "$PWD")
-            for mounted in "$herdr_cwd" "''${git_common:-}"; do
+            core_upstream=$(realpath "$HC_TERMINAL_SOCKET")
+            core_socket_parent=$(dirname "$core_upstream")
+            for mounted in "$PWD" "''${git_common:-}"; do
               [ -n "$mounted" ] || continue
               mounted=$(realpath "$mounted")
-              if [ "$mounted" = / ] || [ "$herdr_socket_parent" = "$mounted" ] \
-                || [[ "$herdr_socket_parent" == "$mounted/"* ]]; then
-                echo "herdr relay: refusing a working tree containing the Herdr socket directory" >&2
+              if [ "$mounted" = / ] || [ "$core_socket_parent" = "$mounted" ] \
+                || [[ "$core_socket_parent" == "$mounted/"* ]]; then
+                echo "Core activity: refusing a working tree containing the Core socket directory" >&2
                 exit 1
               fi
             done
-
-            herdr_relay_dir=$(mktemp -d /tmp/agent-herdr-relay.XXXXXXXX)
+            core_activity_dir=$(mktemp -d /tmp/agent-core-activity.XXXXXXXX)
+            core_lock_dir="''${XDG_RUNTIME_DIR:-/tmp}/agent-core-activity-$(id -u)"
+            (umask 077; mkdir -p "$core_lock_dir")
+            core_lock=$(printf '%s\n%s' "$core_upstream" "$HC_TERMINAL_ID" | ${lib.getExe' pkgs.coreutils "sha256sum"})
+            core_lock="''${core_lock%% *}"
             ${lib.getExe herdrRelay} \
-              --listen "$herdr_relay_dir/relay.sock" \
-              --upstream "$herdr_upstream" \
-              --pane-id "$HERDR_PANE_ID" --agent ${lib.escapeShellArg name} \
-              > "$jail_state/log/herdr-relay-$$.log" 2>&1 &
-            HERDR_RELAY_PID=$!
-            herdr_relay_up=
+              --listen "$core_activity_dir/report.sock" --upstream "$core_upstream" \
+              --terminal "$HC_TERMINAL_ID" --agent ${lib.escapeShellArg name} \
+              --lock-file "$core_lock_dir/$core_lock.lock" \
+              > "$jail_state/log/core-activity-$$.log" 2>&1 &
+            CORE_ACTIVITY_PID=$!
             for _ in $(seq 1 100); do
-              kill -0 "$HERDR_RELAY_PID" 2>/dev/null || break
-              if [ -S "$herdr_relay_dir/relay.sock" ]; then
-                herdr_relay_up=1
-                break
-              fi
+              kill -0 "$CORE_ACTIVITY_PID" 2>/dev/null || break
+              [ -S "$core_activity_dir/report.sock" ] && break
               sleep 0.05
             done
-            if [ -z "$herdr_relay_up" ]; then
-              echo "herdr relay: failed to start; see $jail_state/log/herdr-relay-$$.log" >&2
+            if [ ! -S "$core_activity_dir/report.sock" ]; then
+              echo "Core activity: failed to start; see $jail_state/log/core-activity-$$.log" >&2
               exit 1
             fi
-
-            # Mount last so a caller's state/config overlay cannot expose the real socket.
-            RUNTIME_ARGS+=(--bind "$herdr_relay_dir/relay.sock" "$HERDR_SOCKET_PATH")
-            if [ "$herdr_upstream" != "$HERDR_SOCKET_PATH" ]; then
-              RUNTIME_ARGS+=(--bind "$herdr_relay_dir/relay.sock" "$herdr_upstream")
-            fi
+            # A read-only socket bind would still grant control; replace every inherited route.
+            RUNTIME_ARGS+=(
+              --ro-bind "$core_activity_dir/report.sock" /tmp/herdr-activity.sock
+              --ro-bind "$core_activity_dir/report.sock" "$HC_TERMINAL_SOCKET"
+              --ro-bind "$core_activity_dir/report.sock" "$core_upstream"
+              --setenv HERDR_ACTIVITY_SOCKET /tmp/herdr-activity.sock
+            )
           else
-            RUNTIME_ARGS+=(--unsetenv HERDR_SOCKET_PATH)
+            RUNTIME_ARGS+=(--unsetenv HERDR_ACTIVITY_SOCKET)
+          fi
+
+          core_runtime_dir=$(mktemp -d /tmp/agent-core.XXXXXXXX)
+          app_home="''${HERDR_APP_HOME:-''${XDG_CONFIG_HOME:-$HOME/.config}/herdr-app}"
+          app_home=$(realpath -m "$app_home")
+          for mounted in "$PWD" "''${git_common:-}"; do
+            [ -n "$mounted" ] || continue
+            mounted=$(realpath "$mounted")
+            for protected in "$app_home" "/run/user/$(id -u)" "$core_runtime_dir"; do
+              protected=$(realpath -m "$protected")
+              if [ "$mounted" = / ] || [ "$protected" = "$mounted" ] \
+                || [[ "$protected" == "$mounted/"* ]] || [[ "$mounted" == "$protected/"* ]]; then
+                echo "${name}-jail: refusing a working tree overlapping host App or runtime state" >&2
+                exit 1
+              fi
+            done
+          done
+          # Core autostarts inside this PID namespace, never through the host user manager.
+          RUNTIME_ARGS+=(
+            --bind "$core_runtime_dir" /tmp/agent-core
+            --tmpfs "$app_home"
+            --setenv HC_SOCKET /tmp/agent-core/runtime/herdr-core/agent.sock
+            --setenv HC_SESSION agent
+            --unsetenv HC_TERMINAL_ID --unsetenv HC_TERMINAL_SOCKET
+            --setenv HERDR_SANDBOX_SOCKET "$core_runtime_dir/runtime/herdr-core/agent.sock"
+          )
+
+          # The App socket would run any program on the host; the jail gets a proxy
+          # that starts programs in its own Core and shows them through herdr-core-view.
+          app_proxy_dir=$(mktemp -d /tmp/agent-app-proxy.XXXXXXXX)
+          ${lib.getExe' herdrRelay "agent-herdr-app-proxy"} \
+            --listen "$app_proxy_dir/app.sock" --upstream "$app_home/herdr-app.sock" \
+            --core "$core_runtime_dir/runtime/herdr-core/agent.sock" --workspace "$(realpath "$PWD")" \
+            > "$jail_state/log/app-proxy-$$.log" 2>&1 &
+          APP_PROXY_PID=$!
+          for _ in $(seq 1 100); do
+            kill -0 "$APP_PROXY_PID" 2>/dev/null || break
+            [ -S "$app_proxy_dir/app.sock" ] && break
+            sleep 0.05
+          done
+          if [ -S "$app_proxy_dir/app.sock" ]; then
+            RUNTIME_ARGS+=(--bind "$app_proxy_dir/app.sock" "$app_home/herdr-app.sock")
+          else
+            echo "${name}-jail: warning: App proxy did not start; see $jail_state/log/app-proxy-$$.log" >&2
           fi
         '')
       ]

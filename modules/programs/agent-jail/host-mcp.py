@@ -1,9 +1,9 @@
 """host_* tools as a stdio MCP server for the jailed harnesses.
 
-Exposes the four tools over JSON-RPC and forwards each call to host-query on
-HOST_QUERY_PORT. Approval is the harness's job: Claude Code lists these tools
-under permissions.ask, which prompts on every call even when an allow rule
-also matches.
+Exposes the four tools over JSON-RPC and forwards each call to host-query as
+one JSON line on the HOST_QUERY_SOCKET Unix socket. Approval is the harness's
+job: Claude Code lists these tools under permissions.ask, which prompts on
+every call even when an allow rule also matches.
 
 No dependencies on purpose: the protocol subset needed here is
 initialize / tools/list / tools/call over newline-delimited JSON.
@@ -11,11 +11,10 @@ initialize / tools/list / tools/call over newline-delimited JSON.
 
 import json
 import os
+import socket
 import sys
-import urllib.error
-import urllib.request
 
-PORT = os.environ.get("HOST_QUERY_PORT")
+SOCKET = os.environ.get("HOST_QUERY_SOCKET")
 
 TOOLS = [
     {
@@ -89,33 +88,32 @@ TOOLS = [
     },
 ]
 
-ROUTES = {
-    "host_exec": "/exec",
-    "host_mount": "/mount",
-    "host_journal": "/journal",
-    "host_ssh_agent": "/ssh-agent",
+OPS = {
+    "host_exec": "exec",
+    "host_mount": "mount",
+    "host_journal": "journal",
+    "host_ssh_agent": "ssh-agent",
 }
 
 
 def call_host(name, args):
-    if not PORT:
+    if not SOCKET:
         raise RuntimeError(
-            "HOST_QUERY_PORT is unset: this session is not inside the agent jail. "
+            "HOST_QUERY_SOCKET is unset: this session is not inside the agent jail. "
             "Run the command directly."
         )
-    req = urllib.request.Request(
-        f"http://127.0.0.1:{PORT}{ROUTES[name]}",
-        data=json.dumps(args).encode(),
-        headers={"Content-Type": "application/json"},
-    )
     try:
-        with urllib.request.urlopen(req, timeout=35) as r:
-            data = json.load(r)
-    except urllib.error.HTTPError as e:
-        data = json.load(e)
-        raise RuntimeError(f"host-query error: {data.get('error', e.reason)}")
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"host-query unreachable: {e.reason}")
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(35)
+            s.connect(SOCKET)
+            s.sendall((json.dumps({"op": OPS[name], "args": args}) + "\n").encode())
+            data = json.loads(s.makefile("rb").readline())
+    except OSError as e:
+        raise RuntimeError(f"host-query unreachable: {e}")
+    except ValueError:
+        raise RuntimeError("host-query sent no valid reply")
+    if "error" in data:
+        raise RuntimeError(f"host-query error: {data['error']}")
 
     if name == "host_ssh_agent":
         path = os.path.expanduser(data.get("jail_path", ""))
@@ -144,7 +142,7 @@ def handle(msg):
         return {"tools": TOOLS}
     if method == "tools/call":
         name = params.get("name")
-        if name not in ROUTES:
+        if name not in OPS:
             raise LookupError(f"unknown tool {name!r}")
         try:
             text, err = call_host(name, params.get("arguments") or {}), False

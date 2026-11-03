@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Feed herdr's Agents sidebar with what Claude Code is doing.
+"""Feed Herdr App's Agents sidebar with what Claude Code is doing.
 
 Managed by nix (modules/programs/herdr/claude-activity.py). Claude Code port of
-omp-activity.ts: one hook script for every event, display-only metadata through
-`pane.report_metadata`, never touching the session identity herdr's own hook owns.
+omp-activity.ts: one hook script for every event, using the launcher's
+display-only Core bridge.
 
-Tokens: $agent $title $todo $sub1..$sub3 $submore. No hook carries the session
+Metadata: agent, title, todo, sub1..sub3, submore. No hook carries the session
 title or, on resume, the task list, so both are read from the transcript.
 """
 
@@ -20,7 +20,6 @@ import time
 SOURCE = "user:claude-activity"
 SUB_SLOTS = 3
 MAX_VALUE = 72
-TTL_MS = 12 * 60 * 60 * 1000
 TOKENS = ("agent", "title", "todo", "sub1", "sub2", "sub3", "submore")
 SUBAGENT_EVENTS = {"SubagentStart", "SubagentStop"}
 # apply() result: state changed but no token did.
@@ -59,7 +58,7 @@ def todo_summary(tasks):
 def tokens(state):
     running = list(state["subagents"].values())
     result = {
-        "agent": clean(state["model"]) if state["active"] else "",
+        "agent": clean(state["model"]),
         "title": clean(state["title"]),
         "todo": todo_summary(state["tasks"]),
         "submore": clean(", ".join(entry["type"] for entry in running[SUB_SLOTS:])),
@@ -237,16 +236,13 @@ def apply(state, event):
     return True
 
 
-def publish(state, pane_id, socket_path):
+def publish(state, socket_path, session_id):
     request = {
         "id": f"{SOURCE}:{int(time.time() * 1000)}:{os.getpid()}",
-        "method": "pane.report_metadata",
+        "method": "activity.report",
         "params": {
-            "pane_id": pane_id,
-            "source": SOURCE,
-            "seq": time.time_ns(),
-            "tokens": tokens(state),
-            "ttl_ms": TTL_MS,
+            "seq": time.time_ns(), "epoch": state["epoch"],
+            "session": session_id, "tokens": tokens(state),
         },
     }
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
@@ -260,9 +256,8 @@ def publish(state, pane_id, socket_path):
 
 
 def main():
-    pane_id = os.environ.get("HERDR_PANE_ID")
-    socket_path = os.environ.get("HERDR_SOCKET_PATH")
-    if os.environ.get("HERDR_ENV") != "1" or not pane_id or not socket_path:
+    socket_path = os.environ.get("HERDR_ACTIVITY_SOCKET")
+    if not socket_path:
         return
     event = json.load(sys.stdin)
     if not isinstance(event, dict):
@@ -287,22 +282,28 @@ def main():
             state = {**fresh(), **json.loads(handle.read())}
         except ValueError:
             state = fresh()
+        if event.get("hook_event_name") != "SessionStart" and (state.get("ended") or "epoch" not in state):
+            return
+        epoch = state.get("epoch", time.time_ns())
+        if event.get("hook_event_name") == "SessionStart" and event.get("source") != "compact":
+            epoch = time.time_ns()
         outcome = apply(state, event)
+        state["epoch"] = epoch
         if outcome is True and event.get("hook_event_name") not in {"SessionStart", "SessionEnd"}:
             title = latest_title(event.get("transcript_path"))
             if title is not None:
                 state["title"] = title
         if not outcome:
             return
+        # Retain a tombstone so delayed hooks cannot reclaim the terminal after SessionEnd.
         if event.get("hook_event_name") == "SessionEnd":
-            os.unlink(path)
-        else:
-            handle.seek(0)
-            handle.truncate()
-            json.dump(state, handle)
-            handle.flush()
+            state["ended"] = True
+        handle.seek(0)
+        handle.truncate()
+        json.dump(state, handle)
+        handle.flush()
         if outcome is not SAVE:
-            publish(state, pane_id, socket_path)
+            publish(state, socket_path, session_id)
 
 
 if __name__ == "__main__":

@@ -34,8 +34,6 @@
       "update-nvim*" = "deny";
       "*nixos-rebuild*" = "deny";
       "*darwin-rebuild*" = "deny";
-      "herdr*" = "ask";
-      "*/herdr*" = "ask";
     }
     else {
       "*" = "ask";

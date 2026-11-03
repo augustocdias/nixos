@@ -1,12 +1,10 @@
-// Feeds herdr's Agents sidebar with what omp is actually doing. $agent is the
-// active model: omp has no named primary agents.
+// Feeds Herdr App's Agents sidebar. OMP has no named primary agents, so the
+// agent field contains its selected model.
 //
-// Managed by nix (modules/programs/herdr/omp-activity.ts). It publishes
-// display-only pane metadata through `pane.report_metadata` and never calls
-// `pane.report_agent`, so it cannot disturb the lifecycle state or the session
-// identity owned by herdr's own integration next to it.
+// Managed by nix (modules/programs/herdr/omp-activity.ts). Reports use the
+// launcher's display-only Core bridge, separate from native lifecycle status.
 //
-// Tokens: $agent $title $todo $sub1..$sub3 $submore
+// Metadata: agent, title, todo, sub1..sub3, submore.
 
 import net from "node:net";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
@@ -14,23 +12,19 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 const SOURCE = "user:omp-activity";
 const SUB_SLOTS = 3;
 const MAX_VALUE = 72;
-const TTL_MS = 12 * 60 * 60 * 1000;
 
-const paneId = process.env.HERDR_PANE_ID;
-const socketPath = process.env.HERDR_SOCKET_PATH;
+const socketPath = process.env.HERDR_ACTIVITY_SOCKET;
 // omp sets OMPCODE=1 in every shell it spawns, so an omp started from a
 // session's shell is nested and must not overwrite the pane's tokens.
-const enabled =
-  process.env.HERDR_ENV === "1" &&
-  !!paneId &&
-  !!socketPath &&
-  process.env.OMPCODE !== "1";
+const enabled = !!socketPath && process.env.OMPCODE !== "1";
 
 let reportSeq = Date.now() * 1000;
 let requestChain: Promise<void> = Promise.resolve();
+let epoch = 0;
+let session = "";
+let rootActive = false;
 
 const state = { agent: "", title: "", todo: "" };
-let agentActive = false;
 // Keyed by subagent id. Workers are tracked by their own lifecycle, not by the
 // `task` call: a background spawn returns at once while its workers run on.
 const subagents = new Map<string, { type: string; description: string }>();
@@ -44,16 +38,13 @@ function clean(value: unknown): string {
 }
 
 function requestOnce(
-  method: string,
   params: Record<string, unknown>,
 ): Promise<void> {
   reportSeq = Math.max(reportSeq + 1, Date.now() * 1000);
   const request = {
-    id: `${SOURCE}:${Date.now()}:${Math.floor(Math.random() * 1_000_000)
-      .toString()
-      .padStart(6, "0")}`,
-    method,
-    params: { pane_id: paneId, source: SOURCE, seq: reportSeq, ...params },
+    id: `${SOURCE}:${reportSeq}`,
+    method: "activity.report",
+    params: { seq: reportSeq, ...params },
   };
 
   return new Promise((resolve) => {
@@ -74,7 +65,7 @@ function requestOnce(
 
 function publish(): Promise<void> {
   const tokens: Record<string, string> = {
-    agent: agentActive ? state.agent : "",
+    agent: state.agent,
     title: state.title,
     todo: state.todo,
   };
@@ -98,7 +89,7 @@ function publish(): Promise<void> {
   );
 
   const pending = requestChain.then(() =>
-    requestOnce("pane.report_metadata", { tokens, ttl_ms: TTL_MS }),
+    requestOnce({ tokens, epoch, session }),
   );
   requestChain = pending.catch(() => {});
   return pending;
@@ -153,16 +144,25 @@ export default function (pi: ExtensionAPI) {
   }
 
   // Subagent sessions rebind every extension, and their events must not
-  // reach the pane's tokens. Same test as herdr's own omp integration.
+  // reach the root terminal's tokens.
   const isRoot = (ctx: any) =>
     ctx?.hasUI === true && ctx?.agent?.kind !== "sub";
 
   let unsubscribeTitle: (() => void) | undefined;
+  let heartbeat: NodeJS.Timeout | undefined;
 
   // A new, resumed or re-branched session must not inherit the previous
   // one's tokens, and a fresh process has seen none of its todo results.
   const reseed = async (ctx: any) => {
     unsubscribeTitle?.();
+    rootActive = true;
+    epoch = Math.max(epoch + 1, Date.now() * 1000);
+    session = ctx.sessionManager.getSessionId();
+    state.agent = clean(ctx.model?.id ?? "");
+    if (!heartbeat) {
+      heartbeat = setInterval(() => { void publish(); }, 30_000);
+      heartbeat.unref();
+    }
     // Automatic titles and /rename can finish between agent lifecycle events.
     unsubscribeTitle = ctx.sessionManager.onSessionNameChanged(() => {
       state.title = clean(pi.getSessionName() ?? "");
@@ -171,7 +171,6 @@ export default function (pi: ExtensionAPI) {
     state.title = clean(pi.getSessionName() ?? "");
     state.todo = todoFromBranch(ctx);
     subagents.clear();
-    agentActive = ctx?.isIdle?.() === false;
     await publish();
   };
 
@@ -186,17 +185,18 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  // herdr keys metadata by pane and source, not by process: without an explicit
-  // clear the last tokens outlive omp until their TTL, under whatever runs next.
+  // Clear display metadata before another program takes over the terminal.
   pi.on("session_shutdown", async (_event, ctx) => {
     if (!isRoot(ctx)) return;
+    rootActive = false;
+    clearInterval(heartbeat);
+    heartbeat = undefined;
     unsubscribeTitle?.();
     unsubscribeTitle = undefined;
     state.agent = "";
     state.title = "";
     state.todo = "";
     subagents.clear();
-    agentActive = false;
     await publish();
   });
 
@@ -204,13 +204,11 @@ export default function (pi: ExtensionAPI) {
     if (!isRoot(ctx)) return;
     state.agent = clean(ctx.model?.id ?? "");
     state.title = clean(pi.getSessionName() ?? "");
-    agentActive = true;
     await publish();
   });
 
   pi.on("agent_end", async (event: any, ctx) => {
     if (!isRoot(ctx) || event?.willContinue === true) return;
-    agentActive = false;
     state.title = clean(pi.getSessionName() ?? "");
     await publish();
   });
@@ -229,6 +227,7 @@ export default function (pi: ExtensionAPI) {
 
   // Emitted on the session's own bus, so only this session's workers arrive.
   pi.events.on("task:subagent:lifecycle", (data: any) => {
+    if (!rootActive) return;
     if (typeof data?.id !== "string") return;
     if (data.status === "started") {
       subagents.set(data.id, {
@@ -244,6 +243,7 @@ export default function (pi: ExtensionAPI) {
   // `task` spawns carry no description at start: omp generates the title
   // afterwards and only publishes it on progress frames.
   pi.events.on("task:subagent:progress", (data: any) => {
+    if (!rootActive) return;
     const id = data?.progress?.id;
     const entry = typeof id === "string" ? subagents.get(id) : undefined;
     const description = clean(data?.progress?.description ?? "");

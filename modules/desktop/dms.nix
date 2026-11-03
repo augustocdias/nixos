@@ -610,7 +610,6 @@
           launchPrefix = "uwsm app -- ";
           syncModeWithPortal = true;
           terminalsAlwaysDark = false;
-          muxType = "herdr";
           runDmsMatugenTemplates = true;
           matugenTemplateGtk = true;
           matugenTemplateNiri = false;

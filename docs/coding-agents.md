@@ -13,7 +13,7 @@ Shared material lives in `modules/programs/agent-shared/` and `modules/programs/
 - `agent-shared/_bash.nix`: the bash ruleset, translated by each harness's `_permissions.nix`. See [Approvals](#approvals) for why overrides may only narrow.
 - `agent-jail/_mk-jail.nix`: the bubblewrap jail used by both harnesses. `agent-jail/jail-context.md` is loaded only inside the jail.
 - `agent-jail/_host-query/` backs the `host_*` tools; `agent-jail/host-mcp.py` exposes them to both harnesses as a stdio MCP server.
-- `agent-jail/_herdr-relay/` stands in for the herdr socket.
+- `agent-jail/_herdr-relay/` publishes restricted sidebar metadata to the launching Core terminal and proxies the Herdr App socket into the jail.
 
 The `caveman` and `ponytail` flake inputs are declared in `omp.nix` and `claude-code.nix` but consumed only by Hermes (`modules/services/hermes-agent/`). The harnesses use the adapted copies in `agent-shared/style/`.
 
@@ -33,7 +33,6 @@ Skills specific to this repo (`den-module`, `nvim-plugin`, `sops-secrets`) live 
   - `.dev-skills/` artifacts never enter implementation commits or pushes. Local exclusion is not encryption or backup.
   - Generated wizards run on the host, by the human.
 - **omp task isolation is off** (`task.isolation.enabled = false`): its automatic snapshots are not permission-controlled Git worktrees, and `implement-spec` assigns approved worktrees itself.
-- **Wizard test**: `node --test modules/programs/agent-shared/skills-wizard.test.mjs` checks that wizard GitHub writes target an explicit repository independent of cwd.
 
 ## Agent sandbox (Linux only)
 
@@ -50,23 +49,50 @@ Gotchas behind the jail's design:
 - **`GPG_TTY` is removed twice**: unset in the first runtime block (before `pre` and host-query start) and `--unsetenv` in the final block (after caller overlays). gpg-agent keeps its own terminal and display state, so a missing `GPG_TTY` does not prove GUI pinentry. Do not flush caches or restart the agent just to force a prompt.
 - **No gpg-agent socket.** The agent is a signing and decryption oracle: exposing it would let the jail sign as the user and decrypt every sops secret. With `signByDefault = true` in the read-only git config, `git commit` fails for lack of a signer. That failure is the approval gate; signed commits go through `host_exec`.
 - **SSH comes from a relay, on approval.** `SSH_AUTH_SOCK` is unset at launch. `host_ssh_agent` makes host-query listen on `<grant_root>/ssh-agent.sock` and pipe each connection to the host's `S.gpg-agent.ssh` until host-query exits. It is a relay rather than `host_mount` because a socket seen through bindfs/FUSE cannot be `connect()`ed. `~/.ssh/known_hosts` is read-only and private-key directories are not mounted. The SSH capability is not authorization: pushes and deletions keep their normal approvals, and host verification is never weakened.
-- **No D-Bus.** The session bus reaches `systemd --user`, which can start units outside the jail. omp's desktop notifications are therefore dead; herdr's state toasts signal completion and `blocked`.
+- **No D-Bus.** The session bus reaches `systemd --user`, which can start units outside the jail. OMP's direct desktop notifications are therefore unavailable inside the jail.
 - **`rm` and `rmdir` are rmtrash, and trash is per mount.** Each writable path is its own bind mount, so deletions land in that mount's `.Trash-1000` (a rename into the home trash would fail with `EXDEV`). That is why `programs.git.ignores` contains `.Trash-*/`. `~/.local/share/Trash` is deliberately not bound.
 
-### Herdr relay
+### Core sidebar reporting
 
-Inside herdr (`HERDR_ENV=1`), the launcher starts `_herdr-relay` on the host, pinned to the pane's `HERDR_PANE_ID` and the harness name, in a private `mktemp -d` directory. Its socket is bound over `$HERDR_SOCKET_PATH` (and the canonical path if different) as the last runtime argument, so no caller overlay can expose the real socket.
+For App terminals, the launcher captures `HC_TERMINAL_ID` and `HC_TERMINAL_SOCKET` before entering the jail. A per-launch bridge in `_herdr-relay/server.py` accepts only `activity.report` snapshots. It constructs Core label requests itself, with a fixed terminal and display namespace. Agents cannot select a different target or invoke other Core methods through it.
 
-- It forwards only `pane.report_metadata`, `pane.report_agent` (omp only), and `pane.report_agent_session`, each re-serialized from validated fields. Everything else returns `relay_denied` without touching herdr.
-- `resume_argv` is always refused, so resume is only herdr's built-in `<agent> --resume <ref>`.
-- A relay that fails to start aborts the launch with no fallback. The launcher also refuses a cwd or git-common-dir that contains the socket's directory.
-- Outside herdr the relay does not start and `HERDR_SOCKET_PATH` is unset.
-- The `herdr*` bash `ask` rules stay as defense in depth.
-- Tests: `python3 -m unittest discover -s modules/programs/agent-jail/_herdr-relay`, also run as the package's `checkPhase`.
+The final mounts replace the inherited host Core endpoint and its canonical path with the reporting socket. `HERDR_ACTIVITY_SOCKET` points to that restricted endpoint inside the jail. The launcher removes legacy Herdr identity variables. A missing host Core endpoint or an existing reporter lock aborts launch rather than exposing a fallback socket. Core reporting logs live beside the host-query logs.
+
+The bridge clears its label on normal exit and stops when its launcher exits. Renderer leases cover crashes where cleanup cannot run. This is metadata transport, not general `hc` access; the user's App, human terminals and Core lifetime remain unchanged.
+
+### Session-owned Core
+
+Each Linux jail gets its own Core endpoint through `HC_SOCKET`, separate from the sidebar bridge. The in-jail `hc` wrapper selects private runtime, config and state directories and removes the root reporter's identity before starting Core. A custom runtime directory keeps Core and its holders off host systemd. The root harness's inherited `HC_TERMINAL_ID` and `HC_TERMINAL_SOCKET` are removed so host terminal IDs cannot address sandbox terminals accidentally.
+
+Core starts on demand. Its services use the existing project mounts and shared network, so an agent can start a dev stack and run E2E checks against localhost without another permission prompt. The PID namespace ends Core and all its programs when the jail closes, including programs marked `--outlive-parent`. Separate agent sessions do not share terminals. This does not add network isolation or change the accepted host-helper approval model.
+
+`HERDR_SANDBOX_SOCKET` names the host-visible socket for an approved viewer. `herdr-core-view SOCKET TERMINAL` runs `hc attach` in a second, minimal bubblewrap jail with only that socket inode and the Nix store mounted. Binding the inode prevents attach's autostart path from creating a host Core if the owning jail disappears. The App proxy below opens this viewer for every program an agent starts through the App; no machine connection or reverse-callback route is added.
+
+The launcher refuses working directories or shared Git directories that would expose the host App home or runtime directories. The normal Home Manager App files remain outside the agent jail. Both harnesses install the repo-owned `herdr-app` and `herdr-core` skill directories from `modules/programs/herdr/skills/`, including the App skill's mod-development companion.
+
+Linux `hc` and `herdr-app` use the jailed default allow policy; the App proxy below is the boundary for `herdr-app`. Darwin keeps explicit `herdr*` prompts.
+
+### App proxy
+
+The raw App socket is a host code-execution route: `terminal.open`, `tab.new`, `pane.split` and `space.new` start their `argv` in the host Core, and paste, mods and layout clicks reach host programs too. The launcher therefore starts `_herdr-relay/app_proxy.py` outside the jail and binds its socket over `$app_home/herdr-app.sock`, so the stock `herdr-app` client works unchanged inside the jail.
+
+The proxy speaks the App's one-JSON-line protocol and sorts each request:
+
+- Program-starting commands run their `argv` (plus `task`) in the jail's Core through `terminal.run`, then forward the command with `argv` replaced by `herdr-core-view <core socket> <id>`. The reply gains `sandbox_terminal`. If the App refuses the view, the proxy kills the jail terminal. `machine`, `mod` and `props` are refused.
+- View commands (select, focus, zoom, rename, move, layout visibility, `ls`, `status`) pass through unchanged.
+- Close, kill, keep and park need an explicit target that the proxy created this session. `tab.new` replies with an existing space, so only `space.new` makes a space closable.
+- `shot` renders into a proxy-private directory, then copies the PNG under the workspace by walking `O_NOFOLLOW` directory descriptors, because the jail can swap any workspace path for a symlink.
+- Everything else, including mod commands and `app.*` settings, update and quit commands, is refused.
+
+The jail owns the path of its Core socket and could link it to the host Core. Before each Core call the proxy reads `SO_PEERCRED` and refuses a peer in its own (host) PID namespace. Another jail's Core would still pass that check; the result stays sandboxed.
+
+`tab.new` and `space.new` wrap the viewer in the host shell's `-ic` form, so the pane falls back to a host shell after the jail terminal ends. The agent cannot type into it: paste is refused, and `task` never reaches the App. Jail terminals outlive their viewer panes; the agent ends them with `hc kill`. The proxy reaches the jail Core only once Core is running, so its error asks the agent to run `hc ls` first.
+
+`python3 -m unittest test_app_proxy` in `_herdr-relay/` covers refusals, rewriting, ownership, the PID-namespace check and screenshot containment; the package check phase runs it. Proxy logs live in `$jail_state/log/app-proxy-<pid>.log`.
 
 ### `host_*` tools
 
-`host_exec`, `host_mount`, `host_journal`, and `host_ssh_agent` are the jail's only route to the host. host-query serves them over loopback and both harnesses prompt on every call. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host directory at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv; `host_ssh_agent` relays the SSH agent. Outside the jail `HOST_QUERY_PORT` is unset and all four short-circuit.
+`host_exec`, `host_mount`, `host_journal`, and `host_ssh_agent` are the jail's only route to the host. host-query serves them on a Unix socket bound only into its own jail (`/tmp/host-query.sock`), and both harnesses prompt on every call. `host_exec` runs one command unsandboxed; `host_mount` bindfs-grants a host directory at `~/granted/<name>`; `host_journal` reads the journal with a fixed argv; `host_ssh_agent` relays the SSH agent. Outside the jail `HOST_QUERY_SOCKET` is unset and all four short-circuit.
 
 `host_journal` exists because the user namespace cannot map supplementary groups, so the `wheel` membership the journal ACL needs is gone. In-jail `journalctl` prints "No journal files were found" and exits 0, a silent-success trap.
 
@@ -83,8 +109,8 @@ If a `host_*` tool misbehaves, read `~/.local/share/<name>-jail/log/host-query.l
 - **Provider**: OpenAI Codex, logged in at runtime with `/login openai-codex`. Do not use `/login anthropic`: it works by impersonating Claude Code's client.
 - **Shared prompts**: omp has no `` !`cmd` `` injection, so `omp.nix` strips the markers from shared commands and tells the model to run them.
 - **Models**: roles and per-agent overrides are in `omp.nix`; overrides win over agent frontmatter. They stay out of the overlay so a repo's `.omp/config.yml` can replace them: the `omp-models` activation merges them into `config.yml` with `yq`, which puts them in the global layer, below project config. A project file that sets only some roles leaves the rest on Codex. This repo's `.omp/config.yml` points every role at Ollama Cloud through the built-in `ollama-cloud` provider, which reads `OLLAMA_CLOUD_API_KEY`. Cloud ids carry their tag before the thinking level (`deepseek-v4-pro:0813:high`); omp splits the level at the last colon. Ids come from the bundled catalog, which Codex replaces with its live `/models` list after login, so a missing id shows up as a role fallback in `/models`. Start on the slow role with `omp --model @slow`.
-- **`bash.gitGuard = false`** lets skill ownership agreements permit branch switching. Shared bash rules and host, SSH, MCP, Nix, and herdr approvals still apply.
-- **Keybindings** in `omp.nix` move omp actions off chords that herdr and OmniWM capture; the comment there lists them.
+- **`bash.gitGuard = false`** lets skill ownership agreements permit branch switching. Shared bash rules and host, SSH, MCP and Nix approvals still apply. `herdr-app` asks on both platforms; other explicit Herdr prompts remain on Darwin.
+- **Keybindings** in `omp.nix` move OMP actions off chords captured by Herdr App and OmniWM.
 
 ### Approvals
 
@@ -109,8 +135,8 @@ If a `host_*` tool misbehaves, read `~/.local/share/<name>-jail/log/host-query.l
 - **MCP servers are global**, not scoped to the work subagents, because subagent-only inline servers would not appear in `/mcp` for the OAuth login.
 - **Status line**: plan limits appear only after the first response in a session.
 - **Prompt input**: vim motions are not remappable; only `vimInsertModeRemaps` exists.
-- **Skills** also come from other modules through `programs.claude-code.skills`: `herdr` from `herdr.nix` and `jgrep` from `work/jgrep.nix`.
-- **herdr hook**: `hooks."herdr-agent-state.sh"` is deployed from `${pkgs.herdr.src}` and registered as a `SessionStart` hook with the exact command string herdr's installer writes, so `herdr integration status` is clean. Never run `herdr integration install claude`: it would try to rewrite the immutable `settings.json`. Sidebar tokens come from `claude-activity.py` (see [Agents sidebar](herdr.md#agents-sidebar)).
+- **Skills** also come from other modules through `programs.claude-code.skills`: `herdr-app` and `herdr-core` from `herdr.nix`, and `jgrep` from `work/jgrep.nix`.
+- **Herdr sidebar**: `herdr.nix` registers `claude-activity.py` for display metadata. Native OSC reports supply lifecycle status independently; see [App sidebar](herdr.md#app-sidebar).
 
 ## rtk (shell-output compression)
 

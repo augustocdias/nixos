@@ -1,19 +1,16 @@
 local pipe_suffix
 if vim.g.godot then
     pipe_suffix = 'godot'
-else
-    pipe_suffix = os.getenv('HERDR_WORKSPACE_ID') or 'dettached'
+    local pipepath = vim.fn.stdpath('cache') .. '/server-' .. pipe_suffix .. '.pipe'
+    require('utils').start_server(pipepath)
 end
-
-local pipepath = vim.fn.stdpath('cache') .. '/server-' .. pipe_suffix .. '.pipe'
-require('utils').start_server(pipepath)
 
 vim.g.theme = 'catppuccin'
 vim.g.flavours = {
     catppuccin = 'mocha', -- dark
     -- catppuccin = 'latte', -- light
     -- tokyonight = 'day', -- light
-    tokyonight = 'night'  -- dark
+    tokyonight = 'night', -- dark
 }
 vim.g.flavour = vim.g.flavours[vim.g.theme]
 

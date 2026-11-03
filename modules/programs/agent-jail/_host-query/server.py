@@ -2,21 +2,22 @@
 """host-query: the jail's only route to the host.
 
 Runs outside bubblewrap, started by the jail launcher. The agent reaches it
-over loopback; the agent harness gates every call behind an "ask" permission, so
-the user approves each one in the TUI before it arrives here.
+over a Unix socket bound only into its own jail; the agent harness gates every
+call behind an "ask" permission, so the user approves each one in the TUI
+before it arrives here.
 
-Usage: host-query <port> [grant-root]
-  grant-root enables POST /mount and POST /ssh-agent. Without it, both are
-  refused. HOST_SSH_AUTH_SOCK names the host agent socket /ssh-agent relays.
+Usage: host-query <socket-path> [grant-root]
+  grant-root enables the mount and ssh-agent ops. Without it, both are
+  refused. HOST_SSH_AUTH_SOCK names the host agent socket the ssh-agent op relays.
 """
 
-import http.server
 import json
 import os
 import re
 import shutil
 import signal
 import socket
+import socketserver
 import stat
 import subprocess
 import sys
@@ -25,6 +26,7 @@ import threading
 MAX_OUTPUT = 200_000
 TIMEOUT = 30
 
+SOCKET_PATH = None
 GRANT_ROOT = None
 GRANT_JAIL_PREFIX = "~/granted"
 MOUNTS = {}
@@ -48,44 +50,47 @@ JOURNAL_PRIORITIES = {
 }
 
 
-class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path.rstrip("/") == "/health":
-            return self._json(200, {"status": "ok"})
-        self._json(404, {"error": "Use POST /exec, /mount, /journal or /ssh-agent"})
+class Handler(socketserver.StreamRequestHandler):
+    """One JSON request line in, one JSON reply line out.
 
-    def do_POST(self):
-        route = self.path.rstrip("/")
-        handlers = {
-            "/exec": self._exec,
-            "/mount": self._mount,
-            "/journal": self._journal,
-            "/ssh-agent": self._ssh_agent,
+    Request: {"op": "exec" | "mount" | "journal" | "ssh-agent", "args": {...}}.
+    A reply carrying "error" is a failure.
+    """
+
+    def handle(self):
+        try:
+            msg = json.loads(self.rfile.readline())
+        except ValueError:
+            return self._reply({"error": "Invalid JSON request"})
+        ops = {
+            "exec": self._exec,
+            "mount": self._mount,
+            "journal": self._journal,
+            "ssh-agent": self._ssh_agent,
         }
-        handler = handlers.get(route)
-        if handler is None:
-            return self._json(404, {"error": "Use POST /exec, /mount, /journal or /ssh-agent"})
-        body = self._body()
-        if body is None:
-            return self._json(400, {"error": "Invalid JSON body"})
-        handler(body)
+        op = ops.get(msg.get("op")) if isinstance(msg, dict) else None
+        if op is None:
+            return self._reply({"error": "Use op exec, mount, journal or ssh-agent"})
+        args = msg.get("args") or {}
+        if not isinstance(args, dict):
+            return self._reply({"error": "args must be an object"})
+        op(args)
 
     def _exec(self, body):
         command = body.get("command", "").strip()
         if not command:
-            return self._json(400, {"error": "Missing 'command' field"})
+            return self._reply({"error": "Missing 'command' field"})
         try:
             result = subprocess.run(
                 command, shell=True, capture_output=True, text=True, timeout=TIMEOUT
             )
         except subprocess.TimeoutExpired:
-            return self._json(
-                504, {"error": f"Timed out after {TIMEOUT}s", "command": command}
+            return self._reply(
+                {"error": f"Timed out after {TIMEOUT}s", "command": command}
             )
         except Exception as e:  # noqa: BLE001 - surfaced to the agent verbatim
-            return self._json(500, {"error": str(e), "command": command})
-        self._json(
-            200,
+            return self._reply({"error": str(e), "command": command})
+        self._reply(
             {
                 "command": command,
                 "exit_code": result.returncode,
@@ -108,7 +113,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if unit is not None:
             unit = str(unit).strip()
             if not re.fullmatch(r"[A-Za-z0-9@._\-\\:]+", unit):
-                return self._json(400, {"error": f"Invalid unit: {unit!r}"})
+                return self._reply({"error": f"Invalid unit: {unit!r}"})
             argv += ["--unit", unit]
 
         if body.get("user_units"):
@@ -118,7 +123,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         try:
             lines = int(lines)
         except (TypeError, ValueError):
-            return self._json(400, {"error": "lines must be an integer"})
+            return self._reply({"error": "lines must be an integer"})
         argv += ["--lines", str(max(1, min(lines, 5000)))]
 
         since = body.get("since")
@@ -126,15 +131,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             since = str(since).strip()
             # journalctl's own parser is permissive; keep the charset boring.
             if not re.fullmatch(r"[A-Za-z0-9 :\-+]+", since):
-                return self._json(400, {"error": f"Invalid since: {since!r}"})
+                return self._reply({"error": f"Invalid since: {since!r}"})
             argv += ["--since", since]
 
         priority = body.get("priority")
         if priority is not None:
             priority = str(priority).strip()
             if priority not in JOURNAL_PRIORITIES:
-                return self._json(
-                    400,
+                return self._reply(
                     {
                         "error": f"Invalid priority {priority!r}",
                         "allowed": sorted(JOURNAL_PRIORITIES),
@@ -146,8 +150,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if boot is not None:
             boot = str(boot).strip()
             if not re.fullmatch(r"-?\d+", boot):
-                return self._json(
-                    400, {"error": "boot must be an integer offset, e.g. 0 or -1"}
+                return self._reply(
+                    {"error": "boot must be an integer offset, e.g. 0 or -1"}
                 )
             argv += ["--boot", boot]
 
@@ -159,11 +163,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 argv, capture_output=True, text=True, timeout=TIMEOUT
             )
         except subprocess.TimeoutExpired:
-            return self._json(504, {"error": f"journalctl timed out after {TIMEOUT}s"})
+            return self._reply({"error": f"journalctl timed out after {TIMEOUT}s"})
         except FileNotFoundError:
-            return self._json(500, {"error": "journalctl not found on the host"})
-        self._json(
-            200,
+            return self._reply({"error": "journalctl not found on the host"})
+        self._reply(
             {
                 "command": " ".join(argv),
                 "exit_code": result.returncode,
@@ -184,17 +187,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         already-running jail with no restart.
         """
         if not GRANT_ROOT:
-            return self._json(503, {"error": "Mount grants disabled (no grant root)"})
+            return self._reply({"error": "Mount grants disabled (no grant root)"})
 
         src = os.path.realpath(os.path.expanduser(body.get("path", "").strip()))
         if not src or not os.path.isdir(src):
-            return self._json(400, {"error": f"Not a directory: {src or '(empty)'}"})
+            return self._reply({"error": f"Not a directory: {src or '(empty)'}"})
 
         # Strip leading dots so granting ~/.ssh defaults to "ssh" rather than
         # tripping SAFE_NAME.
         name = (body.get("name") or os.path.basename(src)).strip().lstrip(".")
         if not SAFE_NAME.match(name):
-            return self._json(400, {"error": f"Invalid mount name: {name!r}"})
+            return self._reply({"error": f"Invalid mount name: {name!r}"})
 
         target = os.path.join(GRANT_ROOT, name)
         write = bool(body.get("write"))
@@ -202,7 +205,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         remounted = False
         if os.path.ismount(target):
             if MOUNTS.get(name) == (src, write):
-                return self._json(200, self._mount_result(src, name, write, False))
+                return self._reply(self._mount_result(src, name, write, False))
             u = subprocess.run(
                 [FUSERMOUNT, "-u", target],
                 capture_output=True,
@@ -210,8 +213,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 timeout=TIMEOUT,
             )
             if u.returncode != 0:
-                return self._json(
-                    409,
+                return self._reply(
                     {
                         "error": f"Already mounted and could not unmount {name}: "
                         f"{(u.stderr or u.stdout).strip()}"
@@ -222,7 +224,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         bindfs = shutil.which("bindfs")
         if bindfs is None:
-            return self._json(500, {"error": "bindfs not found on PATH"})
+            return self._reply({"error": "bindfs not found on PATH"})
 
         try:
             os.makedirs(target, exist_ok=True)
@@ -235,15 +237,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 timeout=TIMEOUT,
             )
         except Exception as e:  # noqa: BLE001
-            return self._json(500, {"error": str(e)})
+            return self._reply({"error": str(e)})
 
         if r.returncode != 0:
             if os.path.isdir(target) and not os.listdir(target):
                 os.rmdir(target)
-            return self._json(500, {"error": (r.stderr or r.stdout).strip()})
+            return self._reply({"error": (r.stderr or r.stdout).strip()})
 
         MOUNTS[name] = (src, write)
-        self._json(200, self._mount_result(src, name, write, remounted))
+        self._reply(self._mount_result(src, name, write, remounted))
 
     def _ssh_agent(self, _body):
         """Relay the host SSH agent into the jail at ~/granted/ssh-agent.sock.
@@ -255,10 +257,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         """
         global SSH_AGENT_LISTENER
         if not GRANT_ROOT:
-            return self._json(503, {"error": "SSH agent relay disabled (no grant root)"})
+            return self._reply({"error": "SSH agent relay disabled (no grant root)"})
         result = {"jail_path": f"{GRANT_JAIL_PREFIX}/{SSH_AGENT_NAME}"}
         if SSH_AGENT_LISTENER is not None:
-            return self._json(200, result)
+            return self._reply(result)
 
         upstream = os.environ.get("HOST_SSH_AUTH_SOCK", "")
         try:
@@ -266,8 +268,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except OSError:
             is_sock = False
         if not is_sock:
-            return self._json(
-                503,
+            return self._reply(
                 {
                     "error": f"No host SSH agent socket at {upstream or '(unset)'}; "
                     "is gpg-agent running with enableSshSupport?"
@@ -286,13 +287,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 os.umask(old_umask)
             listener.listen()
         except OSError as e:
-            return self._json(500, {"error": str(e)})
+            return self._reply({"error": str(e)})
 
         SSH_AGENT_LISTENER = (listener, path)
         threading.Thread(
             target=_relay_accept, args=(listener, upstream), daemon=True
         ).start()
-        self._json(200, result)
+        self._reply(result)
 
     @staticmethod
     def _mount_result(src, name, write, remounted):
@@ -312,23 +313,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             output = output[:MAX_OUTPUT] + f"\n... (truncated at {MAX_OUTPUT} bytes)"
         return output
 
-    def _body(self):
-        try:
-            length = int(self.headers.get("Content-Length", 0))
-            return json.loads(self.rfile.read(length)) if length else {}
-        except (json.JSONDecodeError, ValueError):
-            return None
-
-    def _json(self, status, data):
-        body = json.dumps(data).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(body))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, *_):
-        pass
+    def _reply(self, data):
+        self.wfile.write((json.dumps(data) + "\n").encode())
 
 
 def _relay_accept(listener, upstream):
@@ -367,15 +353,27 @@ def _shutdown(*_):
             os.unlink(path)
         except OSError:
             pass
+    try:
+        os.unlink(SOCKET_PATH)
+    except OSError:
+        pass
     sys.exit(0)
 
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 19600
+    if len(sys.argv) < 2:
+        sys.exit("usage: host-query <socket-path> [grant-root]")
+    SOCKET_PATH = sys.argv[1]
     if len(sys.argv) > 2:
         GRANT_ROOT = sys.argv[2]
         os.makedirs(GRANT_ROOT, exist_ok=True)
     signal.signal(signal.SIGTERM, _shutdown)
-    srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
-    print(f"host-query: listening on 127.0.0.1:{port}", flush=True)
+    if os.path.lexists(SOCKET_PATH):
+        os.unlink(SOCKET_PATH)
+    old_umask = os.umask(0o177)
+    try:
+        srv = socketserver.UnixStreamServer(SOCKET_PATH, Handler)
+    finally:
+        os.umask(old_umask)
+    print(f"host-query: listening on {SOCKET_PATH}", flush=True)
     srv.serve_forever()

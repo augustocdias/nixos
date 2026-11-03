@@ -164,10 +164,8 @@
         }
         // cfg.mcpServers;
 
-      # herdr owns ctrl+g, ctrl+h/j/k/l, alt+m/r/d; OmniWM owns Option with
-      # h/j/k/l, shift+h/j/k/l, f, shift+f, e, t, return and the digits. Those
-      # chords never reach omp, so its actions move instead. ctrl+e matches
-      # Claude's setup.
+      # Keep agent actions off App navigation and OmniWM's Option shortcuts.
+      # ctrl+e matches Claude's external-editor shortcut.
       keybindings = {
         "app.editor.external" = "ctrl+e";
         "tui.editor.cursorLineEnd" = "end";

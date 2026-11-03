@@ -53,6 +53,11 @@
       url = "github:vinceliuice/grub2-themes";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    herdr-navigation.url = "github:augustocdias/herdr-navigation";
+    herdr-tmux-prefix = {
+      url = "github:herdrdev/herdr-layout-examples";
+      flake = false;
+    };
     hermes-agent = {
       url = "github:NousResearch/hermes-agent";
       inputs.uv2nix.follows = "uv2nix";
@@ -76,6 +81,7 @@
       url = "github:Janrupf/nix-jetbrains-plugin-repository";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    llm-agents.url = "github:numtide/llm-agents.nix";
     neovim-nightly-overlay = {
       url = "github:nix-community/neovim-nightly-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -291,7 +297,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     zapfast = {
-      url = "github:augustocdias/zapfast/home-manager-module";
+      url = "github:crmne/zapfast";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
