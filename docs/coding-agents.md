@@ -9,6 +9,7 @@
 
 Shared material lives in `modules/programs/agent-shared/` and `modules/programs/agent-jail/`:
 
+- `agent-shared/agent-shared.nix`: shared packages, included by both harness aspects. It installs terminal-browser from the same `llm-agents` input as Herdr.
 - `agent-shared/_lib.nix`: prompt bodies are frontmatter-free, and each harness renders its own frontmatter through `withFrontmatter`, because the harnesses disagree on keys. `contextText` is `context.md` plus the style rules in `style/`.
 - `agent-shared/_bash.nix`: the bash ruleset, translated by each harness's `_permissions.nix`. See [Approvals](#approvals) for why overrides may only narrow.
 - `agent-jail/_mk-jail.nix`: the bubblewrap jail used by both harnesses. `agent-jail/jail-context.md` is loaded only inside the jail.
@@ -16,6 +17,8 @@ Shared material lives in `modules/programs/agent-shared/` and `modules/programs/
 - `agent-jail/_herdr-relay/` publishes restricted sidebar metadata to the launching Core terminal and proxies the Herdr App socket into the jail.
 
 The `caveman` and `ponytail` flake inputs are declared in `omp.nix` and `claude-code.nix` but consumed only by Hermes (`modules/services/hermes-agent/`). The harnesses use the adapted copies in `agent-shared/style/`.
+
+Both harnesses install the terminal-browser skill from `agent-shared/skills/terminal-browser/`. It launches browsers in Core terminals rather than using the browser's legacy Herdr TUI split adapter. The skill owns browser/tab selection, screenshots and cleanup while preserving each harness's sandbox and approval rules.
 
 ## Development skills
 
@@ -101,6 +104,10 @@ If a `host_*` tool misbehaves, read `~/.local/share/<name>-jail/log/host-query.l
 ## oh-my-pi (omp)
 
 `modules/programs/omp/`. omp has no sandbox of its own: its approval system is policy, not containment, so on Linux it runs in the shared jail.
+
+OMP and terminal-browser use the same `llm-agents` flake input as Herdr, without overriding its nixpkgs, so their upstream store paths remain eligible for `cache.numtide.com`. Updating that input updates all its consumers.
+
+The Nix overlay disables OMP's built-in browser prelude in favor of the shared terminal-browser CLI workflow.
 
 - **Not the upstream HM module.** Its `package` is not nullable (the jail installs `omp`) and it writes only `config.yml`.
 - **Settings go through `PI_CONFIG_FILES`**, set by `wrapProgram`. omp rewrites `~/.omp/agent/config.yml` from `/settings` and migrations, so that file cannot be a store symlink. The overlay ranks above global and project config and is never written back. Overlays replace arrays, so the pinned empty `extensions` stops a project from adding packages. Keys the overlay omits stay omp's, except the models below.

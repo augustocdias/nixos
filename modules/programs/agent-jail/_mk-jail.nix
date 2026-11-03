@@ -27,6 +27,12 @@
 
   git = lib.getExe pkgs.git;
 
+  fontsConf = pkgs.makeFontsConf {
+    fontDirectories = [pkgs.dejavu_fonts];
+    impureFontDirectories = [];
+    includes = ["${pkgs.fontconfig.out}/etc/fonts/conf.d"];
+  };
+
   hostQuery = pkgs.callPackage ./_host-query {};
   herdrRelay = pkgs.callPackage ./_herdr-relay {};
   herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
@@ -63,6 +69,7 @@ in
 
         (ro-bind "/nix/store" "/nix/store")
         (set-env "NIX_REMOTE" "daemon")
+        (set-env "FONTCONFIG_FILE" fontsConf)
         (try-rw-bind "/nix/var/nix/daemon-socket" "/nix/var/nix/daemon-socket")
         (try-readonly "/nix/var/nix/db")
         (try-readonly "/nix/var/nix/profiles")

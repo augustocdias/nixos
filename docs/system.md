@@ -118,8 +118,8 @@ nix develop .#nvim-dev
 # Update herdr plugin sources (herdr itself follows nixpkgs)
 nix flake update herdr-plugin-browser
 
-# Bump omp: edit the tag in modules/programs/omp/omp.nix, then
-nix run .#write-flake && nix flake update oh-my-pi
+# Update omp, terminal-browser and Herdr together
+nix flake update llm-agents
 ```
 
 `update-system` pin handling needs `nix-update` from the dev shell and reports per-pin failures in its final summary. HA pins are built after updating. The Ollama pin updates only its source; on Darwin it also builds `ollama-bin`, and on Linux Darwin build and runtime verification remain outstanding. Pin updates neither activate services nor change model tags.

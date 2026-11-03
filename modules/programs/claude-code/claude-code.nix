@@ -9,6 +9,7 @@
   };
 
   den.aspects.claude-code = {
+    includes = [den.aspects.agent-shared];
     homeManager = {pkgs, ...}: let
       shared = import ../agent-shared/_lib.nix {inherit lib;};
       skills = import ../agent-shared/_skills.nix {inherit lib pkgs;};

@@ -4,13 +4,14 @@
   lib,
   ...
 }: {
-  flake-file.inputs.oh-my-pi.url = "github:can1357/oh-my-pi";
+  flake-file.inputs.llm-agents.url = lib.mkDefault "github:numtide/llm-agents.nix";
   flake-file.inputs.caveman = {
     url = lib.mkDefault "github:JuliusBrussee/caveman";
     flake = false;
   };
 
   den.aspects.omp = {
+    includes = [den.aspects.agent-shared];
     homeManager = {
       pkgs,
       lib,
@@ -58,6 +59,7 @@
         marketplace.autoUpdate = "off";
         telemetry.otlpExportEnabled = false;
         astGrep.enabled = true;
+        browser.enabled = false;
         error.notify = "on";
         # Pinned empty so a project `extensions:` cannot add packages; the
         # style rules live in AGENTS.md (agent-shared/style).
@@ -125,11 +127,11 @@
 
       settingsFile = (pkgs.formats.yaml {}).generate "omp-settings.yml" settings;
 
-      base = inputs.oh-my-pi.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      agentPackages = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
 
       package = pkgs.symlinkJoin {
         name = "omp";
-        paths = [base];
+        paths = [agentPackages.omp];
         nativeBuildInputs = [pkgs.makeWrapper];
         postBuild = ''
           wrapProgram $out/bin/omp --set PI_CONFIG_FILES ${settingsFile}
@@ -217,7 +219,8 @@
             ".omp/agent/keybindings.yml".source = (pkgs.formats.yaml {}).generate "keybindings.yml" keybindings;
             ".omp/agent/AGENTS.md".text =
               shared.contextText
-              + lib.optionalString jailed ("\n" + builtins.readFile ../agent-jail/jail-context.md);
+              + lib.optionalString jailed ("\n" + builtins.readFile ../agent-jail/jail-context.md)
+              + "\nFor browser automation and web UI checks, read `skill://terminal-browser` and use its CLI instead of the disabled built-in browser prelude.\n";
 
             ".omp/agent/agents/test-writer.md".source = prompt "agents" "test-writer" {name = "test-writer";};
             ".omp/agent/commands/commit.md".source = command "commit";
