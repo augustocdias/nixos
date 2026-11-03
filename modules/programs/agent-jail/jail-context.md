@@ -38,7 +38,7 @@ The SSH agent socket is not mounted in the jail, and `SSH_AUTH_SOCK` is unset. B
 
 SSH credentials are the user's credentials. Obtain approval for consequential actions such as pushing shared branches, force-pushing, or deleting remote refs. Authorized SSH and remote deployment are not technically blocked by the jail.
 
-The GPG signing/decryption socket is absent. Stage normally, then leave commits to the user or request signed `git commit -S` through approved `host_exec`. Never disable signing or rewrite Git configuration to bypass this gate. SSH authentication does not grant Git authoring access.
+The GPG signing/decryption socket is absent. Stage normally, then leave commits to the user or request signed `git commit -S` through approved `host_exec`. The `git-conventions` skill defines an explicit per-run exception for temporary unsigned local commits and a mandatory final signing task before any push. Only that exception permits `git commit --no-gpg-sign` inside the jail. Keep Git signing configuration unchanged and all host approvals intact. Never push unsigned commits. SSH authentication does not grant Git authoring access.
 
 ## Deletion and recovery
 

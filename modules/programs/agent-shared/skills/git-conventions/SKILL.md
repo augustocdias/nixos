@@ -23,6 +23,8 @@ Offer full routine delegation, ask each time, or mixed ownership. Set each categ
 
 A complete explicit user instruction satisfies the agreement without duplicate questions. A fresh run must not reuse consent recorded by an earlier run. Read-only reviews/design need no mutation agreement.
 
+Alongside commit ownership, ask: "May the agent create unsigned local commits during this run, then re-sign them before any push?" Default to no unless the user explicitly opts in. Commit ownership alone does not grant this exception. Name the covered branches and who will perform the final signing.
+
 Agent-owned skips redundant conversational questions, not mandatory host prompts. Ask-each-time is a skill conversation, not a command permission rule. For human-owned actions, provide an exact handoff and verify the resulting state before dependent work relies on it.
 
 Routine ownership excludes force-discard, automatic stash/reset of user work, adopting/removing unrelated worktrees, branch deletion, repository-setting changes and merging PRs. Published rewrites require separate specific consent naming branches and lease-push scope. Remove only authorized, clean run-created worktrees non-forcibly; preserve dirty/blocked worktrees and report their paths.
@@ -33,9 +35,24 @@ Before dispatching any worker, inspect remote transport and intended remote acti
 
 Workers implement, test and review only their assigned checkout. They return intended production paths, exact checks/review evidence, a commit message and pending actions. The orchestrator serializes staging, signing, ref transitions, pushes, PR/tracker writes and shared stack metadata. Quiesce affected writers before moving refs or rebasing; never mutate an active worker's branch.
 
-On Linux, the parent stages explicit intended production paths and requests signed commits through `host_exec` with explicit worktree targeting, observes the SHA, then performs approved pushes through `host_exec`. Headless workers return proposals instead of attempting unanswered prompts. Keep Darwin's established signing/permission route where no jail exists. Never disable signing, expose the GPG socket, or claim a declined action succeeded.
+On Linux, the parent stages explicit intended production paths and requests signed commits through `host_exec` with explicit worktree targeting, observes the SHA, then performs approved pushes through `host_exec`. The local unsigned exception below permits only its scoped temporary commits inside the jail. Headless workers return proposals instead of attempting unanswered prompts. Keep Darwin's established signing/permission route where no jail exists. Never change signing configuration, expose the GPG socket, or claim a declined action succeeded.
 
 Before staging/publication, inspect tracked/staged `.dev-skills/` artifacts; any such artifact blocks publication until the user resolves the conflict. Never silently untrack/discard it, force-add supporting artifacts, bulk-stage unrelated files, or publish artifact archive branches. Temporary preview wiring also stays out of implementation commits. PR bodies and configured ticket summaries may contain authorized concise evidence; artifact sharing needs a separate explicit request.
+
+## Local unsigned commits
+
+Without explicit approval in the current run, sign every commit through the established approval route. With approval, the parent may use `git commit --no-gpg-sign` only for unpublished commits on the agreed branches. Keep signing enabled in Git configuration. Workers still return proposals; the parent owns commits.
+
+Before the first unsigned commit, record the approved branches and their starting SHAs in the run's task tracker. Add a final task named "Re-sign local commits and verify signatures before pushing", after implementation and review but before every publication task. Make pushes depend on it. Keep that task open in any handoff, even when no push is planned.
+
+To complete the signing task:
+
+1. Quiesce writers on all affected branches. Re-sign the temporary commits through the normal approved signing route, using Linux `host_exec` or a human handoff. Approval for the exception includes rewriting only the run's unpublished commits. Preserve commit content, authorship, messages, and merge topology. Stop for conflicts or changes outside that scope.
+2. Update every affected local descendant branch and stack reference to the signed history. Re-sign rewritten descendants as needed. Record the resulting SHAs; an old unsigned tip must not remain a publication target.
+3. Before each push, refresh the destination's refs and enumerate every commit the explicit refspec would introduce, including commits reached through merge parents. Verify each commit's signature with `git verify-commit` and the expected signer identity. Checking only the tip or the tracked temporary commits is insufficient. Missing, invalid, unexpected, or unverifiable signatures block the push.
+4. Mark the task complete only after all publication targets pass. Any later commit or rewrite reopens the task and requires verification again.
+
+If signing approval or verification is unavailable, leave the task blocked and report the unsigned branches and commit range. Never push unsigned commits, including to backup branches, draft PR branches, or another remote. Signing a push or a tag does not replace signing its commits.
 
 ## Commits
 
@@ -77,4 +94,4 @@ Before staging/publication, inspect tracked/staged `.dev-skills/` artifacts; any
 - Never force-push shared branches. Published feature-branch rewrites require separate consent naming branches and `--force-with-lease` scope; a non-fast-forward rejection pauses rather than triggering a forced retry.
 - Preserve unrelated user work and existing approvals. Verify actual refs, commits and remote effects; partial effects are not rollback.
 - Keep push and PR actions separate under mixed ownership. Use explicit remote/refspec and explicit PR repository/head/base.
-- Never bypass signing or host prompts. A declined or failed action remains pending, not completed.
+- Never bypass the pre-push signing gate or host prompts. Only the explicit local unsigned exception permits deferred signing. A declined or failed action remains pending, not completed.

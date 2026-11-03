@@ -20,7 +20,6 @@ Write a commit message for the staged changes above.
   commits.
 - If nothing is staged, say so and stop — do not stage anything yourself.
 
-Be terse: show only the proposed message, then commit it. Signing only works on
-the host, so inside the sandbox use `host_exec` (it prompts for approval). No preamble, no summary. Do not push.
+Load `git-conventions` and resolve commit ownership and the local unsigned exception before committing. Show only the proposed message, then commit it through the agreed route. Signed commits inside the sandbox use `host_exec`, which prompts for approval. An explicitly approved local unsigned commit follows the skill's tracking and final signing requirements. No summary. Do not push.
 
 $ARGUMENTS
