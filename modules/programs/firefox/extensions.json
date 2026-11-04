@@ -8,7 +8,7 @@
   "ublock-origin": {
     "slug": "ublock-origin",
     "name": "uBlock Origin",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/5034826/ublock_origin-1.75.0.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5203014/ublock_origin-1.75.4.xpi",
     "addonId": "uBlock0@raymondhill.net"
   },
   "onepassword-password-manager": {
@@ -32,7 +32,7 @@
   "pia": {
     "slug": "pia",
     "name": "PAYBACK Internet Assistent",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4834550/pia-3.82.0.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5206670/pia-3.82.1.xpi",
     "addonId": "toolbar-ff@payback.de"
   },
   "catppuccin-mocha-blue": {

@@ -30,7 +30,7 @@ OMP's launcher entry and agent shortcuts resolve installed command names, includ
 
 ### Tab titles and agent picker
 
-The `herdr-navigation` input owns the Smart Tabs and Agent Picker mods in [their standalone repository](https://github.com/augustocdias/herdr-navigation). Its Home Manager module installs the files; `herdr.nix` connects the packaged main layout and Alt+W to them. Change mod code in that repository, then update the input and rebuild here. The optional community layout is not installed.
+The `herdr-navigation` input owns the Smart Tabs, Agent Picker and Space Shortcuts mods in [their standalone repository](https://github.com/augustocdias/herdr-navigation). Its Home Manager module installs the files; `herdr.nix` connects the packaged main layout and Alt+W to them. Change mod code in that repository, then update the input and rebuild here. The optional community layout is not installed.
 
 Titles are display-only and do not rewrite saved tab names. Descriptive names take precedence; launch defaults such as `shell` and the current program name remain automatic. Session titles prefer the existing activity integration, then native agent reports, then terminal titles. The picker searches full titles even when the visible label is truncated.
 
@@ -51,6 +51,8 @@ herdr-app check ~/.config/herdr-app/mods/tmux-prefix
 herdr-app check ~/.config/herdr-app/mods/agents-enriched
 herdr-app check ~/.config/herdr-app/mods/tabs-enriched
 herdr-app check ~/.config/herdr-app/mods/picker-enriched
+herdr-app check ~/.config/herdr-app/mods/spaces-enriched
+herdr-app check ~/.config/herdr-app/mods/space-open
 ```
 
 `check` needs a compositor and does not prove key handling. Exercise keys in an isolated App/Core session and inspect `herdr-app shot`. Test the Home Manager symlinks, not only an unpacked source copy: App rejects relative JavaScript imports that resolve through those symlinks into the store, so the enriched mod is bundled into one file.
@@ -96,6 +98,12 @@ After resolving the checkout, it calls `herdr-workspace <checkout> <branch>`. Th
 | The branch does not exist | `git worktree add <repo folder>/<branch> -b <branch>` from HEAD |
 
 After creation, the path is re-read from `git worktree list --porcelain`. The directory convention is shared with `git wa` in `modules/programs/git/git.nix`; change both together. The helper makes its own Git calls rather than depending on that alias.
+
+### Sidebar buttons
+
+The packaged main layout uses `spaces-enriched` from `herdr-navigation`. Its folder and branch buttons beside the local `+` open the `space-open` dialog, a JavaScript port of `herdr-workspace` and `herdr-worktree`: same labels, existing-space matching, worktree preconditions and `<repo folder>/<branch>` convention. The worktree button takes the repository from the active space's first terminal, not a shell cwd. Instead of running `direnv allow` unconditionally, the dialog asks before trusting a folder's own `.envrc` that direnv has not allowed. The buttons act on this computer only.
+
+The port is a copy, not a call into the Fish helpers. A behavior change to either helper or to the `git wa` directory convention needs the same change in `navigation/mods/space-open/main.js` of `herdr-navigation`.
 
 ## Agent integrations
 

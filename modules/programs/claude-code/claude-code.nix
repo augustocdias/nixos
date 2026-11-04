@@ -135,6 +135,7 @@
           disableWorkflows = true;
           editorMode = "vim";
           tui = "fullscreen";
+          idleCompaction = false;
           statusLine = {
             type = "command";
             command = lib.getExe statusline;

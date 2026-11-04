@@ -3,10 +3,10 @@
   stdenvNoCC,
   lib,
 }: let
-  version = "0.40.13";
+  version = "0.40.14";
   archive = fetchurl {
     url = "https://github.com/ollama/ollama/releases/download/v${version}/ollama-darwin.tgz";
-    hash = "sha256-uuKSUiMrnhNYz1gBp9ZaB0Qq8Y+1Rny2jH/DcR9ZxRE=";
+    hash = "sha256-87+aUo6QjaDaWis6StMlKjadYhhlAdxIgCYejZAjv/U=";
   };
 in {
   # Native fetcher on each platform; nix-update changes this single pin.

@@ -11,13 +11,13 @@
 buildHomeAssistantComponent (finalAttrs: {
   owner = "homeassistant-ai";
   domain = "ha_mcp_tools";
-  version = "9.0.0";
+  version = "9.1.0";
 
   src = fetchFromGitHub {
     owner = "homeassistant-ai";
     repo = "ha-mcp-integration";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-KF635M6v8wwWFJBJFSbsGmk3R+DYrFOFzqXFpHta8Jo=";
+    hash = "sha256-goXp1vb5yfqxHBC254e0te5yehdzyXwit5X9Gylu36A=";
   };
 
   dependencies = with python3Packages; [

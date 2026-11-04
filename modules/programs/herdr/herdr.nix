@@ -42,7 +42,8 @@
                             "local_layout_ready": self.documents.get("").is_some_and(|s| s.available),'
             substituteInPlace defaults/layouts/main.json \
               --replace-fail '"mod": "agents"' '"mod": "agents-enriched"' \
-              --replace-fail '"mod": "tabs"' '"mod": "tabs-enriched"'
+              --replace-fail '"mod": "tabs"' '"mod": "tabs-enriched"' \
+              --replace-fail '"mod": "spaces"' '"mod": "spaces-enriched"'
             substituteInPlace defaults/AGENTS.md \
               --replace-fail '<!-- Written by the Herdr app on every start. Edits here are overwritten. -->' \
               ${lib.escapeShellArg ''
