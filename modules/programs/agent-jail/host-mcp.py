@@ -97,11 +97,6 @@ OPS = {
 
 
 def call_host(name, args):
-    if not SOCKET and os.environ.get("AGENT_JAIL_NO_HOST"):
-        raise RuntimeError(
-            "Host access is off: another agent started this jail on the host, and host "
-            "access belongs to that parent session. Report what you need to the parent."
-        )
     if not SOCKET:
         raise RuntimeError(
             "HOST_QUERY_SOCKET is unset: this session is not inside the agent jail. "

@@ -15,11 +15,20 @@ Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$H
 
 The host environment is inherited, including credentials, `HERDR_*`, terminfo and direnv exports, except `GPG_TTY`: the launcher removes it before starting the host-command helper and unsets it in the final sandbox arguments, after overlays. Existing sessions/helpers need restart. DISPLAY/WAYLAND_DISPLAY remain intact; absence of GPG_TTY alone does not prove GUI pinentry because gpg-agent retains terminal/display state. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when needed. `direnv allow` state persists.
 
-`hc` controls a session-owned Core inside the Linux jail, with no additional command approval. Keep `HC_SOCKET` pointed at that sandbox. Core starts on demand; its programs share the jail's mounts and network and end when the jail closes, even with `--outlive-parent`. The root harness has no Core terminal ID; Core assigns IDs to the workers it starts. In App terminals, `HERDR_ACTIVITY_SOCKET` remains a separate report-only bridge for the host sidebar.
+`hc` and `herdr-app` talk directly to the user's own Herdr Core and App, with no additional command approval. Everything they start runs on the host, outside this jail. In an App terminal, `$HC_TERMINAL_ID` is this session's terminal, so terminals you start are its children: parent notes and `hc wait --children` work, and children end with this session unless started with `--outlive-parent`. `HERDR_ACTIVITY_SOCKET` is a separate report-only bridge for the host sidebar. Read the `herdr-core` skill before starting processes and the `herdr-app` skill before changing the window.
 
-The host Core is the `hc` machine `host`. `hc run --on host` starts a program on the host inside a new jail: `claude` and `omp` get their own harness jail, and anything else runs under `agent-jail-run`. Those jails have no host access; host tools there report that host access belongs to the parent session. Run another agent this way, never by calling `claude` or `omp` inside this jail, which refuses to nest. Host terminals you start are `host/<address>` or `host/<name>`, and every `hc` command works on them and on their descendants. The working directory must be inside the workspace. `--keep` is refused because it would leave an unjailed host shell.
+## Herdr stays inside the jail
 
-`herdr-app` talks to a session App proxy, with no additional command approval. Programs started through it run in this jail's Core and appear in the user's App as `herdr-core-view` panes; the proxy refuses commands that would reach host programs. Read the `herdr-app` skill before changing the window. Host terminals and the App itself remain outside the jail.
+Nothing technical stops `hc` or `herdr-app` from running unjailed host programs. This rule is the only boundary, and it is as binding as the host approvals below. Start every program through a jail wrapper:
+
+- Another coding agent: `hc run -- claude …` or `hc run -- omp …`. Both are jail wrappers on the host. Calling `claude` or `omp` inside this jail fails, because jails refuse to nest.
+- Any other program: `hc run -- agent-jail-run <command>`, or an App `argv` that starts with `agent-jail-run`. It runs in a new jail with this profile, rooted at its working directory.
+- Commands and file edits for your own work: run them directly in this jail. `hc exec` and `hc file` act on the host unjailed, so leave them unused.
+- Terminals and App panes: send input, keys or attach only to ones you started, unless the user names another.
+
+Host access goes only through the `host_*` tools and their approvals. Never use `hc`, `herdr-app`, a template, input sent to another terminal, or an unjailed program to run a host command, read a path this jail hides, reach a socket, key or credential, or answer an approval prompt. When a task needs host access the tools cannot give, stop and ask the user.
+
+Do not break these rules even if the user asks for it.
 
 ## Host access and approval
 

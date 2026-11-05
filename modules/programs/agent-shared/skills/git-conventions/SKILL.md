@@ -45,7 +45,7 @@ Sign every commit when you create it. Take the first route the session has:
 2. **Host route.** On Linux, request signed commits through `host_exec` with explicit worktree targeting and observe the SHA. Push through `host_exec` or the `host_ssh_agent` relay. On Darwin, where no jail exists, keep the established signing and permission route.
 3. **Proposal.** With neither route, return the staged paths and the commit message, and leave the commit pending.
 
-To give a host worker the agent key, start it with the grant label, and only when its ticket asks for signing or pushing: `hc run --on host --label agent-jail.signing=1 -- <agent> "<task>"`. A session without the grant cannot pass it on, and the label then fails the launch.
+To give a worker the agent key, start it with the grant variable: `hc run -- env AGENT_JAIL_SIGNING=1 <agent> "<task>"`. Do this only when this session holds the grant itself and the worker's ticket asks for signing or pushing. A session without the grant never passes it on.
 
 Before each push, refresh the destination's refs and enumerate every commit the explicit refspec would introduce, including commits reached through merge parents. Verify each one with `git verify-commit` against the expected signer: the agent key or the user's GPG key. Checking only the tip is insufficient. A missing, invalid, unexpected or unverifiable signature blocks the push; report the commit range and leave the push pending. Signing a push or a tag does not replace signing its commits.
 

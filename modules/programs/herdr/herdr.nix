@@ -20,11 +20,6 @@
       ...
     }: let
       herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
-      coreView = mkFish "herdr-core-view" ./core-view.fish {
-        "@core@" = lib.getExe herdrCore;
-        "@bwrap@" = lib.getExe pkgs.bubblewrap;
-        "@realpath@" = lib.getExe' pkgs.coreutils "realpath";
-      };
       herdrApp = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-app.overrideAttrs (old: {
         patches = (old.patches or []) ++ [./vim-navigation.patch];
         postPatch =
@@ -146,7 +141,7 @@
       };
     in {
       imports = [inputs.herdr-navigation.homeManagerModules.default];
-      home.packages = [workspace worktree herdrApp herdrCore] ++ lib.optional pkgs.stdenv.hostPlatform.isLinux coreView;
+      home.packages = [workspace worktree herdrApp herdrCore];
 
       xdg.configFile = {
         "herdr-app/settings.json".text = builtins.toJSON {

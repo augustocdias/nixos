@@ -11,9 +11,7 @@ For persistent mod, layout, theme, setting or keybinding changes, read [Mod deve
 
 ## 1. Know the route
 
-In a Linux agent jail, `herdr-app` talks to an App proxy that the jail launcher started for this session. Run it directly, with no host approval. The proxy runs every program you start through the App inside this jail's Core and shows it in a `herdr-core-view` pane, so nothing you launch runs on the host. It refuses commands that would reach host programs: paste, mods, layout edits, settings, theme, updates, quit and remote machines. A refusal is final for this session; tell the user instead of routing around it through `host_exec`.
-
-Outside the Linux jail, including Darwin, `herdr-app` drives the user's App directly and programs it starts run on the host. Follow the harness's approval policy there.
+`herdr-app` drives the user's App directly, and programs it starts run on the host. In a Linux agent jail it runs with no host approval, and nothing technical keeps those programs jailed. Start each one through a jail wrapper, as the jail contract requires: `claude` or `omp` by name, anything else with `agent-jail-run` first in `argv`. Outside the Linux jail, including Darwin, follow the harness's approval policy.
 
 `herdr-app --help`, `herdr-app --skill` and `herdr-app commands` are local reference. Running bare `herdr-app` opens or raises the window, so use `ls` and `status` to inspect.
 
@@ -36,12 +34,7 @@ herdr-app do terminal.open --place right --name web --argv '["npm","run","dev"]'
 herdr-app do tab.new --name tests --folder /path/to/project --argv '["cargo","test"]'
 ```
 
-`terminal.open`, `tab.new`, `pane.split` and `space.new` accept `argv`, plus `folder` and `task` where `herdr-app commands` lists them. Without `argv` the pane gets a shell. In the jail, the reply carries two terminal IDs:
-
-- `terminal` is the host pane's viewer. Use it for App commands such as `agent.focus` or `terminal.kill`.
-- `sandbox_terminal` is the program in this jail's Core. Use it for `hc read`, `hc wait`, `hc send` and `hc kill`.
-
-If the proxy answers that the sandbox Core is not running, run `hc ls` once to start it and retry.
+`terminal.open`, `tab.new`, `pane.split` and `space.new` accept `argv`, plus `folder` and `task` where `herdr-app commands` lists them. Without `argv` the pane gets a host shell; in the jail, give `["agent-jail-run"]` for a jailed shell instead. The reply's `terminal` is the program's Core terminal: use it for App commands such as `agent.focus` or `terminal.kill`, and for `hc read`, `hc wait`, `hc send` and `hc kill`.
 
 ### Show a terminal you already started with `hc`
 
@@ -51,18 +44,18 @@ Open a pane that attaches to it:
 herdr-app do terminal.open --place right --name web --argv '["hc","attach","t4"]'
 ```
 
-For a terminal started with `hc run --on host`, attach to `host/<address>` the same way. Closing that pane detaches without stopping the program.
+Closing that pane detaches without stopping the program.
 
 ### Close what you opened
 
-In the jail, `pane.close`, `tab.close`, `space.close`, `terminal.kill`, `terminal.keep` and `terminal.park` accept only targets created through the proxy in this session, named explicitly. The user's own panes stay theirs. Closing a pane leaves the jail program running; end it with `hc kill <sandbox_terminal>`. After a `tab.new` or `space.new` program exits, its pane falls back to a host shell for the user.
+Close, kill, keep or park only targets you created, named explicitly. The user's own panes stay theirs. Closing a pane leaves an attached program running; end it with `hc kill <terminal>`.
 
 Proceed when the command named the intended operation and target.
 
 ## 4. Verify
 
-Read the command result and keep any created IDs. Check `ls` or `status` for the intended placement or focus and for new errors. A successful launch reply does not prove the program started correctly; read its `sandbox_terminal` with `hc read` as well.
+Read the command result and keep any created IDs. Check `ls` or `status` for the intended placement or focus and for new errors. A successful launch reply does not prove the program started correctly; read its `terminal` with `hc read` as well.
 
-For visual changes, run `herdr-app shot <path>.png` and inspect the image. In the jail the path must lie inside the workspace, for example under `.dev-skills/`. The screenshot shows Herdr's window, not the application under test. Use App commands rather than pointer or keyboard automation against the user's desktop.
+For visual changes, run `herdr-app shot <path>.png` and inspect the image. In the jail, choose a path inside the workspace, for example under `.dev-skills/`, so you can read the image. The screenshot shows Herdr's window, not the application under test. Use App commands rather than pointer or keyboard automation against the user's desktop.
 
 Report the observed result and any remaining error. Leave the user's App and Core running; a window operation never needs a restart.
