@@ -21,6 +21,8 @@
   "liebherr"
   "logbook"
   "matter"
+  "mcp"
+  "mcp_server"
   "met"
   "mobile_app"
   "mqtt"

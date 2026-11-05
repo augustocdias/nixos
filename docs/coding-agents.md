@@ -137,6 +137,41 @@ The Nix overlay disables OMP's built-in browser prelude in favor of the shared t
 - **Skills** also come from other modules through `programs.claude-code.skills`: `herdr-app` and `herdr-core` from `herdr.nix`, and `jgrep` from `work/jgrep.nix`.
 - **Herdr sidebar**: `herdr.nix` registers `claude-activity.py` for display metadata. Native OSC reports supply lifecycle status independently; see [App sidebar](herdr.md#app-sidebar).
 
+## Work Hermes (laptop)
+
+The `hermes-agent` aspect has two parts: `_darwin.nix` is the macmini household Hermes ([Voice services](voice-services.md#hermes-agent)), and `_linux.nix` is a work delegator, included by the `work` aspect. It runs `hermes gateway run` as the Home Manager user unit `hermes-agent`, inside its own agent-jail profile (`hermes-jail`). The `hermes` on PATH is the same wrapper, so the CLI and the service share mounts and state.
+
+How work flows:
+
+1. The user triages with the `coordinator` (Hermes chat or Slack) or in their own Claude Code or omp session. The spec and tickets go to the repo's own tracker. When the repo's `.dev-skills/issue-tracker.md` ties it to the Hermes board (`setup-dev-skills` asks), `to-tickets` also files one card per ticket. The coordinator uses `kanban_create`; other sessions use the `hermes-board` MCP, whose cards land in `triage`.
+2. Each card starts with header lines: `Repo:`, `Tracker:`, `Agents:` (harness per role), `Git:` (the `git-conventions` decisions) and `Herdr:` (space, pane or tab, close on completion). The template is `CARD_TEMPLATE` in `plugin/__init__.py`, and `board_template` serves it.
+3. The dispatcher spawns the assigned role. The role picks one of its skills; `agent_launch` (`herdr-agents` plugin) takes the harness, repo, signing and space from the card header. It runs `hc run --bg --outlive-parent hermes-<harness>[-signing] <message>`, attaches the terminal in the card's space, and the role parks the card with `kanban_schedule`.
+4. The agent reports through `report_done`, `report_blocked`, `ask` or `comment`. The plugin's loopback endpoint (port in `_linux.nix`; gateway process only; JSON with a loopback `Host` only) checks the per-launch token, records the iteration, comments on the card and unblocks it, so the role wakes and judges the result.
+
+Design points the source does not show:
+
+- **Skills drive the agents.** Templates have no body and no model, so the plugin writes the whole first message: the skill call (`/implement <ticket>` for Claude, `/skill:implement <ticket>` for omp), the card and token, the card's git agreement, and `protocol.md`. Each role may only launch with the skills in `launchSkills` in `_linux.nix`. Only the programmer gets the `-signing` template, and only when the card's `Git:` line gives commits or pushes to the agent.
+- **Iterations.** Every launch and every `agent_send` follow-up opens an iteration on the card, with its start, end, outcome, session id and resume command. Each is posted as a card comment and returned by `agent_status`.
+- **Toolsets.** Every profile lists the toolsets it keeps; the rest go into `agent.disabled_toolsets`, which Hermes applies last. Roles have no `terminal`, so the plugin is their only route to Herdr: it refuses repos and spaces outside `~/dev`.
+- **The coordinator has a terminal** (`terminal`, `file`, `web`) by the user's choice, so it can manage Herdr spaces with `hc` and `herdr-app`. Anything those start runs on the host outside every jail, so `approvals.mode` is `manual` for the coordinator: every terminal command asks. Its SOUL carries the jail contract's Herdr rule and the hook-free `herdr-worktree` command. The terminal can also reach the jail's `host-query` socket directly, the same gap every jail has.
+- **Approval on every call.** `host-mcp.py` (every profile except the assistant's) and the coordinator's known Linear, Notion and Datadog write tools each cost more than the MCP `spend_limit`. A crossing call prompts Allow Once or Deny even under YOLO or `trust: full`, and unattended kanban runs refuse it. The work MCPs are also `trust: untrusted`, so a new write tool without a read-only hint still asks. Log in at runtime with `hermes -p coordinator mcp login <name>`.
+- **The assistant reads untrusted mail.** It has no shell, so the bundled `google-workspace` skill (shell scripts, full-scope token) cannot work for it. The plugin gives it read-only `gmail_search`, `gmail_get` and `calendar_list` (toolset `google`) instead. `hermes -p assistant google-login < client_secret.json`, a plugin CLI command, stores a token with only `gmail.readonly` and `calendar.readonly` in the assistant's profile. A `pre_tool_call` hook forces its `kanban_create` into `triage` and blocks every other kanban write.
+- **Local-tracker repos.** `~/dev` is read-only to Hermes, so the coordinator cannot write a repo's `.dev-skills/`. It writes a handoff and launches an agent with `to-spec` or `to-tickets` instead.
+- **Jail.** `readOnlyCwd` binds `~/dev` and its Git common dir read-only; `~/.hermes` is the only writable state. The wrapper unsets `AGENT_JAIL_SIGNING` before the signing block and drops `INVOCATION_ID`, without which kanban would wrap workers in `systemd-run --user --scope` and fail on the missing user bus.
+- **Parks and review.** `kanban_schedule` never counts toward the block-recurrence limit, and `scheduled` and `unblocked` events never notify. Unblocking a scheduled card always lands in `ready`. When the parked run was claimed from `review`, the plugin flips the card straight back to `review` in one transaction, mirroring `unblock_task` with private kanban helpers. Calling `request_review` instead would emit `review_requested` and wake the coordinator on every reviewer report. Re-check `_wake` when the Hermes pin moves. A report that arrives before the park is held and applied by the plugin's watcher. The review lane force-loads `sdlc-review`; the Nix copy launches a `code-review` agent.
+- **Grouping.** Hermes kanban has no sub-tickets: `parents` are dependency edges (a child waits in `todo` until its parents are done). A spec's cards share a `tenant`, which the dashboard filters on.
+- **Shared plugin state.** Each profile re-imports the plugin, so launch records live in `~/.hermes/herdr-agents.json` behind a file lock: one agent per card and profile, plus the card's iterations. Per-profile settings (launch skills, `force_triage`, the agent cap, the protocol) are rendered into the plugin's `settings.json`.
+- **Bootstrap.** `_bootstrap_linux.py` runs before each start and reuses `_bootstrap.py`'s helpers. It merges Nix-owned keys into each profile's `config.yaml`, keeps runtime keys, and fails on malformed YAML instead of overwriting it. The root profile is the host gateway: the unit runs `hermes gateway run` with no `-p`, and the root's explicit `gateway.multiplex_profiles: true` makes it serve every profile under `~/.hermes/profiles/`. A named profile's `gateway run` would only attach to it. The root also catches unrouted chat and gets no work tools.
+- **SOULs** are the profile's file in `souls/`, plus `souls/_role.md` for roles, the "Evidence and decisions" and "Development skills" sections of `agent-shared/context.md`, and the shared style rules. Skills come from `skills.external_dirs`: the `agent-shared` bundle, the Hermes skills, the Herdr skills and `datadog-queries`.
+- **Runtime-only setup:** `hermes auth add openai-codex` (shared by all profiles), the chat platform and its home channel, `gateway.profile_routes` for the coordinator and the assistant, MCP logins, `hermes -p assistant google-login`, and cron jobs. Blocked-agent alerts go to every platform with a `<PLATFORM>_HOME_CHANNEL`, and stay silent until one exists.
+- **Restart.** `X-RestartIfChanged=false`: restart by hand with `systemctl --user restart hermes-agent`. Launched agents live on the user's Core and survive the restart.
+
+Verify after a change:
+
+- **Rendered config.** Inspect `~/.hermes/profiles/<p>/config.yaml` and `hermes -p <p> tools list --platform cli`: roles show `agents` and `kanban` on and `terminal` off; the coordinator also shows `terminal`, `file`, `web` and the four MCP servers.
+- **Skills.** `hermes -p coordinator skills list` shows the shared skills, `herdr-core`, `herdr-app` and `datadog-queries` from external dirs.
+- **Logs.** Check `journalctl --user -u hermes-agent` (`host_journal` with `user_units` from a jail).
+
 ## rtk (shell-output compression)
 
 `modules/programs/rtk.nix` (aspect `rtk`, in `user-base`) installs nixpkgs `rtk`, the full edition with the BUSL `engine` feature. No `pipeline.toml` is written, so it runs `rtk:default`: the bash rewrite plus per-command filters.
@@ -144,7 +179,7 @@ The Nix overlay disables OMP's built-in browser prelude in favor of the shared t
 - **Claude**: a `PreToolUse` hook on `Bash` runs `rtk hook claude`, which rewrites supported commands (`git status` to `rtk git status`) through `updatedInput`. rtk returns `allow` only when one of our allow rules matched, and Claude still applies its deny and ask rules over a hook `allow`.
 - **omp**: `~/.omp/agent/extensions/rtk.ts` is upstream's extension from `pkgs.rtk.src`, version-matched to the binary. It rewrites the command in place.
 - **Rule twins**: Claude checks permission rules against the rewritten command, and omp's order is unverified. So `_bash.nix` gives each pattern not starting with `*` an `rtk <pattern>` twin with the same action. Without twins, `rtk nix run …` would slip past `nix run*` and land on the jailed `*` allow.
-- **Hermes** (macmini) uses the `rtk-rewrite` plugin; see [Voice services](voice-services.md#hermes-agent).
+- **Hermes** (macmini) uses the `rtk-rewrite` plugin; see [Voice services](voice-services.md#hermes-agent). The laptop Hermes has no terminal tool, so nothing to rewrite.
 - **Never run `rtk init`**: it would patch the immutable `settings.json` and the Nix-owned extension.
 - **Stats**: `~/.local/share/rtk` is bound read-write in the jail, so `rtk gain` persists. The home-manager activation creates the directory, because the jail skips a missing bind source.
 

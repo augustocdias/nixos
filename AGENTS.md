@@ -20,7 +20,7 @@ Declarative Den/aspect configuration for `augusto` across three hosts:
 | Compositor, greeter, window manager, keyboard, session, desktop shell | [Desktop](docs/desktop.md) |
 | Herdr panes, workspaces, worktrees, plugins, sidebar, agent lifecycle | [Herdr](docs/herdr.md) |
 | Neovim plugins, LSP, formatters, linters | [Neovim](docs/neovim.md) |
-| Harness prompts, settings, skills, models, MCPs, approvals, sandbox, jail | [Coding agents](docs/coding-agents.md) |
+| Harness prompts, settings, skills, models, MCPs, approvals, sandbox, jail; work Hermes delegator | [Coding agents](docs/coding-agents.md) |
 
 Topic docs are a snapshot of the current system. Source files win when they disagree. When a change alters documented behavior, load the `writing-for-agents` skill and edit the owning topic in the same change:
 

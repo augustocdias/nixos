@@ -73,6 +73,14 @@ Work the **frontier**: any ticket whose blockers are all done. For a purely line
 
 Do NOT close or modify any parent issue.
 
+### 6. File Hermes cards
+
+Run this step only when the workspace's `issue-tracker.md` says the repo is tied to the Hermes board.
+
+1. Agree the card header with the user once for the whole set: the harness per role, the `git-conventions` decisions (branch and the five ownership categories), and the Herdr space with its placement and whether it closes when the work is done. Leave the space out when the user wants the Hermes coordinator to create it.
+2. File one card per published ticket, in the same order, through the Hermes board MCP (`board_create`): the ticket reference in `tracker`, the agreed header fields, the spec slug as `tenant`, and the cards of the ticket's blockers as `parents`. Inside Hermes, the coordinator uses `kanban_create` with the same fields instead.
+3. Report the card ids beside the ticket references. Board cards land in `triage` until the user promotes them.
+
 <local-ticket-template>
 
 # <NN>: <Ticket title>

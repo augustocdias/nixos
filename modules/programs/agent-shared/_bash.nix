@@ -15,19 +15,11 @@
     if jailed
     then {
       "*" = "allow";
-      "nix build*" = "allow";
-      "nix-build" = "allow";
-      "nix-build *" = "allow";
-      "nix flake check*" = "allow";
-      "nix-store -r*" = "allow";
-      "nix-store --realise*" = "allow";
-      "nix run*" = "ask";
-      "nix shell*" = "ask";
-      "nix develop*" = "ask";
       "nix-env*" = "deny";
       "nix profile*" = "deny";
       "nix-collect-garbage*" = "deny";
       "nixos-rebuild*" = "deny";
+      "nix-rebuild*" = "deny";
       "darwin-rebuild*" = "deny";
       "home-manager*" = "deny";
       "update-system*" = "deny";

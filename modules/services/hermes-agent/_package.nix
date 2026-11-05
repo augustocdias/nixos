@@ -3,6 +3,8 @@
   hermesInput,
   honchoSource,
   system,
+  # The macmini's WhatsApp pairing needs the bridge; other hosts take upstream's wheel as is.
+  whatsappBridge ? true,
 }: let
   base = hermesInput.packages.${system}.messaging;
   python = base.python;
@@ -66,6 +68,9 @@
 in
   base.override {
     version = "unstable-${hermesInput.shortRev}";
-    inherit uv2nix;
+    uv2nix =
+      if whatsappBridge
+      then uv2nix
+      else upstreamUv2nix;
     extraPythonPackages = [sdk];
   }

@@ -6,6 +6,7 @@
 #   pre     = c: [ ... ];      # combinators that run before host-query starts
 #   extra   = c: [ ... ];      # agent-specific binds and env
 #   reportActivity = true;     # sidebar metadata bridge; harnesses only
+#   readOnlyCwd = false;       # bind the working directory and its Git common dir read-only
 # `c` is jail-nix's combinator set, already extended with pkgs.
 # }
 {
@@ -19,7 +20,12 @@
   pre ? (_: []),
   extra ? (_: []),
   reportActivity ? true,
+  readOnlyCwd ? false,
 }: let
+  bindFlag =
+    if readOnlyCwd
+    then "--ro-bind"
+    else "--bind";
   jail = inputs.jail-nix.lib.extend {
     inherit pkgs;
     suppressExperimentalWarnings = true;
@@ -87,7 +93,11 @@ in
 
         (ro-bind "${pkgs.coreutils}/bin/env" "/usr/bin/env")
 
-        mount-cwd
+        (
+          if readOnlyCwd
+          then unsafe-add-raw-args "--ro-bind \"$PWD\" \"$PWD\""
+          else mount-cwd
+        )
 
         (add-runtime ''
           if [ -n "''${AGENT_JAIL:-}" ]; then
@@ -100,7 +110,7 @@ in
             && git_dir=$(${git} rev-parse --git-dir 2>/dev/null) \
             && [ "$git_common" != "$git_dir" ]; then
             git_common=$(realpath "$git_common")
-            RUNTIME_ARGS+=(--bind "$git_common" "$git_common")
+            RUNTIME_ARGS+=(${bindFlag} "$git_common" "$git_common")
           fi
         '')
       ]

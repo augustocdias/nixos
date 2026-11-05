@@ -51,6 +51,10 @@ When `triage` is not installed, skip triage vocabulary configuration. When it is
 
 Default to workspace `GLOSSARY.md` and `adr/`. Offer `GLOSSARY-MAP.md` plus `domains/<context>/` only when actual bounded contexts justify it. Record existing authoritative documents as read-only references in `domain.md`; never move, overwrite, or untrack them. Use [domain.md](domain.md) for consumer rules. Discover genuine terminology and verified coding standards. Do not invent either.
 
+### D. Hermes board
+
+Ask whether work in this repo is tracked on the Hermes kanban board, unless `issue-tracker.md` already says. The board is the user's own tracking copy: cards point at this repo's tickets, and Hermes roles launch agents from them. Recommend yes when the repo is under `~/dev` and the Hermes board MCP (`hermes-board`) is connected. Record the answer and the repo's absolute path in `issue-tracker.md` under `## Hermes board`; `to-tickets` and the Hermes coordinator read it there.
+
 ## 3. Confirm material changes
 
 Present discovered tracker/project selection, label mapping, domain layout, and any conflicts with prior choices. Resolve only unresolved material tradeoffs. Preserve existing user-edited documents and tracker decisions. Create missing documents; propose conflicting updates instead of replacing the directory. Do not add an Agent skills block to tracked context files.
@@ -60,7 +64,7 @@ Present discovered tracker/project selection, label mapping, domain layout, and 
 Create these documents at the absolute workspace path, retaining existing content:
 
 - `README.md`: purpose, selected project/tracker, document index, local sharing/backup and exclusion limitations, and invocation examples: Claude `/setup-dev-skills`, `/grill-me`; omp `/skill:setup-dev-skills`, `/skill:grill-me`, with contextual loading via `read skill://code-review`.
-- `issue-tracker.md`: selected tracker, concrete identifiers, complete verified operations, parents/blockers, and wayfinding claims/resolutions.
+- `issue-tracker.md`: selected tracker, concrete identifiers, complete verified operations, parents/blockers, wayfinding claims/resolutions, and the Hermes board answer.
 - `triage-labels.md`: five-role mapping and any unapplied remote proposals.
 - `domain.md`: domain layout, consumer rules, and links to authoritative existing documents.
 - `GLOSSARY.md`: discovered/agreed terms, or an honest empty glossary header pending real domain work.

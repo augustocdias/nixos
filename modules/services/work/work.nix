@@ -11,6 +11,7 @@
       jgrep
       claude-code
       claude-code-jail
+      hermes-agent
     ];
 
     homeManager = {
