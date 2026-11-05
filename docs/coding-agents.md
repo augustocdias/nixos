@@ -14,7 +14,8 @@ Shared material lives in `modules/programs/agent-shared/` and `modules/programs/
 - `agent-shared/_bash.nix`: the bash ruleset, translated by each harness's `_permissions.nix`. See [Approvals](#approvals) for why overrides may only narrow.
 - `agent-jail/_mk-jail.nix`: the bubblewrap jail used by both harnesses. `agent-jail/jail-context.md` is loaded only inside the jail.
 - `agent-jail/_host-query/` backs the `host_*` tools; `agent-jail/host-mcp.py` exposes them to both harnesses as a stdio MCP server.
-- `agent-jail/_herdr-relay/` publishes restricted sidebar metadata to the launching Core terminal and proxies the Herdr App socket into the jail.
+- `agent-jail/_herdr-relay/` publishes restricted sidebar metadata to the launching Core terminal, proxies the Herdr App socket into the jail, and links the jail Core to the host Core.
+- `agent-jail/_runner.nix` builds `agent-jail-run`, the jail the host link puts in front of programs that have no harness jail of their own. Both harness modules install it.
 
 The `caveman` and `ponytail` flake inputs are declared in `omp.nix` and `claude-code.nix` but consumed only by Hermes (`modules/services/hermes-agent/`). The harnesses use the adapted copies in `agent-shared/style/`.
 
@@ -31,7 +32,7 @@ Skills specific to this repo (`den-module`, `nvim-plugin`, `sops-secrets`) live 
 - **Boundaries** that every skill workflow keeps:
   - `git-conventions` owns the upfront agreement for branch, worktree, commit, push, and PR ownership. Read-only work needs none.
   - Existing approvals stay mandatory. Routine delegation never authorizes published rewrites, merging PRs, destructive cleanup, or repository-setting changes.
-  - Temporary unsigned local commits require a separate per-run opt-in under `git-conventions`. The parent tracks a final re-signing task that blocks every push until all outgoing commits have verified signatures. Commit ownership alone does not grant the exception.
+  - Every commit is signed when it is created: with the agent key in a session holding the signing grant, otherwise through `host_exec`. A pre-push `git verify-commit` over every outgoing commit gates each push.
   - The parent owns credentials, signed commits and pushes (through Linux `host_exec`), refs, tracker writes, and shared progress. Required `host_ssh_agent` approval comes before any subagent starts.
   - Delegates receive the parent's absolute `.dev-skills/` workspace, even outside their own Git root. One writer owns each checkout.
   - `.dev-skills/` artifacts never enter implementation commits or pushes. Local exclusion is not encryption or backup.
@@ -51,9 +52,10 @@ Gotchas behind the jail's design:
 - **No curated toolbelt.** `/nix/store` is bound read-only and PATH comes from `/run/current-system/sw` and `/etc/profiles/per-user/<user>`. Curating tools would not be a boundary, since every store binary is reachable by absolute path.
 - **The host environment is inherited.** jail-nix's `base` ends with `--clearenv`, so the jail uses `reset` and rebuilds the pieces without it; that is how sops-derived keys, `HERDR_*`, and direnv exports arrive. Consequence: `add-path` seeds from an empty PATH, so use `set-env "PATH" "…:$PATH"`.
 - **`GPG_TTY` is removed twice**: unset in the first runtime block (before `pre` and host-query start) and `--unsetenv` in the final block (after caller overlays). gpg-agent keeps its own terminal and display state, so a missing `GPG_TTY` does not prove GUI pinentry. Do not flush caches or restart the agent just to force a prompt.
-- **No gpg-agent socket.** The agent is a signing and decryption oracle: exposing it would let the jail sign as the user and decrypt every sops secret. With `signByDefault = true` in the read-only git config, ordinary `git commit` fails for lack of a signer. Signed commits go through `host_exec`. The explicit local unsigned exception uses a per-command flag without changing that configuration or exposing the socket; its final signing task remains a publication gate.
+- **No gpg-agent socket.** The agent is a signing and decryption oracle: exposing it would let the jail sign as the user and decrypt every sops secret. With `signByDefault = true` in the read-only git config, ordinary `git commit` fails for lack of a signer. Signed commits go through `host_exec`, or through the agent key when the session holds the [signing grant](#signing-and-push-grant).
 - **SSH comes from a relay, on approval.** `SSH_AUTH_SOCK` is unset at launch. `host_ssh_agent` makes host-query listen on `<grant_root>/ssh-agent.sock` and pipe each connection to the host's `S.gpg-agent.ssh` until host-query exits. It is a relay rather than `host_mount` because a socket seen through bindfs/FUSE cannot be `connect()`ed. `~/.ssh/known_hosts` is read-only and private-key directories are not mounted. The SSH capability is not authorization: pushes and deletions keep their normal approvals, and host verification is never weakened.
 - **No D-Bus.** The session bus reaches `systemd --user`, which can start units outside the jail. OMP's direct desktop notifications are therefore unavailable inside the jail.
+- **Jails refuse to nest.** Each jail sets `AGENT_JAIL`, and a launcher that sees it exits with a pointer to `hc run --on host`. A nested launch half-worked before: `claude` failed on its read-only state directory, and `omp` started without `~/.omp`, so it had no login or config.
 - **`rm` and `rmdir` are rmtrash, and trash is per mount.** Each writable path is its own bind mount, so deletions land in that mount's `.Trash-1000` (a rename into the home trash would fail with `EXDEV`). That is why `programs.git.ignores` contains `.Trash-*/`. `~/.local/share/Trash` is deliberately not bound.
 
 ### Core sidebar reporting
@@ -93,6 +95,35 @@ The jail owns the path of its Core socket and could link it to the host Core. Be
 `tab.new` and `space.new` wrap the viewer in the host shell's `-ic` form, so the pane falls back to a host shell after the jail terminal ends. The agent cannot type into it: paste is refused, and `task` never reaches the App. Jail terminals outlive their viewer panes; the agent ends them with `hc kill`. The proxy reaches the jail Core only once Core is running, so its error asks the agent to run `hc ls` first.
 
 `python3 -m unittest test_app_proxy` in `_herdr-relay/` covers refusals, rewriting, ownership, the PID-namespace check and screenshot containment; the package check phase runs it. Proxy logs live in `$jail_state/log/app-proxy-<pid>.log`.
+
+### Host link
+
+`_herdr-relay/host_link.py` makes the host Core the jail Core's machine `host`, so `hc run --on host` and every other `hc` command reach host terminals. The launcher starts it outside the jail and binds its socket at `/tmp/agent-host-link.sock`. The jail's `hc` wrapper registers the machine on its first call, with `agent-host-via` (socat to that socket) as the `--via` command. Each connection runs `herdr-core connect` against the host Core and rewrites the stream:
+
+- `terminal.run` never starts the requested argv directly. `claude` and `omp` go through their installed wrappers, and everything else goes through `agent-jail-run`, so each program gets a new jail with the same profile. A shell `line` becomes `sh -c` inside that jail.
+- The host Core starts every program at the workspace root. A subdirectory travels as `AGENT_JAIL_CHDIR`, and the launcher applies it with bubblewrap `--chdir`, so a symlink planted in the workspace resolves inside the new jail. Working directories outside the workspace are refused.
+- Only `TERM`, `COLORTERM` and `TERM_PROGRAM` pass from the client environment, because the wrapper script runs on the host before bubblewrap starts.
+- The parent is always the launcher's own host terminal (`HC_TERMINAL_ID`), and `caller` and `on` are stripped, so the jail cannot attach work to another host terminal or hop to another machine.
+- Terminal calls, listings and events cover only terminals the link started and their descendants. Ownership comes from a per-link label (`agent-jail-link`), because a terminal's `created` event arrives before the `terminal.run` reply. Names resolve to owned addresses before forwarding.
+- `machine.exec` and `file.*` are answered by the jail Core, which sees the same workspace.
+- `terminal.keep`, `--keep`, `server.stop`/`restart` and the `machine.*` changes are refused: each would leave an unjailed host shell or change the host Core. Methods the link does not know are refused too.
+
+**Host children have no host access.** The link sets `AGENT_JAIL_NO_HOST=1`, and the launcher then skips host-query, so `host-mcp.py` reports that host access belongs to the parent. This is what makes `keys`, `attach` and `send --force` safe on host children: no approval prompt in them can reach the host, so a parent typing into a child cannot approve its own escape.
+
+The wire format after the `hello` line is `u32le channel | u8 kind | u32le length | payload`; kind 1 is a flow-control credit. Event channels are byte streams of newline-terminated JSON, and one event can span frames, so the link buffers lines per channel. It credits the bytes of every event it drops, or the host Core's window fills and the stream stalls.
+
+Logs live in `$jail_state/log/host-link-<pid>.log`.
+
+### Signing and push grant
+
+Autonomous runs need children that commit and push, and children have no host access. The grant gives a session a separate agent SSH key for both, without exposing the user's GPG key.
+
+- **The user grants it at launch** with `AGENT_JAIL_SIGNING=1 claude` (or `omp`). The launcher starts an ssh-agent on the host, loads the sops secret `agent_ssh_key`, and binds only the agent socket into the jail as `/tmp/agent-ssh.sock`. The jail can use the key, never read it.
+- **Git is configured through the environment** (`GIT_CONFIG_COUNT`), which has command-line precedence over the read-only Home Manager config: `gpg.format=ssh`, `user.signingkey=key::<public key>` (ssh-keygen then signs through the agent), and `gpg.ssh.allowedSignersFile` for `git verify-commit`. SSH pushes find the key through `SSH_AUTH_SOCK`.
+- **A granted session passes it on by label.** `hc run --on host --label agent-jail.signing=1` makes the host link set `AGENT_JAIL_SIGNING=1` for that child. The link runs with `--signing` only in a granted session; anywhere else the label fails the launch, so ticket text cannot create a grant. The variable itself never passes through the link's environment filter.
+- **Setup.** `agent-jail/agent-ssh-key.pub` holds the public key, and GitHub lists it as both an authentication key and a signing key. Without that file or the secret, a grant prints a warning and the session runs ungranted. Agent logs live in `$jail_state/log/agent-key-<pid>.log`.
+
+The key authenticates as the user's GitHub account, so a granted session can push to any repository that account can push to. Branch protection is what keeps agents off protected branches.
 
 ### `host_*` tools
 

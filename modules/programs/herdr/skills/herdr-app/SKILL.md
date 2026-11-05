@@ -51,7 +51,7 @@ Open a pane that attaches to it:
 herdr-app do terminal.open --place right --name web --argv '["hc","attach","t4"]'
 ```
 
-Closing that pane detaches without stopping the program.
+For a terminal started with `hc run --on host`, attach to `host/<address>` the same way. Closing that pane detaches without stopping the program.
 
 ### Close what you opened
 

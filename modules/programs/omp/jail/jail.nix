@@ -25,7 +25,7 @@
           ];
       };
     in {
-      home.packages = [jailed];
+      home.packages = [jailed (import ../../agent-jail/_runner.nix mkJail pkgs)];
     };
   };
 }

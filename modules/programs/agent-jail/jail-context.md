@@ -17,6 +17,8 @@ The host environment is inherited, including credentials, `HERDR_*`, terminfo an
 
 `hc` controls a session-owned Core inside the Linux jail, with no additional command approval. Keep `HC_SOCKET` pointed at that sandbox. Core starts on demand; its programs share the jail's mounts and network and end when the jail closes, even with `--outlive-parent`. The root harness has no Core terminal ID; Core assigns IDs to the workers it starts. In App terminals, `HERDR_ACTIVITY_SOCKET` remains a separate report-only bridge for the host sidebar.
 
+The host Core is the `hc` machine `host`. `hc run --on host` starts a program on the host inside a new jail: `claude` and `omp` get their own harness jail, and anything else runs under `agent-jail-run`. Those jails have no host access; host tools there report that host access belongs to the parent session. Run another agent this way, never by calling `claude` or `omp` inside this jail, which refuses to nest. Host terminals you start are `host/<address>` or `host/<name>`, and every `hc` command works on them and on their descendants. The working directory must be inside the workspace. `--keep` is refused because it would leave an unjailed host shell.
+
 `herdr-app` talks to a session App proxy, with no additional command approval. Programs started through it run in this jail's Core and appear in the user's App as `herdr-core-view` panes; the proxy refuses commands that would reach host programs. Read the `herdr-app` skill before changing the window. Host terminals and the App itself remain outside the jail.
 
 ## Host access and approval
@@ -38,7 +40,7 @@ The SSH agent socket is not mounted in the jail, and `SSH_AUTH_SOCK` is unset. B
 
 SSH credentials are the user's credentials. Obtain approval for consequential actions such as pushing shared branches, force-pushing, or deleting remote refs. Authorized SSH and remote deployment are not technically blocked by the jail.
 
-The GPG signing/decryption socket is absent. Stage normally, then leave commits to the user or request signed `git commit -S` through approved `host_exec`. The `git-conventions` skill defines an explicit per-run exception for temporary unsigned local commits and a mandatory final signing task before any push. Only that exception permits `git commit --no-gpg-sign` inside the jail. Keep Git signing configuration unchanged and all host approvals intact. Never push unsigned commits. SSH authentication does not grant Git authoring access.
+The GPG signing/decryption socket is absent. When the user launched this session with the signing grant, `SSH_AUTH_SOCK` is `/tmp/agent-ssh.sock` and git's environment config selects SSH signing: commits are signed with the agent key, and SSH pushes use the same key, without `host_ssh_agent`. The key stays in a host ssh-agent, so it can be used here but not read. Without the grant, request signed `git commit -S` through approved `host_exec`, or leave the commit to the user. The `git-conventions` skill owns the signing route and the pre-push signature check. Keep Git signing configuration unchanged and all host approvals intact. SSH authentication does not grant Git authoring access.
 
 ## Deletion and recovery
 

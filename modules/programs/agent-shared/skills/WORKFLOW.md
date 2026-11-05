@@ -54,7 +54,7 @@ Existing permissions remain unchanged. Remote mutations, label creation, publica
 
 The parent owns approval-dependent actions and credentials. When Git-over-SSH is needed, obtain `host_ssh_agent` approval before any worker starts; pass the approved socket path to applicable workers. Rejection does not permit another credential route. Workers return evidence, intended production paths and pending actions; the parent stages explicit production paths and handles signed commits/pushes through the required host route. Preserve Darwin's existing signing route outside the Linux jail.
 
-`git-conventions` also owns the per-run opt-in for temporary unsigned local commits. If approved, the parent may create those commits inside the jail and must track the final signing task as a dependency of every push. Signed commits and pushes retain their normal approval routes; workers still return proposals.
+`git-conventions` also owns the signing route. A session the user launched with the signing grant signs and pushes with the agent key, and passes that grant only to host workers whose tickets ask for it. Without the grant, signed commits and pushes keep their normal approval routes, and workers return proposals.
 
 Before commits or publication, inspect tracked and staged supporting artifacts. If any `.dev-skills/` artifacts are tracked or staged, stop publication and explain the conflict without discarding or untracking user work. Never force-add supporting artifacts, temporary preview wiring, or artifact archive branches. Authorized PR bodies and tracker summaries may contain concise necessary evidence, not uploaded supporting files or inaccessible local links. Sharing generated artifacts needs a separate explicit request.
 

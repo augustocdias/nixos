@@ -102,9 +102,7 @@ Static channel credentials such as Telegram bot tokens belong in SOPS, wired to 
 
 ### MCP servers
 
-Both profiles get Context7 (anonymous public endpoint) and the Home Assistant MCP server over its authenticated webhook. `hermes_home_assistant_mcp_url` and `hermes_home_assistant_token` hold the webhook URL and a dedicated long-lived token named `Hermes Agent`, owned by the `HA-MCP Server` admin account and revocable there. Bootstrap renders them only into each profile's private `.env`, never the store or the host profile. Both profiles share this household access. The connection is HTTP on the trusted LAN; never expose it or its credentials to untrusted networks.
-
-Reference these credentials as `${HERMES_HOME_ASSISTANT_MCP_URL}` and `${HERMES_HOME_ASSISTANT_TOKEN}`. The `${env:NAME}` form triggers a false warning because the config loader runs before the profile `.env` loads.
+Both profiles get Context7 (anonymous public endpoint) and the Home Assistant MCP server over its authenticated webhook.
 
 Both servers use `trust: untrusted`, so tools without a read-only annotation need approval and unattended calls fail closed. Open WebUI's chat route cannot answer approvals; make HA changes from an approval-capable Hermes surface.
 

@@ -24,6 +24,8 @@
           dd_api_key = {};
           github_token = {};
           ollama_api_key = {};
+          # Agent jails' signing and push key, loaded only for granted sessions.
+          agent_ssh_key = {};
         };
 
         templates = {

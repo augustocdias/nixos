@@ -53,11 +53,6 @@
               url = "https://mcp.context7.com/mcp";
               trust = "untrusted";
             };
-            home_assistant = {
-              url = "\${HERMES_HOME_ASSISTANT_MCP_URL}";
-              headers.Authorization = "Bearer \${HERMES_HOME_ASSISTANT_TOKEN}";
-              trust = "untrusted";
-            };
           };
         };
       soul = ./SOUL.md;
@@ -65,10 +60,6 @@
       profile_keys = {
         augusto = config.sops.secrets.hermes_augusto_api_key.path;
         livia = config.sops.secrets.hermes_livia_api_key.path;
-      };
-      mcp_secrets = {
-        HERMES_HOME_ASSISTANT_MCP_URL = config.sops.secrets.hermes_home_assistant_mcp_url.path;
-        HERMES_HOME_ASSISTANT_TOKEN = config.sops.secrets.hermes_home_assistant_token.path;
       };
       plugins = {
         honcho = "${inputs.hermes-plugin-honcho}/hermes-plugin-honcho";
@@ -110,8 +101,6 @@
       hermes_host_api_key = {owner = "augusto";};
       hermes_augusto_api_key = {owner = "augusto";};
       hermes_livia_api_key = {owner = "augusto";};
-      hermes_home_assistant_mcp_url = {owner = "augusto";};
-      hermes_home_assistant_token = {owner = "augusto";};
     };
     launchd.daemons.hermes-agent = {
       # launchd must not lend the host gateway ambient cloud credentials.
