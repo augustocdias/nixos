@@ -128,6 +128,36 @@
   ];
   soul = name: extra: pkgs.writeText "${name}-SOUL.md" (builtins.readFile ./souls/${name}.md + extra + "\n# Global rules\n" + globalContext + "\n" + style);
 
+  # Catppuccin Mocha for the CLI; missing keys inherit the built-in default skin.
+  skin = (pkgs.formats.yaml {}).generate "catppuccin-mocha.yaml" {
+    name = "catppuccin-mocha";
+    description = "Catppuccin Mocha";
+    colors = {
+      banner_border = "#cba6f7";
+      banner_title = "#b4befe";
+      banner_accent = "#89b4fa";
+      banner_dim = "#6c7086";
+      banner_text = "#cdd6f4";
+      ui_accent = "#cba6f7";
+      ui_label = "#94e2d5";
+      ui_ok = "#a6e3a1";
+      ui_error = "#f38ba8";
+      ui_warn = "#fab387";
+      prompt = "#cdd6f4";
+      input_rule = "#585b70";
+      response_border = "#89b4fa";
+      session_label = "#b4befe";
+      session_border = "#45475a";
+      status_bar_bg = "#181825";
+      voice_status_bg = "#181825";
+      selection_bg = "#45475a";
+      completion_menu_bg = "#181825";
+      completion_menu_current_bg = "#313244";
+      completion_menu_meta_bg = "#181825";
+      completion_menu_meta_current_bg = "#313244";
+    };
+  };
+
   # Every configurable toolset at the pinned Hermes; each profile disables what it does not list.
   allToolsets = ["web" "browser" "terminal" "file" "code_execution" "vision" "video" "image_gen" "video_gen" "x_search" "tts" "skills" "todo" "kanban" "memory" "context_engine" "session_search" "connections" "clarify" "delegation" "cronjob" "discord" "discord_admin" "yuanbao" "computer_use"];
   luna = {
@@ -241,6 +271,13 @@
     # Kanban worker turns use the cli list.
     platform_toolsets.cli = toolsets;
     security.allow_lazy_installs = false;
+    # The classic `hermes` CLI; vim_mode does not apply to `hermes --tui`.
+    display = {
+      vim_mode = true;
+      skin = "catppuccin-mocha";
+      streaming = true;
+      bell_on_prompt = true;
+    };
     skills.external_dirs = [
       "${sharedSkills.package}"
       "${./skills}"
@@ -300,6 +337,7 @@
   pluginLink = "${root}/nix/plugins/herdr-agents";
   manifest = pkgs.writeText "hermes-profiles.json" (builtins.toJSON {
     plugin = pluginLink;
+    skins."catppuccin-mocha" = "${skin}";
     inherit profiles;
     # Messages no runtime route matches land here: it gets no work tools.
     root = {
@@ -337,6 +375,18 @@
   '';
 in {
   home.packages = [hermes];
+
+  # The Herdr App's built-in Hermes entry, opening the coordinator. A sticky
+  # `hermes profile use` would also turn the gateway unit into a named profile.
+  herdr.programs.hermes = {
+    name = "Hermes";
+    icon = "icons/hermes.svg";
+    tint = true;
+    tile = "#1c1d21";
+    color = "#ffffff";
+    run = ["hermes" "-p" "coordinator"];
+  };
+  herdr.keys."super-s" = "terminal.open:hermes";
   assertions = [
     {
       assertion = lib.all (skill: sharedSkills.skills ? ${skill}) (lib.concatLists (lib.attrValues launchSkills));

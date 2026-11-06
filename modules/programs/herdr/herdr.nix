@@ -141,139 +141,160 @@
       };
     in {
       imports = [inputs.herdr-navigation.homeManagerModules.default];
-      home.packages = [workspace worktree herdrApp herdrCore];
 
-      xdg.configFile = {
-        "herdr-app/settings.json".text = builtins.toJSON {
-          zoom = 1;
-          sounds.enabled = true;
-          minimum_contrast = 1;
-          appearance = "dark";
-          font = "MonaspiceNe Nerd Font";
-          font_size = 10;
-          ui_font = "MonaspiceNe Nerd Font";
-          telemetry = false;
-          theme = "catppuccin";
+      options.herdr = {
+        programs = lib.mkOption {
+          type = lib.types.attrsOf (pkgs.formats.json {}).type;
+          default = {};
+          description = "Extra or overridden entries for herdr-app/programs.json, merged over the App's defaults.";
         };
-        "herdr-app/keys.json".text = builtins.toJSON (lib.recursiveUpdate appDefaultKeys {
-          global =
-            {
-              "alt-m" = "pane.zoom";
-              "alt-]" = "tab.next";
-              "alt-[" = "tab.prev";
-              "ctrl-shift-r" = "tab.rename";
-              ${prefixKey} = "mod.open:tmux-prefix";
-            }
-            // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-              "super-t" = "terminal.open";
-              "super--" = "pane.split:down";
-              "super-\\" = "pane.split:right";
-              "super-o" = "terminal.open:omp";
-              "super-c" = "terminal.open:claude";
-            };
-          "layout:main"."ctrl-alt-b" = "layout.toggle:sidebar";
-          terminal = {
-            ${prefixKey} = "mod.open:tmux-prefix";
-            "ctrl-h" = "pane.navigate:left";
-            "ctrl-j" = "pane.navigate:down";
-            "ctrl-k" = "pane.navigate:up";
-            "ctrl-l" = "pane.navigate:right";
-          };
-          "mod:tmux-prefix".${prefixKey} =
-            if pkgs.stdenv.hostPlatform.isLinux
-            then "tmux-prefix.dismiss"
-            else "tmux-prefix.send-prefix";
-        });
-        "herdr-app/mods/tmux-prefix/main.js".source = "${tmuxPrefix}/main.js";
-        "herdr-app/mods/tmux-prefix/mod.json".source = "${tmuxPrefix}/mod.json";
-        "herdr-app/mods/agents-enriched/main.js".source = "${enrichedAgents}/main.js";
-        "herdr-app/mods/agents-enriched/mod.json".source = "${enrichedAgents}/mod.json";
-        "herdr-app/programs.json".text = builtins.toJSON {
-          programs.omp = {
-            name = "OMP";
-            icon = "icons/pi.svg";
-            tint = true;
-            run = ["omp"];
-          };
-        };
-        "herdr-app/themes/catppuccin.json".text = builtins.toJSON {
-          background = "#1e1e2e";
-          foreground = "#cdd6f4";
-          selection = "#45475a";
-          cursor = "#f5e0dc";
-          ansi = [
-            "#45475a"
-            "#f38ba8"
-            "#a6e3a1"
-            "#f9e2af"
-            "#89b4fa"
-            "#f5c2e7"
-            "#94e2d5"
-            "#bac2de"
-            "#585b70"
-            "#f38ba8"
-            "#a6e3a1"
-            "#f9e2af"
-            "#89b4fa"
-            "#f5c2e7"
-            "#94e2d5"
-            "#a6adc8"
-          ];
+        keys = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          default = {};
+          description = "Extra global App keybindings, e.g. a key that opens one of `herdr.programs`.";
         };
       };
 
-      # No-op unless the claude-code aspect enables the module.
-      programs.claude-code = {
-        skills.herdr-app = ./skills/herdr-app;
-        skills.herdr-core = ./skills/herdr-core;
+      config = {
+        home.packages = [workspace worktree herdrApp herdrCore];
 
-        # Display metadata is separate from the agents' native OSC lifecycle reports.
-        hooks."herdr-activity.py" = ./claude-activity.py;
-        settings.hooks = let
-          hook = matcher: [
-            ({
-                hooks = [
-                  {
-                    type = "command";
-                    command = "${lib.getExe pkgs.python3} '${config.programs.claude-code.configDir}/hooks/herdr-activity.py'";
-                    timeout = 5;
-                  }
-                ];
+        xdg.configFile = {
+          "herdr-app/settings.json".text = builtins.toJSON {
+            zoom = 1;
+            sounds.enabled = true;
+            minimum_contrast = 1;
+            appearance = "dark";
+            font = "MonaspiceNe Nerd Font";
+            font_size = 10;
+            ui_font = "MonaspiceNe Nerd Font";
+            telemetry = false;
+            theme = "catppuccin";
+          };
+          "herdr-app/keys.json".text = builtins.toJSON (lib.recursiveUpdate appDefaultKeys {
+            global =
+              {
+                "alt-m" = "pane.zoom";
+                "alt-]" = "tab.next";
+                "alt-[" = "tab.prev";
+                "ctrl-shift-r" = "tab.rename";
+                ${prefixKey} = "mod.open:tmux-prefix";
               }
-              // lib.optionalAttrs (matcher != null) {inherit matcher;})
-          ];
-        in {
-          SessionStart = hook null;
-          UserPromptSubmit = hook null;
-          Stop = hook null;
-          PreToolUse = hook "^(Agent|Task)$";
-          PostToolUse = hook "^(TaskCreate|TaskUpdate|TodoWrite)$";
-          SubagentStart = hook null;
-          SubagentStop = hook null;
-          Notification = hook "^idle_prompt$";
-          SessionEnd = hook null;
+              // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+                "super-t" = "terminal.open";
+                "super--" = "pane.split:down";
+                "super-\\" = "pane.split:right";
+                "super-o" = "terminal.open:omp";
+                "super-c" = "terminal.open:claude";
+              }
+              // config.herdr.keys;
+            "layout:main"."ctrl-alt-b" = "layout.toggle:sidebar";
+            terminal = {
+              ${prefixKey} = "mod.open:tmux-prefix";
+              "ctrl-h" = "pane.navigate:left";
+              "ctrl-j" = "pane.navigate:down";
+              "ctrl-k" = "pane.navigate:up";
+              "ctrl-l" = "pane.navigate:right";
+            };
+            "mod:tmux-prefix".${prefixKey} =
+              if pkgs.stdenv.hostPlatform.isLinux
+              then "tmux-prefix.dismiss"
+              else "tmux-prefix.send-prefix";
+          });
+          "herdr-app/mods/tmux-prefix/main.js".source = "${tmuxPrefix}/main.js";
+          "herdr-app/mods/tmux-prefix/mod.json".source = "${tmuxPrefix}/mod.json";
+          "herdr-app/mods/agents-enriched/main.js".source = "${enrichedAgents}/main.js";
+          "herdr-app/mods/agents-enriched/mod.json".source = "${enrichedAgents}/mod.json";
+          "herdr-app/programs.json".text = builtins.toJSON {
+            programs =
+              {
+                omp = {
+                  name = "OMP";
+                  icon = "icons/pi.svg";
+                  tint = true;
+                  run = ["omp"];
+                };
+              }
+              // config.herdr.programs;
+          };
+          "herdr-app/themes/catppuccin.json".text = builtins.toJSON {
+            background = "#1e1e2e";
+            foreground = "#cdd6f4";
+            selection = "#45475a";
+            cursor = "#f5e0dc";
+            ansi = [
+              "#45475a"
+              "#f38ba8"
+              "#a6e3a1"
+              "#f9e2af"
+              "#89b4fa"
+              "#f5c2e7"
+              "#94e2d5"
+              "#bac2de"
+              "#585b70"
+              "#f38ba8"
+              "#a6e3a1"
+              "#f9e2af"
+              "#89b4fa"
+              "#f5c2e7"
+              "#94e2d5"
+              "#a6adc8"
+            ];
+          };
         };
-      };
 
-      home.file = {
-        ".omp/agent/extensions/herdr-activity.ts".source = ./omp-activity.ts;
-        ".omp/agent/skills/herdr-app" = {
-          source = ./skills/herdr-app;
-          recursive = true;
-        };
-        ".omp/agent/skills/herdr-core" = {
-          source = ./skills/herdr-core;
-          recursive = true;
-        };
-      };
+        # No-op unless the claude-code aspect enables the module.
+        programs.claude-code = {
+          skills.herdr-app = ./skills/herdr-app;
+          skills.herdr-core = ./skills/herdr-core;
 
-      home.activation.herdr-sidebar-state = lib.hm.dag.entryAfter ["writeBoundary"] ''
-        old=${lib.escapeShellArg "${config.xdg.configHome}/herdr-app/data/agents"}
-        new=${lib.escapeShellArg "${config.xdg.configHome}/herdr-app/data/agents-enriched"}
-        if [ -d "$old" ] && [ ! -e "$new" ]; then
-          ${lib.getExe' pkgs.coreutils "cp"} -R -- "$old" "$new"
-        fi
-      '';
+          # Display metadata is separate from the agents' native OSC lifecycle reports.
+          hooks."herdr-activity.py" = ./claude-activity.py;
+          settings.hooks = let
+            hook = matcher: [
+              ({
+                  hooks = [
+                    {
+                      type = "command";
+                      command = "${lib.getExe pkgs.python3} '${config.programs.claude-code.configDir}/hooks/herdr-activity.py'";
+                      timeout = 5;
+                    }
+                  ];
+                }
+                // lib.optionalAttrs (matcher != null) {inherit matcher;})
+            ];
+          in {
+            SessionStart = hook null;
+            UserPromptSubmit = hook null;
+            Stop = hook null;
+            PreToolUse = hook "^(Agent|Task)$";
+            PostToolUse = hook "^(TaskCreate|TaskUpdate|TodoWrite)$";
+            SubagentStart = hook null;
+            SubagentStop = hook null;
+            Notification = hook "^idle_prompt$";
+            SessionEnd = hook null;
+          };
+        };
+
+        home.file = {
+          ".omp/agent/extensions/herdr-activity.ts".source = ./omp-activity.ts;
+          ".omp/agent/skills/herdr-app" = {
+            source = ./skills/herdr-app;
+            recursive = true;
+          };
+          ".omp/agent/skills/herdr-core" = {
+            source = ./skills/herdr-core;
+            recursive = true;
+          };
+        };
+
+        home.activation.herdr-sidebar-state = lib.hm.dag.entryAfter ["writeBoundary"] ''
+          old=${lib.escapeShellArg "${config.xdg.configHome}/herdr-app/data/agents"}
+          new=${lib.escapeShellArg "${config.xdg.configHome}/herdr-app/data/agents-enriched"}
+          if [ -d "$old" ] && [ ! -e "$new" ]; then
+            ${lib.getExe' pkgs.coreutils "cp"} -R -- "$old" "$new"
+          fi
+        '';
+      };
     };
   };
 }

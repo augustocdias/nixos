@@ -28,6 +28,8 @@ The prefix input follows the upstream default branch. `nix flake update herdr-tm
 
 OMP's launcher entry and agent shortcuts resolve installed command names, including the Linux jail wrappers. Remote spaces require those commands on their target machine; a launcher entry does not install them remotely.
 
+Other modules add launcher entries and global keys through the `herdr.programs` and `herdr.keys` options, because `programs.json` and `keys.json` are single files. An entry with an App built-in name, such as `hermes`, replaces that built-in entry, so restate its icon and colours. The work Hermes uses this for Super+S, which opens the coordinator.
+
 ### Tab titles and agent picker
 
 The `herdr-navigation` input owns the Smart Tabs, Agent Picker and Space Shortcuts mods in [their standalone repository](https://github.com/augustocdias/herdr-navigation). Its Home Manager module installs the files; `herdr.nix` connects the packaged main layout and Alt+W to them. Change mod code in that repository, then update the input and rebuild here. The optional community layout is not installed.
