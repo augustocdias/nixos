@@ -5,8 +5,10 @@ Managed by nix (modules/programs/herdr/claude-activity.py). Claude Code port of
 omp-activity.ts: one hook script for every event, using the launcher's
 display-only Core bridge.
 
-Metadata: agent, title, todo, sub1..sub3, submore. No hook carries the session
-title or, on resume, the task list, so both are read from the transcript.
+Metadata: agent, title, todo, sub1..sub3, submore, plus optional details for
+expanded cards (limits in modules/programs/agent-jail/_herdr-relay/server.py).
+No hook carries the session title or, on resume, the task list, so both are
+read from the transcript.
 """
 
 import fcntl
@@ -16,19 +18,25 @@ import re
 import socket
 import sys
 import time
+import unicodedata
 
 SOURCE = "user:claude-activity"
 SUB_SLOTS = 3
 MAX_VALUE = 72
 TOKENS = ("agent", "title", "todo", "sub1", "sub2", "sub3", "submore")
 SUBAGENT_EVENTS = {"SubagentStart", "SubagentStop"}
+# Worker types are kept long enough to tell workers apart; output bounds them separately.
+TYPE_KEEP = 256
+# The c9ffd3b reporter saved pending types clamped to this length.
+LEGACY_TYPE = 72
 # apply() result: state changed but no token did.
 SAVE = "save"
 
 
-def clean(value):
-    text = " ".join(str(value or "").split())
-    return text if len(text) <= MAX_VALUE else text[: MAX_VALUE - 1] + "…"
+def clean(value, limit=MAX_VALUE):
+    # The relay rejects control characters, so drop the ones split() keeps.
+    text = " ".join("".join(c for c in str(value or "") if unicodedata.category(c) != "Cc" or c.isspace()).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def field(mapping, *names):
@@ -70,6 +78,68 @@ def tokens(state):
             if entry
             else ""
         )
+    return result
+
+
+def git_branch(cwd):
+    """Branch name, or the short commit when detached; read directly to keep hooks cheap."""
+    try:
+        path = os.path.abspath(cwd)
+        while not os.path.exists(os.path.join(path, ".git")):
+            if os.path.dirname(path) == path:
+                return ""
+            path = os.path.dirname(path)
+        git = os.path.join(path, ".git")
+        if os.path.isfile(git):
+            with open(git, encoding="utf-8") as handle:
+                line = handle.read(4096).strip()
+            if not line.startswith("gitdir:"):
+                return ""
+            git = os.path.join(path, line[len("gitdir:"):].strip())
+        with open(os.path.join(git, "HEAD"), encoding="utf-8") as handle:
+            head = handle.read(4096).strip()
+    except (OSError, TypeError, ValueError):
+        return ""
+    return head[len("ref: refs/heads/"):] if head.startswith("ref: refs/heads/") else head[:12]
+
+
+def details(state):
+    """Longer, structured view of the same session for expanded cards."""
+    result = {
+        key: clean(value, limit)
+        for key, value, limit in (
+            ("model", state["model"], 128),
+            ("title", state["title"], 300),
+            ("workspace", state.get("cwd"), 512),
+            ("branch", git_branch(state.get("cwd")), 200),
+        )
+        if clean(value, limit)
+    }
+    tasks = state["tasks"]
+    if tasks:
+        active = (clean(task.get("active_form") or task.get("subject"), 200)
+                  for task in tasks if task["status"] == "in_progress")
+        result["tasks"] = {
+            "completed": min(sum(task["status"] == "completed" for task in tasks), 10_000),
+            "total": min(len(tasks), 10_000),
+            "active": [label for label in active if label][:5],
+        }
+    running = state["subagents"]
+    if running:
+        items = {}
+        for agent_id, entry in running.items():
+            # IDs that collide after bounding are omitted; total still counts them.
+            items.setdefault(clean(agent_id, 128) or "agent", entry)
+            if len(items) == 8:
+                break
+        result["subagents"] = {
+            "total": min(len(running), 10_000),
+            "items": [
+                # State saved by older reporters may hold longer values; bound them here.
+                {"id": item_id, "type": clean(entry["type"], 64) or "agent", "description": clean(entry["description"], 200)}
+                for item_id, entry in items.items()
+            ],
+        }
     return result
 
 
@@ -203,6 +273,12 @@ def apply(state, event):
             state["model"] = str(model)
     elif name == "UserPromptSubmit":
         state["active"] = True
+    elif name == "PostModelSwitch":
+        # Hook input is untrusted: accept only a plausible model ID.
+        model = event.get("to_model")
+        if not isinstance(model, str) or len(model) > 256 or not clean(model) or model == state["model"]:
+            return False
+        state["model"] = model
     # Stop does not fire on an interrupt; the idle prompt notification does, a minute later.
     elif name == "Stop" or (name == "Notification" and event.get("notification_type") == "idle_prompt"):
         if not state["active"]:
@@ -212,8 +288,8 @@ def apply(state, event):
         tool_input = event.get("tool_input") or {}
         state["pending"].append(
             {
-                "type": clean(field(tool_input, "subagent_type") or "general-purpose"),
-                "description": clean(field(tool_input, "description") or ""),
+                "type": clean(field(tool_input, "subagent_type") or "general-purpose", TYPE_KEEP),
+                "description": clean(field(tool_input, "description") or "", 200),
             }
         )
         del state["pending"][:-16]
@@ -221,8 +297,13 @@ def apply(state, event):
     elif name == "PostToolUse":
         return apply_tool(state, event.get("tool_name"), event.get("tool_input"), event.get("tool_response"))
     elif name == "SubagentStart":
-        agent_type = clean(event.get("agent_type") or "")
-        index = next((i for i, entry in enumerate(state["pending"]) if entry["type"] == agent_type), None)
+        agent_type = clean(event.get("agent_type") or "", TYPE_KEEP)
+        # Exact matches first, so a legacy-clamped entry never takes another worker's call.
+        index = next(
+            (i for wanted in (agent_type, clean(agent_type, LEGACY_TYPE))
+             for i, entry in enumerate(state["pending"]) if entry["type"] == wanted),
+            None,
+        )
         entry = state["pending"].pop(index) if index is not None else {"type": agent_type or "agent", "description": ""}
         state["subagents"][str(event.get("agent_id"))] = entry
     elif name == "SubagentStop":
@@ -242,7 +323,7 @@ def publish(state, socket_path, session_id):
         "method": "activity.report",
         "params": {
             "seq": time.time_ns(), "epoch": state["epoch"],
-            "session": session_id, "tokens": tokens(state),
+            "session": session_id, "tokens": tokens(state), "details": details(state),
         },
     }
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
@@ -289,6 +370,8 @@ def main():
             epoch = time.time_ns()
         outcome = apply(state, event)
         state["epoch"] = epoch
+        if isinstance(event.get("cwd"), str):
+            state["cwd"] = event["cwd"]
         if outcome is True and event.get("hook_event_name") not in {"SessionStart", "SessionEnd"}:
             title = latest_title(event.get("transcript_path"))
             if title is not None:

@@ -1,0 +1,90 @@
+--- a/src/commands.rs
++++ b/src/commands.rs
+@@ -74,7 +74,7 @@
+     cmd("layout.clone", &[req("name"), opt("as")], "Duplicate a layout as <name>-copy (or as), then show it."),
+     cmd("mod.clone", &[req("name"), opt("as")], "Duplicate a mod as <name>-copy (or as)."),
+     cmd("layout.set", &[req("layout")], "Replace a personal layout tree; shipped layouts accept only click/look fields (not structure)."),
+-    cmd("layout.toggle", &[req("id")], "Hide or show a layout node."),
++    cmd("layout.toggle", &[req("id"), opt("focus")], "Hide or show a layout node; with a terminal block focus target, focus it first and hide only when it has the keyboard."),
+     cmd("layout.show", &[req("id")], "Show a layout node."),
+     cmd("layout.hide", &[req("id")], "Hide a layout node."),
+     cmd("layout.resize", &[req("id"), opt("px"), opt("weight")], "Size a layout node."),
+@@ -133,7 +133,7 @@
+                 return Err(format!("{}: unknown argument(s): {}; valid arguments: {valid}", c.name, unknown.join(", ")));
+             }
+             for (key, value) in args {
+-                if matches!(key.as_str(), "id" | "pane" | "space" | "terminal" | "target") && !value.is_string() && !value.is_null() {
++                if matches!(key.as_str(), "id" | "pane" | "space" | "terminal" | "target" | "focus") && !value.is_string() && !value.is_null() {
+                     return Err(format!("{}: argument {key} must be a string (or null to omit it)", c.name));
+                 }
+             }
+@@ -198,7 +198,7 @@
+ 
+     #[test]
+     fn malformed_targets_cannot_fall_back_to_the_current_work() {
+-        for (name, arg) in [("tab.close", "id"), ("pane.close", "pane"), ("space.close", "id"), ("tab.new", "space"), ("terminal.show", "terminal"), ("pane.swap", "pane"), ("pane.swap", "target")] {
++        for (name, arg) in [("tab.close", "id"), ("pane.close", "pane"), ("space.close", "id"), ("tab.new", "space"), ("terminal.show", "terminal"), ("pane.swap", "pane"), ("pane.swap", "target"), ("layout.toggle", "focus")] {
+             let c = find(name).unwrap();
+             for value in [json!(123), json!(false), json!([]), json!({"id": "target"})] {
+                 let error = validate_args(c, &json!({arg: value})).unwrap_err();
+--- a/src/window.rs
++++ b/src/window.rs
+@@ -3257,12 +3257,32 @@
+             },
+             "layout.toggle" | "layout.show" | "layout.hide" => {
+                 let id = Self::arg(a, "id").unwrap_or_default();
++                let target = (name == "layout.toggle").then(|| Self::arg(a, "focus")).flatten();
++                let has_focus = target.and_then(|id| self.pane_term(id))
++                    .is_some_and(|t| t.view.read(cx).owns_keyboard_focus(window, cx));
+                 let Some(n) = self.chrome.find_mut(id) else { return self.fail(format!("no node {id:?} in the shown layout")) };
++                if let Some(target) = target
++                    && !n.find(target).is_some_and(|n| n.terminal().is_some())
++                {
++                    return self.fail(format!("no terminal block {target:?} under node {id:?}"));
++                }
+                 n.hidden = match name {
++                    "layout.toggle" if target.is_some() => !n.hidden && has_focus,
+                     "layout.toggle" => !n.hidden,
+                     "layout.show" => false,
+                     _ => true,
+                 };
++                if !n.hidden && let Some(target) = target {
++                    self.sync(window, cx);
++                    self.focused_block = None;
++                    self.focused_pane = Some(target.to_owned());
++                    self.synced_model_pane = self.model.focused_pane();
++                    if !self.overlays.iter().any(|o| o.kind.modal_keys())
++                        && let Some(f) = self.pane_focus(target, cx)
++                    {
++                        f.focus(window, cx);
++                    }
++                }
+             }
+             "layout.resize" => {
+                 let id = Self::arg(a, "id").unwrap_or_default();
+--- a/defaults/herdr.d.ts
++++ b/defaults/herdr.d.ts
+@@ -67,6 +67,7 @@
+  *   terminal.scroll {lines | pages | to: "top" | "bottom", terminal?} (Herdr's view of the history: negative goes up; pages may be fractional).
+  * Agents: agent.next, agent.prev (the agents list's order), agent.focus {terminal} (sub-agents too).
+  * Layout (the shown layout's nodes by id): layout.toggle|show|hide {id}, layout.resize {id, px | weight},
++ *   layout.toggle also accepts focus: a descendant terminal block id. It shows and focuses that block, or hides the node if the block has keyboard focus.
+  *   layout.select {stack, child}, layout.set {layout} (personal trees; shipped layouts: click/look fields only), layout.switch {name?} (no name: the next one).
+  *   layout.clone {name, as?} duplicates and switches; mod.clone {name, as?} duplicates a mod.
+  *   Layout clones copy the look and clicks as-is. Layout looks win; settings fill unset fields; theme picks override both.
+--- a/defaults/AGENTS.md
++++ b/defaults/AGENTS.md
+@@ -605,11 +605,12 @@
+   Terminals display Kitty graphics, including Unicode placeholder images used by
+   programs such as yazi; partial images and scrolling follow the placeholder cells.
+ - Agents: `agent.next`, `agent.prev`, `agent.focus {terminal}`.
+-- Layout: `layout.switch {name?}`, `layout.toggle {id}`, `layout.show {id}`, `layout.hide {id}`,
++- Layout: `layout.switch {name?}`, `layout.toggle {id, focus?}`, `layout.show {id}`, `layout.hide {id}`,
+   `layout.resize {id, px | weight}`, `layout.select {stack, child}`, `layout.set {layout}`
+   (personal tree edits; on shipped layouts only click/look fields change),
+   `layout.reset {name?}` (reset a shipped layout and its clicks),
+   `layout.clone {name, as?}` (duplicate, then switch; default `<name>-copy`).
++  With `layout.toggle`, `focus` names a terminal block under `id`. The command shows and focuses it, or hides the node when that terminal has the keyboard. Without `focus`, it only toggles visibility.
+ - App: `mod.clone {name, as?}` (duplicate; default `<name>-copy`), `mod.open {name}` (again: closes it), `overlay.close {id?}`, `app.help` (again: closes it), `app.palette` (again: closes it), `app.settings {section?}`
+   (sections: `look`, `machines`, `alerts`, `updates`, `privacy`; Machines lists, updates, renames and removes ssh machines; settings edit the same files you do).
+   `app.check_updates` (only a successful check reports Up to date; a failed check clears the checked time and can be retried), `app.update_core` (a newer herdr-core of this generation, terminals kept;

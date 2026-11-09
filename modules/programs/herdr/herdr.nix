@@ -48,7 +48,7 @@
       };
       herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
       herdrApp = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-app.overrideAttrs (old: {
-        patches = (old.patches or []) ++ [./vim-navigation.patch];
+        patches = (old.patches or []) ++ [./vim-navigation.patch ./layout-focus.patch];
         postPatch =
           (old.postPatch or "")
           + ''
@@ -124,30 +124,6 @@
             --replace-fail 'Esc cancel · ^B send prefix' 'Esc / Super+H cancel'
         ''}
       '';
-      enrichedAgents = pkgs.runCommand "herdr-agents-enriched" {} ''
-        mkdir -p $out
-        cp ${herdrApp.src}/defaults/mods/agents/{main.js,mod.json} $out/
-        cp ${./activity.js} $out/activity.js
-        chmod u+w $out/{main,activity}.js
-        # App rejects relative imports through store symlinks; keep the mod in one file.
-        substituteInPlace $out/activity.js \
-          --replace-fail 'import { div } from "gpui-kit";' "" \
-          --replace-fail 'import { v_flex } from "gpui-base";' "" \
-          --replace-fail 'export function ' 'function '
-        cat $out/activity.js >> $out/main.js
-        rm $out/activity.js
-        substituteInPlace $out/main.js \
-          --replace-fail 'const all = terminals();' \
-            'const all = terminals();
-            const metadata = new Map(all.map(t => [t.address, activity(t)]));' \
-          --replace-fail 'return [r, ...subs.map' \
-            'return [r, ...(collapsed ? [] : activityRows(metadata.get(a.address), a.address, t)), ...subs.map' \
-          --replace-fail '.when(Boolean(machine), el =>' \
-            '.when(Boolean(metadata.get(a.address)?.agent), el => el.child(div().max_w(110).truncate().text_size(10.5).text_color(t.muted).tooltip(metadata.get(a.address).agent).child(metadata.get(a.address).agent)))
-                .when(Boolean(machine), el =>' \
-          --replace-fail 'mod: "agents", kind: "popup"' 'mod: "agents-enriched", kind: "popup"'
-      '';
-
       mkFish = name: file: extra: let
         substitutions =
           {
@@ -184,7 +160,7 @@
           description = "Extra or overridden entries for herdr-app/programs.json, merged over the App's defaults.";
         };
         keys = lib.mkOption {
-          type = lib.types.attrsOf lib.types.str;
+          type = lib.types.attrsOf (pkgs.formats.json {}).type;
           default = {};
           description = "Extra global App keybindings, e.g. a key that opens one of `herdr.programs`.";
         };
@@ -200,7 +176,15 @@
             mod = "hermes-shepherd";
           }
         ];
-        herdr.keys = lib.mkIf shepherd {"ctrl-shift-y" = "layout.toggle:shepherd";};
+        herdr.keys = lib.mkIf shepherd {
+          "ctrl-shift-y" = {
+            command = "layout.toggle";
+            args = {
+              id = "shepherd";
+              focus = "shepherd-terminal";
+            };
+          };
+        };
 
         xdg.configFile = {
           "herdr-app/settings.json".text = builtins.toJSON {
@@ -246,8 +230,6 @@
           });
           "herdr-app/mods/tmux-prefix/main.js".source = "${tmuxPrefix}/main.js";
           "herdr-app/mods/tmux-prefix/mod.json".source = "${tmuxPrefix}/mod.json";
-          "herdr-app/mods/agents-enriched/main.js".source = "${enrichedAgents}/main.js";
-          "herdr-app/mods/agents-enriched/mod.json".source = "${enrichedAgents}/mod.json";
           "herdr-app/programs.json".text = builtins.toJSON {
             programs =
               {
@@ -309,6 +291,7 @@
           in {
             SessionStart = hook null;
             UserPromptSubmit = hook null;
+            PostModelSwitch = hook null;
             Stop = hook null;
             PreToolUse = hook "^(Agent|Task)$";
             PostToolUse = hook "^(TaskCreate|TaskUpdate|TodoWrite)$";

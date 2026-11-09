@@ -32,7 +32,7 @@ Other modules add launcher entries and global keys through the `herdr.programs` 
 
 ### Tab titles and agent picker
 
-The `herdr-navigation` input owns the Smart Tabs, Agent Picker and Space Shortcuts mods in [their standalone repository](https://github.com/augustocdias/herdr-navigation). Its Home Manager module installs the files; `herdr.nix` connects the packaged main layout and Alt+W to them. Change mod code in that repository, then update the input and rebuild here. The optional community layout is not installed.
+The `herdr-navigation` input owns the Smart Tabs, Agent Picker, Agent Cards and Space Shortcuts mods in [their standalone repository](https://github.com/augustocdias/herdr-navigation). Its Home Manager module installs the files; `herdr.nix` connects the packaged main layout and Alt+W to them. Change mod code in that repository, then update the input and rebuild here. The optional community layout is not installed.
 
 Titles are display-only and do not rewrite saved tab names. Descriptive names take precedence; launch defaults such as `shell` and the current program name remain automatic. Session titles prefer the existing activity integration, then native agent reports, then terminal titles. The picker searches full titles even when the visible label is truncated.
 
@@ -46,7 +46,9 @@ The `herdr-hermes-shepherd` input provides a Herdr App tab that shows the [Work 
 
 - A Smart Tabs pinned tab in every space, labelled `default`. The label selects Hermes's `default` board by name, so the toolbar shows no "no board has this name" hint.
 - A `shepherd` column after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default. Its terminal block is named `hermes-shepherd`, and Shepherd starts `hermes -p coordinator` there through the jailed `hermes` wrapper.
-- Ctrl+Shift+Y (`layout.toggle:shepherd`) in the global key set, so it also works while a terminal has focus.
+- Ctrl+Shift+Y in the global key set opens and focuses the coordinator terminal. If the panel is visible but focus is elsewhere, the shortcut focuses it without hiding it. Pressing it while the coordinator has the keyboard hides the panel.
+
+The key uses the packaged App's optional `layout.toggle` focus target, supplied by `layout-focus.patch`. Plain `layout.toggle:shepherd`, the tab button and Hide retain their visibility-only behavior.
 
 The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` jail sets `HERMES_HOME` to the same path and binds it read-write at the same location, so the CLI, the gateway and the tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
 
@@ -74,17 +76,28 @@ herdr-app check ~/.config/herdr-app/mods/hermes-shepherd
 
 ## App sidebar
 
-The packaged main layout uses `agents-enriched`, a copy of the matching upstream agents mod with model, session title, todo progress and internal-worker rows. Stock lifecycle status, attention ordering, focus, pins and real child terminals retain their upstream behavior. Internal workers are informational rows, not terminal targets. Activation copies the stock agents mod's runtime storage once if the enriched mod has none, preserving pins and ordering history.
+The packaged main layout uses `agents-enriched` from `herdr-navigation`. Agent Cards shows native lifecycle status and activity metadata, with expanded details and real child terminals. Harness-reported internal workers are informational rows, not terminal targets. Activation copies the stock agents mod's runtime storage once if the enriched mod has none.
 
 On Linux, `omp-activity.ts` and `claude-activity.py` send full snapshots through the launcher's `HERDR_ACTIVITY_SOCKET`. The bridge writes only the current terminal's `nix.activity` label. Native OSC reports own lifecycle status; these collectors enrich display metadata only. The model stays visible while idle, and session shutdown clears enrichment.
 
 The bridge holds a per-terminal lock, rejects older session epochs and sequences, and checks terminal identity before writes and cleanup. Its lease expires after 60 seconds without renewal; the renderer checks expiry on its normal refresh. Snapshot age is capped at 12 hours even while the launcher remains alive. OMP sends a collector heartbeat; Claude publishes hook events. The raw host Core socket remains unavailable in the jail.
+
+Reports may add an optional `details` object for expanded cards: longer model and title text, the reporter's working directory as `workspace`, its Git branch, checklist counts (`tasks.completed`/`tasks.total`) with active-task text, and harness-reported `subagents`. The bridge (`agent-jail/_herdr-relay/server.py`) owns the field set and limits, and rejects a whole report on any unknown field or oversized value rather than truncating, so the collectors clamp first. Counts clamp at 10,000 each, so larger checklists report inexact counts: 10,000 completed plus one pending reads 10,000/10,000. Subagent IDs that collide after the 128-character bound are left out of `items` while `total` still counts them. The label keeps `version: 1` and the seven tokens unchanged. Empty tokens still clear the label, details included. `details.subagents` describes workers inside the harness: they carry no Core terminal ID, so match real child terminals through Core, never through this list.
+
+Run the bridge and collector tests after changing any of the three files:
+
+```sh
+python3 -m unittest discover -s modules/programs/agent-jail/_herdr-relay
+python3 -m unittest discover -s modules/programs/herdr -p 'test_*.py'
+node --test modules/programs/herdr/omp-activity.test.mjs
+```
 
 Collector details that span harness APIs:
 
 - Every snapshot carries the complete token set; empty values clear fields. Nested sessions do not replace root-session metadata.
 - OMP worker descriptions arrive after `task:subagent:lifecycle`, through progress events. Session titles follow `sessionManager.onSessionNameChanged`, including automatic titles and `/rename`.
 - Claude hooks run in separate processes, so per-session state under `~/.claude/herdr-activity/` uses `flock`. Subagent descriptions come from the preceding `PreToolUse` on `Agent`; `SubagentStart` supplies only the type.
+- Claude's `SessionStart` model goes stale after `/model` or an automatic fallback; `PostModelSwitch` supplies the new `to_model`.
 - Claude hooks do not carry session titles. The collector reads the last `ai-title` entry from the final 1 MiB of the transcript. Resume and fork replay task state; compaction preserves it.
 - Claude session shutdown retains an ended-session marker so delayed hooks cannot resurrect metadata. Task progress requires `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in `claude-code.nix`.
 

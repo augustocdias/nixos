@@ -138,10 +138,25 @@ def _app(command, payload):
     return json.loads(_run(SETTINGS["herdr_app"], "do", command, json.dumps(payload)) or "{}")
 
 
+BUSY = ("working", "blocked")
+
+
 def _launched():
-    """Live and finished terminals carrying the launch label."""
+    """Live and finished terminals carrying the launch label. `hc ls` omits labels: use _card_map for cards."""
     out = _hc("ls", "--all", "--json", "--label", f"{LAUNCH_LABEL}=1")
     return json.loads(out).get("terminals", [])
+
+
+def _card_map():
+    """Agent terminal -> card, from the launch records (takes the state lock; never call it while holding it)."""
+    with _state() as data:
+        return {
+            agent["terminal"]: card
+            for card, entry in data.items()
+            if not card.startswith("_")
+            for agent in (entry.get("agents") or {}).values()
+            if agent.get("terminal")
+        }
 
 
 def _status(info):
@@ -191,29 +206,40 @@ def card_fields(body):
     }
 
 
-def inherited_fields(kb, conn, task, depth=3):
-    """The card's header, with lines it lacks taken from its parents (nearest first).
+DECOMPOSER = "auto-decomposer"
 
-    The triage decomposer writes child cards without our header; their parent,
-    the original card, carries it.
+
+def inherited_fields(kb, conn, task, depth=4):
+    """The card's run settings, with what it lacks taken from related cards (nearest first).
+
+    A card inherits from the cards it waits on. A card the triage decomposer wrote has no
+    settings, and the original card that carries them waits on it (it is judged once its
+    pieces finish), so decomposer cards also inherit from the cards waiting on them.
     """
     fields = card_fields(task.body)
-    frontier, seen = [task.id], {task.id}
+    frontier, seen = [task], {task.id}
     for _ in range(depth):
-        parents = [p for card in frontier for p in kb.parent_ids(conn, card) if p not in seen]
-        if not parents:
+        related = []
+        for card in frontier:
+            ids = list(kb.parent_ids(conn, card.id))
+            if card.created_by == DECOMPOSER:
+                ids += kb.child_ids(conn, card.id)
+            for rid in ids:
+                if rid in seen:
+                    continue
+                seen.add(rid)
+                other = kb.get_task(conn, rid)
+                if other is not None:
+                    related.append(other)
+        if not related:
             break
-        for parent_id in parents:
-            seen.add(parent_id)
-            parent = kb.get_task(conn, parent_id)
-            if parent is None:
-                continue
-            theirs = card_fields(parent.body)
+        for other in related:
+            theirs = card_fields(other.body)
             for key in ("repo", "tracker"):
                 fields[key] = fields[key] or theirs[key]
             for key in ("agents", "git", "herdr"):
                 fields[key] = {**theirs[key], **fields[key]}
-        frontier = parents
+        frontier = related
     return fields
 
 
@@ -223,16 +249,98 @@ def _space(space_id):
     return next((s for s in listing.get("spaces", []) if s.get("id") == space_id), None)
 
 
-def _place(space, placement, terminal, label, previous_pane):
-    """Show the agent in the card's space in a new pane or tab; never reuse one."""
+def _place(space, placement, terminal, label, previous_viewer):
+    """Show the agent in the card's space in a new pane or tab; never reuse one.
+
+    Returns the viewer: the App terminal running `hc attach <agent>`. It ends when
+    the user closes that pane or tab, which is how a closed view is noticed.
+    """
     argv = [SETTINGS["hc"], "attach", terminal]
     if placement == "pane":
-        panes = [t["pane"] for tab in space.get("tabs", []) for t in tab.get("terminals", []) if t.get("pane")]
+        panes = {t["terminal"]: t["pane"] for tab in space.get("tabs", []) for t in tab.get("terminals", []) if t.get("pane")}
         # Split next to the card's previous agent, so a card's agents stay together.
-        target = previous_pane if previous_pane in panes else (panes[-1] if panes else None)
+        target = panes.get(previous_viewer) or (list(panes.values())[-1] if panes else None)
         if target:
-            return _app("pane.split", {"pane": target, "direction": "right", "argv": argv}).get("pane")
-    return _app("tab.new", {"space": space["id"], "name": label, "argv": argv}).get("pane")
+            return _app("pane.split", {"pane": target, "direction": "right", "argv": argv}).get("terminal")
+    return _app("tab.new", {"space": space["id"], "name": label, "argv": argv}).get("terminal")
+
+
+def _viewer_live(viewer):
+    if not viewer:
+        return False
+    try:
+        return json.loads(_hc("get", viewer, "--json")).get("state") == "live"
+    except Exception:
+        return False
+
+
+def _git_common(folder):
+    try:
+        out = subprocess.run(
+            [SETTINGS["git"], "-C", str(folder), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return out.stdout.strip() if out.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def _same_repo(folder, repo):
+    """Whether `folder` is a checkout of `repo`: the same directory, or a worktree sharing its Git common dir."""
+    if Path(folder).resolve() == Path(repo).resolve():
+        return True
+    common = _git_common(folder)
+    return common is not None and common == _git_common(repo)
+
+
+def _new_space(card, old_space, folder, label, terminal, why=None):
+    """Open a new space at the agent's folder, show the agent there, and point the card at it.
+
+    For a closed space, and for a space that belongs to another repository.
+    """
+    reply = _app("space.new", {"name": label, "folder": folder, "argv": [SETTINGS["hc"], "attach", terminal]})
+    new_space = reply.get("space")
+    if new_space:
+        kb, connect = _kb()
+        with connect() as conn:
+            # The Herdr row lives on this card or, for a decomposed card, on a related card.
+            related = [card, *kb.parent_ids(conn, card), *kb.child_ids(conn, card)]
+            for candidate in related:
+                task = kb.get_task(conn, candidate)
+                if task is not None and f"space={old_space}" in (task.body or ""):
+                    kb.edit_task(conn, candidate, body=task.body.replace(f"space={old_space}", f"space={new_space}"))
+                    break
+    why = why or f"Space `{old_space}` no longer exists."
+    _comment(card, f"### Herdr space replaced\n\n{why} The agent now shows in a new space `{new_space}` at `{folder}`, and the card points at it.")
+    return reply.get("terminal")
+
+
+def _show_agent(card, profile, agent, title):
+    """Before a follow-up: make sure a foreground agent still has an open pane, reopening it if needed."""
+    kb, connect = _kb()
+    with connect() as conn:
+        task = kb.get_task(conn, card)
+        fields = inherited_fields(kb, conn, task) if task is not None else card_fields("")
+    space_id = fields["herdr"].get("space", "")
+    if not space_id or space_id == "none" or not SPACE_ID.match(space_id) or _viewer_live(agent.get("viewer")):
+        return None
+    label = f"{profile.title()}: {title}"[:48]
+    space = _space(space_id)
+    if space is None:
+        viewer = _new_space(card, space_id, agent["cwd"], label, agent["terminal"])
+    elif not _same_repo(space.get("folder") or "", agent["cwd"]):
+        viewer = _new_space(
+            card, space_id, agent["cwd"], label, agent["terminal"],
+            f"Space `{space_id}` shows `{space.get('folder')}`, which is not a checkout of `{agent['cwd']}`.",
+        )
+    else:
+        viewer = _place(space, fields["herdr"].get("placement", "pane"), agent["terminal"], label, agent.get("viewer"))
+        _comment(card, f"### Agent view reopened\n\nThe pane showing `{agent.get('name') or agent['terminal']}` was closed; it is open again in space `{space_id}`.")
+    with _state() as data:
+        record = ((data.get(card) or {}).get("agents") or {}).get(profile)
+        if record is not None:
+            record["viewer"] = viewer
+    return viewer
 
 
 def _agent_name(profile, title):
@@ -348,16 +456,65 @@ def _bound_card(args):
     return card
 
 
+def _close_idle(data, idle, count):
+    """Close the `count` least recently active idle agents (caller holds the state lock).
+
+    Returns how many were closed and the (card, note) pairs to post once the lock is
+    released. A closed agent's last iteration keeps its session id and resume command.
+    """
+    owners = {
+        a["terminal"]: (card, profile, a)
+        for card, entry in data.items() if not card.startswith("_")
+        for profile, a in (entry.get("agents") or {}).items() if a.get("terminal") and not a.get("closed")
+    }
+
+    def last_active(t):
+        card, _profile, agent = owners.get(t["address"], (None, None, {}))
+        its = [i for i in (data.get(card) or {}).get("iterations", []) if i["terminal"] == t["address"]]
+        return max([agent.get("launched_at", 0)] + [i.get("ended_at") or i["started_at"] for i in its])
+
+    notes, chosen = [], sorted(idle, key=last_active)[:count]
+    for t in chosen:
+        address = t["address"]
+        for target in (address, owners.get(address, (None, None, {}))[2].get("viewer")):
+            if target:
+                for verb in ("kill", "rm"):
+                    try:
+                        _hc(verb, target)
+                    except Exception:
+                        pass
+        if address not in owners:
+            continue
+        card, profile, agent = owners[address]
+        agent["closed"] = _now()
+        resume = ""
+        for it in (data.get(card) or {}).get("iterations", []):
+            if it["terminal"] == address:
+                if "ended_at" not in it:
+                    it["ended_at"], it["outcome"] = _now(), "closed"
+                resume = it.get("resume") or resume
+        notes.append((card, (
+            f"### Agent closed to free capacity\n\n`{agent.get('name') or address}` (`{address}`) was idle and was "
+            "closed so another agent could start. "
+            + (f"Resume it by hand with `{resume}`." if resume else "It never reported a session id.")
+            + " A follow-up on this card starts a new agent."
+        )))
+    return len(chosen), notes
+
+
 def _agent(card, profile):
     """This profile's agent on `card`; the coordinator falls back to the newest one."""
     with _state() as data:
-        agents = (data.get(card) or {}).get("agents") or {}
+        agents = {p: a for p, a in ((data.get(card) or {}).get("agents") or {}).items() if not a.get("closed")}
     if profile in agents:
         return profile, dict(agents[profile])
     if profile == "coordinator" and agents:
         owner = max(agents, key=lambda p: agents[p].get("launched_at", 0))
         return owner, dict(agents[owner])
-    raise LookupError(f"no agent was launched for card {card} by {profile}")
+    raise LookupError(
+        f"no open agent for card {card} by {profile} (it may have been closed to free capacity): "
+        "start a new one with agent_launch"
+    )
 
 
 def _owned_terminal(card, profile):
@@ -447,36 +604,62 @@ def make_tools(profile):
             repo = _inside_dev(fields["repo"] or (args.get("repo") if profile == "coordinator" else ""))
             if repo is None:
                 return _error("the card's Repo must be an existing directory inside ~/dev, or ~/nixos")
-            cwd, space = repo, None
+            cwd, space, recreate, mismatch = repo, None, None, None
             space_id = fields["herdr"].get("space", "")
             if space_id and space_id != "none":
                 if not SPACE_ID.match(space_id):
                     return _error(f"invalid Herdr space id {space_id!r}")
                 space = _space(space_id)
                 if space is None:
-                    return _error(f"Herdr space {space_id} does not exist; block the card for the user")
-                cwd = _inside_dev(space.get("folder") or "")
-                if cwd is None:
-                    return _error(f"Herdr space {space_id} is not a folder inside ~/dev")
+                    # Closed space: a card that ran before reopens one at its earlier agent's folder.
+                    with _state() as data:
+                        earlier = [a.get("cwd") for a in ((data.get(card) or {}).get("agents") or {}).values() if a.get("cwd")]
+                    cwd = _inside_dev(earlier[-1]) if earlier else None
+                    if cwd is None:
+                        return _error(
+                            f"Herdr space {space_id} does not exist and no earlier agent of this card shows where it "
+                            "was; block the card so the coordinator recreates the space"
+                        )
+                    recreate = space_id
+                elif not _same_repo(space.get("folder") or "", repo):
+                    # A space copied from another repository's card: the card's repo wins.
+                    mismatch = (
+                        f"Space `{space_id}` shows `{space.get('folder')}`, which is not a checkout of `{repo}`."
+                    )
+                    space, recreate = None, space_id
+                else:
+                    cwd = _inside_dev(space.get("folder") or "")
+                    if cwd is None:
+                        return _error(f"Herdr space {space_id} is not a folder inside ~/dev")
             # Only the programmer may commit or push with the agent key, and only when the card agreed to it.
             signing = profile in SETTINGS["writers"] and "agent" in (
                 fields["git"].get("commits"), fields["git"].get("pushes")
             )
             template = f"hermes-{harness}" + ("-signing" if signing else "")
             token = secrets.token_urlsafe(24)
+            closed_notes = []
             # Reserve a slot under the lock: launches from parallel roles must not overshoot the cap.
             with _state() as data:
                 now = _now()
                 pending = {t: at for t, at in (data.get("_launching") or {}).items() if now - at < LAUNCH_TTL}
                 live = [t for t in _launched() if t.get("state") == "live"]
-                if len(live) + len(pending) >= SETTINGS["cap"]:
+                over = len(live) + len(pending) + 1 - SETTINGS["cap"]
+                if over > 0:
+                    # Make room by closing the least recently active idle or done agents; their sessions
+                    # stay resumable from their cards' Agent sessions tables.
+                    count, closed_notes = _close_idle(data, [t for t in live if _status(t) not in BUSY], over)
+                    over -= count
+                if over > 0:
                     return _error(
-                        f"{len(live) + len(pending)} Hermes agents are live or starting "
-                        f"(cap {SETTINGS['cap']}); kill a finished one or wait"
+                        f"{SETTINGS['cap']} Hermes agents are working, blocked or starting (cap {SETTINGS['cap']}); "
+                        "wait for one to finish"
                     )
                 pending[token] = now
                 data["_launching"] = pending
             name = _agent_name(profile, title)
+            for closed_card, note in closed_notes:
+                _sync_sessions(closed_card)
+                _comment(closed_card, note)
             try:
                 started = json.loads(_hc(
                     "run", "--bg", "--outlive-parent", "--json",
@@ -485,7 +668,7 @@ def make_tools(profile):
                     "--label", f"{LAUNCH_LABEL}=1",
                     "--label", f"{CARD_LABEL}={card}",
                     template,
-                    _message(harness, skill, skill_args, card, token, fields, space is not None, title, description),
+                    _message(harness, skill, skill_args, card, token, fields, space is not None or bool(recreate), title, description),
                     timeout=120,
                 ))
             finally:
@@ -496,13 +679,15 @@ def make_tools(profile):
                 return _error(f"hc started nothing: {started}")
             with _state() as data:
                 previous = ((data.get(card) or {}).get("agents") or {}).get(profile) or {}
-            pane = None
-            if space is not None:
-                placement = fields["herdr"].get("placement", "pane")
-                try:
-                    pane = _place(space, placement, terminal, f"{profile.title()}: {title}"[:48], previous.get("pane"))
-                except Exception as e:  # the agent runs either way; the view is a convenience
-                    logger.warning("herdr-agents could not place %s: %s", terminal, e)
+            viewer = None
+            label = f"{profile.title()}: {title}"[:48]
+            try:
+                if space is not None:
+                    viewer = _place(space, fields["herdr"].get("placement", "pane"), terminal, label, previous.get("viewer"))
+                elif recreate:
+                    viewer = _new_space(card, recreate, str(cwd), label, terminal, mismatch)
+            except Exception as e:  # the agent runs either way; the view is a convenience
+                logger.warning("herdr-agents could not place %s: %s", terminal, e)
             with _state() as data:
                 data.setdefault(card, {}).setdefault("agents", {})[profile] = {
                     "terminal": terminal,
@@ -510,7 +695,7 @@ def make_tools(profile):
                     "harness": harness,
                     "cwd": str(cwd),
                     "token": token,
-                    "pane": pane,
+                    "viewer": viewer,
                     "name": name,
                     "launched_at": _now(),
                 }
@@ -556,7 +741,19 @@ def make_tools(profile):
             # Never type into a working agent or a permission prompt: those belong to the user.
             if info.get("state") != "live" or status not in SENDABLE:
                 return _error(f"{agent['terminal']} is {info.get('state')}/{status}; send only to an idle or done agent")
-            _hc("send", *(["--if", "idle"] if status == "idle" else []), agent["terminal"], text)
+            try:
+                kb, connect = _kb()
+                with connect() as conn:
+                    task = kb.get_task(conn, card)
+                _show_agent(card, owner, agent, task.title if task else card)
+            except Exception as e:  # the follow-up goes out either way; the view is a convenience
+                logger.warning("herdr-agents could not reopen the view of %s: %s", agent["terminal"], e)
+            # Every round ends with a report, or the card waits forever: remind the agent each time.
+            reminder = (
+                f"\n\n---\nWhen you finish this, call `report_done` (or `report_blocked`) with card `{card}` "
+                f"and task token `{agent['token']}`. It does not close the card: it hands your result back to Hermes."
+            )
+            _hc("send", *(["--if", "idle"] if status == "idle" else []), agent["terminal"], text + reminder)
             with _state() as data:
                 iteration = _start_iteration(data, card, owner, "follow-up", "")
             _comment(card, _iteration_line(iteration))
@@ -577,10 +774,12 @@ def make_tools(profile):
 
     def agent_list(args, **_):
         try:
+            cards = _card_map()
             return _json([
                 {
                     "terminal": t.get("address"),
-                    "card": (t.get("labels") or {}).get(CARD_LABEL),
+                    "name": t.get("name"),
+                    "card": cards.get(t.get("address")),
                     "state": t.get("state"),
                     "status": _status(t),
                     "cwd": t.get("cwd"),
@@ -612,16 +811,33 @@ def make_tools(profile):
     if profile == "coordinator":
         blocked = {"type": "string", "description": "The blocked card's id (not your blocker-check card)"}
         tools += [
+            (kanban_archive, "Archive a card, preserving its history. Use kanban_list to select cards first. Archiving a running card stops its worker.", {
+                "card": {"type": "string", "description": "The card id to archive"},
+            }, ["card"]),
             (blocker_resolve, "Unblock a blocked card you can resolve: posts your guidance on it, then unblocks it so its role runs again with that guidance.", {
                 "card": blocked,
                 "guidance": {"type": "string", "description": "Markdown: what the agent got wrong or missed, and exactly what to do now"},
             }, ["card", "guidance"]),
-            (blocker_note, "Comment on a legitimately blocked card and leave it blocked for the user: why it needs them and what they must decide or do.", {
+            (blocker_note, "Comment on a legitimately blocked card and leave it blocked for the user. Write it for the user to read in ten seconds: '**Needs you:**' with the decision in one sentence, '**What happened:**' in terms the user sees, '**Options:**' as lettered one-line choices with what each leads to, then one line linking any evidence. About 120 words, plain words, no process narration.", {
                 "card": blocked,
-                "note": {"type": "string", "description": "Markdown"},
+                "note": {"type": "string", "description": "Markdown: Needs you / What happened / Options, about 120 words"},
             }, ["card", "note"]),
         ]
     return tools
+
+
+def kanban_archive(args, **_):
+    try:
+        card = str(args.get("card") or "").strip()
+        if not card:
+            return _error("card is required")
+        kb, connect = _kb()
+        with connect() as conn:
+            if not kb.archive_task(conn, card):
+                return _error(f"could not archive {card}: missing or already archived")
+            return _json({"archived": card})
+    except Exception as e:
+        return _error(str(e))
 
 
 # --- Blocker checks (coordinator) --------------------------------------------
@@ -1130,8 +1346,9 @@ def watch(stop):
     while not stop.wait(SETTINGS["poll_seconds"]):
         try:
             terminals = _launched()
+            cards = _card_map()
             blocked = {
-                t["address"]: (t.get("labels") or {}).get(CARD_LABEL)
+                t["address"]: cards.get(t["address"])
                 for t in terminals
                 if t.get("state") == "live" and _status(t) == "blocked"
             }

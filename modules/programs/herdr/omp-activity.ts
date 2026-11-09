@@ -4,9 +4,12 @@
 // Managed by nix (modules/programs/herdr/omp-activity.ts). Reports use the
 // launcher's display-only Core bridge, separate from native lifecycle status.
 //
-// Metadata: agent, title, todo, sub1..sub3, submore.
+// Metadata: agent, title, todo, sub1..sub3, submore, plus optional details for
+// expanded cards (limits in modules/programs/agent-jail/_herdr-relay/server.py).
 
+import fs from "node:fs";
 import net from "node:net";
+import path from "node:path";
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
 const SOURCE = "user:omp-activity";
@@ -24,17 +27,93 @@ let epoch = 0;
 let session = "";
 let rootActive = false;
 
-const state = { agent: "", title: "", todo: "" };
+type TodoTask = { content?: string; status?: string };
+
+const state = { model: "", title: "", cwd: "", tasks: [] as TodoTask[] };
 // Keyed by subagent id. Workers are tracked by their own lifecycle, not by the
 // `task` call: a background spawn returns at once while its workers run on.
 const subagents = new Map<string, { type: string; description: string }>();
 
-function clean(value: unknown): string {
+function clean(value: unknown, limit = MAX_VALUE): string {
+  // The relay rejects control characters; whitespace ones become spaces.
   const text = String(value ?? "")
     .replace(/\s+/g, " ")
+    .replace(/\p{Cc}/gu, "")
     .trim();
+  if (text.length <= limit) return text;
+  // Cut whole code points: a lone surrogate is invalid JSON to the relay. The
+  // UTF-16 bounds keep legacy tokens within the navigation mods' .length check.
+  let cut = "";
+  for (const char of text) {
+    if (cut.length + char.length > limit - 1) break;
+    cut += char;
+  }
+  return `${cut}…`;
+}
 
-  return text.length <= MAX_VALUE ? text : `${text.slice(0, MAX_VALUE - 1)}…`;
+// Branch name, or the short commit when detached.
+function gitBranch(cwd: string): string {
+  try {
+    let dir = path.resolve(cwd);
+    while (!fs.existsSync(path.join(dir, ".git"))) {
+      if (path.dirname(dir) === dir) return "";
+      dir = path.dirname(dir);
+    }
+    let git = path.join(dir, ".git");
+    if (fs.statSync(git).isFile()) {
+      const line = fs.readFileSync(git, "utf8").slice(0, 4096).trim();
+      if (!line.startsWith("gitdir:")) return "";
+      git = path.resolve(dir, line.slice("gitdir:".length).trim());
+    }
+    const head = fs.readFileSync(path.join(git, "HEAD"), "utf8").slice(0, 4096).trim();
+    return head.startsWith("ref: refs/heads/") ? head.slice("ref: refs/heads/".length) : head.slice(0, 12);
+  } catch {
+    return "";
+  }
+}
+
+function todoToken(tasks: TodoTask[]): string {
+  const done = tasks.filter((task) => task.status === "completed").length;
+  if (done === tasks.length) return "";
+  const active = tasks.find((task) => task.status === "in_progress");
+  return clean(`${done}/${tasks.length} ${active?.content ?? ""}`);
+}
+
+// Longer, structured view of the same session for expanded cards.
+function details(): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value, limit] of [
+    ["model", state.model, 128],
+    ["title", state.title, 300],
+    ["workspace", state.cwd, 512],
+    ["branch", state.cwd ? gitBranch(state.cwd) : "", 200],
+  ] as const) {
+    const text = clean(value, limit);
+    if (text) result[key] = text;
+  }
+  if (state.tasks.length) {
+    result.tasks = {
+      completed: Math.min(state.tasks.filter((task) => task.status === "completed").length, 10_000),
+      total: Math.min(state.tasks.length, 10_000),
+      active: state.tasks
+        .filter((task) => task.status === "in_progress")
+        .map((task) => clean(task.content, 200))
+        .filter(Boolean)
+        .slice(0, 5),
+    };
+  }
+  if (subagents.size) {
+    const items: Record<string, string>[] = [];
+    for (const [rawId, entry] of subagents) {
+      const id = clean(rawId, 128) || "task";
+      // IDs that collide after bounding are omitted; total still counts them.
+      if (items.some((item) => item.id === id)) continue;
+      items.push({ id, type: entry.type || "task", description: entry.description });
+      if (items.length === 8) break;
+    }
+    result.subagents = { total: Math.min(subagents.size, 10_000), items };
+  }
+  return result;
 }
 
 function requestOnce(
@@ -65,9 +144,9 @@ function requestOnce(
 
 function publish(): Promise<void> {
   const tokens: Record<string, string> = {
-    agent: state.agent,
-    title: state.title,
-    todo: state.todo,
+    agent: clean(state.model),
+    title: clean(state.title),
+    todo: todoToken(state.tasks),
   };
 
   const running = [...subagents.values()];
@@ -88,39 +167,30 @@ function publish(): Promise<void> {
       .join(", "),
   );
 
-  const pending = requestChain.then(() =>
-    requestOnce({ tokens, epoch, session }),
-  );
+  // Snapshot every field now; queued sends must not read later state.
+  const params = { tokens, details: details(), epoch, session };
+  const pending = requestChain.then(() => requestOnce(params));
   requestChain = pending.catch(() => {});
   return pending;
 }
 
-type TodoTask = { content?: string; status?: string };
-
-function todoSummary(phases: unknown): string {
+function todoTasks(phases: unknown): TodoTask[] {
   if (!Array.isArray(phases)) {
-    return "";
+    return [];
   }
-  const tasks: TodoTask[] = phases.flatMap((phase) =>
-    Array.isArray(phase?.tasks) ? phase.tasks : [],
-  );
-  if (!tasks.length) {
-    return "";
-  }
-  const active = tasks.find((task) => task.status === "in_progress");
-  const done = tasks.filter((task) => task.status === "completed").length;
-  if (done === tasks.length) return "";
-  return clean(`${done}/${tasks.length} ${active?.content ?? ""}`);
+  return phases
+    .flatMap((phase) => (Array.isArray(phase?.tasks) ? phase.tasks : []))
+    .filter((task) => task && typeof task === "object");
 }
 
 // The latest todo snapshot on the active branch, by the same rules as omp's
 // own canonicalTodoPhases (tools/todo.ts): a successful, non-view todo result.
-function todoFromBranch(ctx: any): string {
+function todoFromBranch(ctx: any): TodoTask[] {
   let entries: any[] = [];
   try {
     entries = ctx?.sessionManager?.getBranch?.() ?? [];
   } catch {
-    return "";
+    return [];
   }
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const message =
@@ -132,10 +202,10 @@ function todoFromBranch(ctx: any): string {
       message.details?.op !== "view" &&
       Array.isArray(message.details?.phases)
     ) {
-      return todoSummary(message.details.phases);
+      return todoTasks(message.details.phases);
     }
   }
-  return "";
+  return [];
 }
 
 export default function (pi: ExtensionAPI) {
@@ -158,18 +228,19 @@ export default function (pi: ExtensionAPI) {
     rootActive = true;
     epoch = Math.max(epoch + 1, Date.now() * 1000);
     session = ctx.sessionManager.getSessionId();
-    state.agent = clean(ctx.model?.id ?? "");
+    state.model = ctx.model?.id ?? "";
+    state.cwd = typeof ctx.cwd === "string" ? ctx.cwd : "";
     if (!heartbeat) {
       heartbeat = setInterval(() => { void publish(); }, 30_000);
       heartbeat.unref();
     }
     // Automatic titles and /rename can finish between agent lifecycle events.
     unsubscribeTitle = ctx.sessionManager.onSessionNameChanged(() => {
-      state.title = clean(pi.getSessionName() ?? "");
+      state.title = pi.getSessionName() ?? "";
       void publish();
     });
-    state.title = clean(pi.getSessionName() ?? "");
-    state.todo = todoFromBranch(ctx);
+    state.title = pi.getSessionName() ?? "";
+    state.tasks = todoFromBranch(ctx);
     subagents.clear();
     await publish();
   };
@@ -193,23 +264,24 @@ export default function (pi: ExtensionAPI) {
     heartbeat = undefined;
     unsubscribeTitle?.();
     unsubscribeTitle = undefined;
-    state.agent = "";
+    state.model = "";
     state.title = "";
-    state.todo = "";
+    state.cwd = "";
+    state.tasks = [];
     subagents.clear();
     await publish();
   });
 
   pi.on("agent_start", async (_event, ctx) => {
     if (!isRoot(ctx)) return;
-    state.agent = clean(ctx.model?.id ?? "");
-    state.title = clean(pi.getSessionName() ?? "");
+    state.model = ctx.model?.id ?? "";
+    state.title = pi.getSessionName() ?? "";
     await publish();
   });
 
   pi.on("agent_end", async (event: any, ctx) => {
     if (!isRoot(ctx) || event?.willContinue === true) return;
-    state.title = clean(pi.getSessionName() ?? "");
+    state.title = pi.getSessionName() ?? "";
     await publish();
   });
 
@@ -221,7 +293,7 @@ export default function (pi: ExtensionAPI) {
       event.details?.op === "view"
     )
       return;
-    state.todo = todoSummary(event.details?.phases);
+    state.tasks = todoTasks(event.details?.phases);
     await publish();
   });
 
@@ -231,8 +303,8 @@ export default function (pi: ExtensionAPI) {
     if (typeof data?.id !== "string") return;
     if (data.status === "started") {
       subagents.set(data.id, {
-        type: clean(data.agent ?? "task"),
-        description: clean(data.description ?? ""),
+        type: clean(data.agent ?? "task", 64),
+        description: clean(data.description ?? "", 200),
       });
     } else if (!subagents.delete(data.id)) {
       return;
@@ -246,7 +318,7 @@ export default function (pi: ExtensionAPI) {
     if (!rootActive) return;
     const id = data?.progress?.id;
     const entry = typeof id === "string" ? subagents.get(id) : undefined;
-    const description = clean(data?.progress?.description ?? "");
+    const description = clean(data?.progress?.description ?? "", 200);
     if (!entry || !description || description === entry.description) return;
     entry.description = description;
     void publish();

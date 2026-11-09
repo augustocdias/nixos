@@ -36,7 +36,7 @@ def text_schema(field, description):
 REPORT_TOOLS = [
     {
         "name": "report_done",
-        "description": "Report that the task is finished, with the result. Ends your part until your role answers.",
+        "description": "Hand your finished work back to Hermes. Call it every time you finish a task, the first one and every follow-up, even mid-review. It does not close the card: it records your result and wakes the role, which decides the next step (review, another round, done). Without it the card waits forever.",
         "inputSchema": text_schema("result", "What you did and where to find it"),
     },
     {

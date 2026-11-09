@@ -39,6 +39,7 @@ Every card body follows this template (`board_template` shows it): a **Run setti
 <What to do, or a pointer to the ticket.>
 ```
 
+- **Herdr spaces belong to one repository.** Copy a space into a card's `Herdr` row only when the space shows that card's repository or one of its worktrees. For another repository, leave `space` out or prepare that repository's own space; `agent_launch` opens a new space when the one named shows another repository.
 - **One repository per card.** Work that changes several repositories becomes one ticket and one card per repository, linked with `parents` where one must land first.
 
 - **Work in another repository is a new card, not a mount.** When a card turns out to need changes elsewhere (for example `~/nixos`, the machine's configuration, including Hermes itself), file a card for that repository with its own `Repo` and the agreed settings, and, when the first card must wait for it, `kanban_link` the new card as that card's parent. Its agent starts with that repository as its working directory and its own write access. Never ask for `host_mount` or write access to do another repository's work.
@@ -62,7 +63,7 @@ When a role blocks a card, Hermes gives you a **Check blocker** card naming it. 
 1. `kanban_show` the blocked card and read its whole thread: the brief, the agent's reports, and the block reason.
 1. Decide whether you, the role or a fresh agent can resolve it:
    - **Resolvable**: the agent misread its brief, missed a decision already on the card, asked something the ticket, thread or repo answers, or needs an implementation choice. Call `blocker_resolve` with guidance in Markdown: what went wrong and exactly what to do now. The card unblocks and its role runs again with your guidance.
-   - **Legitimate**: a decision only the user can make, access or credentials only they have, or an approval. Call `blocker_note` explaining in Markdown what they must decide or do, and leave the card blocked. Do not block anything again.
+   - **Legitimate**: a decision only the user can make, access or credentials only they have, or an approval. Call `blocker_note` with a note in the *Writing for the user* shape (**Needs you**, **What happened**, **Options**), and leave the card blocked. Do not block anything again.
 1. `kanban_complete` the check card. Hermes deletes it afterwards, so put everything worth keeping in your comment on the blocked card.
 
 # Workspaces

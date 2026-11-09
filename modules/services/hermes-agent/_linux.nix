@@ -106,6 +106,7 @@
       extra_repos = ["${homeDirectory}/nixos"];
       hc = "${profileDirectory}/bin/hc";
       herdr_app = "${profileDirectory}/bin/herdr-app";
+      git = lib.getExe pkgs.git;
       google_token = googleToken;
       poll_seconds = 15;
       protocol = builtins.readFile ./protocol.md;
@@ -184,6 +185,8 @@
     {
       command = lib.getExe pkgs.python3;
       args = ["${../../programs/agent-jail/host-mcp.py}"];
+      # Routed profiles resolve ${VAR} from profile secrets, not the jail environment.
+      env.HOST_QUERY_SOCKET = "/tmp/host-query.sock";
     }
     // askEveryCall ["host_exec" "host_mount" "host_journal" "host_ssh_agent"] "host access outside the jail";
   # Triage context for the coordinator. OAuth runs at runtime (`hermes -p coordinator mcp login <name>`).
@@ -400,7 +403,9 @@
           };
         };
       soul = soul "default" "";
-      plugin = false;
+      # No tools here (the root has no plugin settings): the gateway loads only the root's plugins at
+      # startup, and this one must serve the report endpoint.
+      plugin = true;
     };
   });
 
@@ -465,7 +470,9 @@ in {
       ];
       WorkingDirectory = dev;
       ExecStartPre = "${bootstrap}";
-      ExecStart = "${lib.getExe hermes} gateway run";
+      # `-p default` (the root profile) beats a sticky `hermes profile use`. Hermes ignores the sticky
+      # profile for systemd-supervised gateways, but detects them by INVOCATION_ID, which the jail drops.
+      ExecStart = "${lib.getExe hermes} -p default gateway run";
       Restart = "on-failure";
       RestartSec = 10;
     };

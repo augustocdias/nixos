@@ -19,6 +19,11 @@ import uuid
 MAX_FRAME = 65_536
 IO_TIMEOUT = 1.0
 TOKEN_KEYS = {"agent", "title", "todo", "sub1", "sub2", "sub3", "submore"}
+# Optional expanded-card details, bounded per field and per collection.
+DETAIL_TEXT = {"model": 128, "title": 300, "workspace": 512, "branch": 200}
+MAX_COUNT = 10_000
+MAX_ACTIVE_TASKS = 5
+MAX_SUBAGENTS = 8
 
 
 class RelayError(Exception):
@@ -117,6 +122,54 @@ def text(value, maximum, field, allowed_controls=()):
         invalid("invalid " + field)
 
 
+def bounded(value, limit, field, required=False):
+    text(value, limit * 4, field)
+    if len(value) > limit or (required and not value):
+        invalid("invalid " + field)
+
+
+def exact(value, keys, field):
+    if not isinstance(value, dict) or set(value) != keys:
+        denied("invalid " + field + " fields")
+
+
+def bounded_list(value, limit, field):
+    if not isinstance(value, list) or len(value) > limit:
+        invalid("invalid " + field)
+    return value
+
+
+def details(value):
+    """Validate optional details; reject rather than truncate, like tokens."""
+    if not isinstance(value, dict) or not set(value) <= set(DETAIL_TEXT) | {"tasks", "subagents"}:
+        denied("unknown detail field")
+    for key, limit in DETAIL_TEXT.items():
+        if key in value:
+            bounded(value[key], limit, key)
+    if "tasks" in value:
+        # Checklist completion only: no percentages or time estimates.
+        tasks = value["tasks"]
+        exact(tasks, {"completed", "total", "active"}, "tasks")
+        integer(tasks["total"], 1, MAX_COUNT, "task total")
+        integer(tasks["completed"], 0, tasks["total"], "completed tasks")
+        for item in bounded_list(tasks["active"], MAX_ACTIVE_TASKS, "active tasks"):
+            bounded(item, 200, "active task", required=True)
+    if "subagents" in value:
+        # Harness-internal workers; they carry no Core terminal ID and are not children.
+        subagents = value["subagents"]
+        exact(subagents, {"total", "items"}, "subagents")
+        items = bounded_list(subagents["items"], MAX_SUBAGENTS, "subagent items")
+        integer(subagents["total"], max(1, len(items)), MAX_COUNT, "subagent total")
+        for item in items:
+            exact(item, {"id", "type", "description"}, "subagent")
+            bounded(item["id"], 128, "subagent id", required=True)
+            bounded(item["type"], 64, "subagent type", required=True)
+            bounded(item["description"], 200, "subagent description")
+        if len({item["id"] for item in items}) != len(items):
+            invalid("duplicate subagent id")
+    return value
+
+
 class CoreActivity:
     """One locked launch owns one display-only label, never Core lifecycle state."""
 
@@ -162,7 +215,8 @@ class CoreActivity:
         if not valid_id(request["id"]) or request["method"] != "activity.report":
             denied("only activity.report is allowed")
         p = request["params"]
-        if not isinstance(p, dict) or set(p) != {"seq", "epoch", "session", "tokens"}:
+        if not isinstance(p, dict) or not {"seq", "epoch", "session", "tokens"} <= set(p) \
+                or not set(p) <= {"seq", "epoch", "session", "tokens", "details"}:
             denied("unknown metadata field")
         for field in ("seq", "epoch"):
             integer(p[field], 0, (1 << 64) - 1, field)
@@ -181,9 +235,14 @@ class CoreActivity:
                 invalid("token exceeds 80 characters")
         snapshot = {"version": 1, "owner": self.owner, "agent": self.agent,
                     "session": p["session"], "tokens": tokens}
+        if "details" in p:
+            snapshot["details"] = details(p["details"])
+        # Tokens alone decide presence: empty tokens clear details too.
+        if not any(tokens.values()):
+            snapshot = None
         now = int(time.time() * 1000)
-        self.publish(snapshot if any(tokens.values()) else None, now)
-        self.snapshot = snapshot if any(tokens.values()) else None
+        self.publish(snapshot, now)
+        self.snapshot = snapshot
         self.updated = now
         self.epoch, self.seq, self.session = p["epoch"], p["seq"], p["session"]
         return {"id": request["id"], "result": {"accepted": True}}

@@ -9,7 +9,7 @@ Every card starts with a **Run settings** table (`board_template` in the Hermes 
 
 - `Repo:` where the agent works.
 - `Tracker:` the spec and ticket in the repo's own tracker. The ticket holds the real description; the card is the user's tracking copy.
-- `Agents:` which harness each role uses. You never choose one. A card the triage decomposer created inherits these lines from its parent card; `agent_launch` does that for you. Block and ask the user only when `agent_launch` says no harness is named anywhere.
+- `Agents:` which harness each role uses. You never choose one. A card the triage decomposer created inherits these lines from its parent card; `agent_launch` does that for you. Never conclude from the card body that settings are missing: a card the triage decomposer wrote has none in its body and inherits them from the card it belongs to. Always call `agent_launch` first and act on its answer; block only when it returns an error you cannot fix by following its message.
 - `Git:` the git-conventions decisions the user made for this work. They travel to the agent as its agreement.
 - `Herdr:` the space the agents run in, and whether they open as panes or tabs.
 
@@ -36,7 +36,7 @@ Then do exactly one of:
 - **Review**: (programmer only) `kanban_request_review` with reviewer `reviewer`.
 - **Follow up**: the agent missed a criterion or a check, or asked a question. `agent_status`, then `agent_send` (idle or done agents only), then park again. Follow up up to three times before blocking for the same gap.
 - **Another repository**: the agent needs changes in a different repository (for example `~/nixos`). `kanban_create` a card for that repository with the same Run settings except `Repo`, assigned to `programmer`, and, when this card must wait for it, `kanban_link` the new card as a parent of this card. Then follow up or park this card. Never ask for mounts or host access to work across repositories.
-- **Block**: only for a decision that belongs to the user (scope, product behaviour, a trade-off the ticket does not settle) or a blocker no agent can clear. `kanban_block` with a Markdown reason: what is blocked, what was tried, the exact question, and the agent's name. The coordinator checks every block first and unblocks the card with guidance when it can.
+- **Block**: only for a decision that belongs to the user (scope, product behaviour, a trade-off the ticket does not settle) or a blocker no agent can clear. `kanban_block` with a reason written for the user (see *Writing for the user*): **Needs you**, **What happened**, **Options**, about 120 words, evidence linked rather than pasted. The coordinator checks every block first and unblocks the card with guidance when it can.
 
 Answer an agent's question yourself whenever the ticket, the card, the thread or the repo's documents answer it, or when it is an implementation detail: pick the reasonable option and say so. When an agent reports blocked on an approval or a question, it is not blocked: tell it with `agent_send` to request the approval or ask in its terminal, and park again.
 
