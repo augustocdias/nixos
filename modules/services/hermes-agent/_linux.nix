@@ -34,6 +34,9 @@
       with c; [
         (set-env "HERMES_HOME" root)
         (try-rw-bind root root)
+        # Read-only context: this repo, and Herdr Core's config and templates for `hc templates`.
+        (try-readonly (noescape "\"$HOME/nixos\""))
+        (try-readonly (noescape "\"$HOME/.config/herdr-core\""))
         # Under systemd, kanban would wrap workers in `systemd-run --user --scope`,
         # which needs the user bus the jail does not have.
         (add-runtime "RUNTIME_ARGS+=(--unsetenv INVOCATION_ID)")
@@ -99,6 +102,8 @@
     cp ${./plugin/plugin.yaml} $out/plugin.yaml
     cp ${pkgs.writeText "settings.json" (builtins.toJSON {
       inherit port cap dev roles writers;
+      # Repositories outside ~/dev that cards may name; agents work there with their own write access.
+      extra_repos = ["${homeDirectory}/nixos"];
       hc = "${profileDirectory}/bin/hc";
       herdr_app = "${profileDirectory}/bin/herdr-app";
       google_token = googleToken;
@@ -108,7 +113,7 @@
         lib.mapAttrs (_: skills: {inherit skills;}) launchSkills
         // {
           assistant = {
-            force_triage = true;
+            force_blocked = true;
             google = true;
           };
         };
@@ -126,7 +131,7 @@
     ../../programs/agent-shared/style/caveman.md
     ../../programs/agent-shared/style/ponytail.md
   ];
-  soul = name: extra: pkgs.writeText "${name}-SOUL.md" (builtins.readFile ./souls/${name}.md + extra + "\n# Global rules\n" + globalContext + "\n" + style);
+  soul = name: extra: pkgs.writeText "${name}-SOUL.md" (builtins.readFile ./souls/${name}.md + extra + builtins.readFile ./souls/_formatting.md + "\n# Global rules\n" + globalContext + "\n" + style);
 
   # Catppuccin Mocha for the CLI; missing keys inherit the built-in default skin.
   skin = (pkgs.formats.yaml {}).generate "catppuccin-mocha.yaml" {
@@ -284,12 +289,21 @@
       "${../../programs/herdr/skills}"
       "${../../programs/claude-code/skills}"
     ];
-    mcp_servers = lib.optionalAttrs host {host = hostMcp;} // extraMcp;
+    # Disabled explicitly: the bootstrap merges and never deletes, so an older `host` entry would survive.
+    mcp_servers =
+      {
+        host =
+          if host
+          then hostMcp
+          else {enabled = false;};
+      }
+      // extraMcp;
   };
   base = ["skills" "memory" "session_search"];
   profiles =
     {
       coordinator = {
+        description = "Orchestrator: triages work with the user, prepares Herdr spaces, owns decomposed parent cards and judges them when their children finish. Not for implementation.";
         config =
           lib.recursiveUpdate (profileConfig {
             model = "gpt-6-astra";
@@ -304,6 +318,7 @@
         plugin = true;
       };
       assistant = {
+        description = "Reads the user's mail and calendar and writes briefs. Never assign engineering work here.";
         config = profileConfig {
           model = "gpt-6-luna";
           # google: the plugin's read-only Gmail and Calendar tools.
@@ -315,6 +330,16 @@
       };
     }
     // lib.genAttrs roles (role: {
+      description =
+        {
+          programmer = "Implements tickets, fixes bugs and builds prototypes through a launched coding agent; requests review when done.";
+          reviewer = "Reviews code changes against a ticket through a launched coding agent running code-review.";
+          qa = "Runs end-to-end and manual-style checks of a reviewed change through a launched coding agent.";
+          research = "Answers questions from primary sources through a launched coding agent running the research skill.";
+        }
+        .${
+          role
+        };
       config = profileConfig {
         model =
           {
@@ -327,6 +352,9 @@
             role
           };
         toolsets = base ++ ["kanban" "agents"];
+        # Roles only ever run as unattended card runs, where a host_* call can never be approved.
+        # Their agents ask for host access in their own terminals instead.
+        host = false;
       };
       soul = soul role (builtins.readFile ./souls/_role.md);
       plugin = true;
@@ -352,9 +380,23 @@
           gateway.multiplex_profiles = true;
           kanban = {
             dispatch_in_gateway = true;
-            dispatch_profiles = roles;
-            # Triage is the holding lane for untrusted cards; no LLM may decompose them.
-            auto_decompose = false;
+            # The coordinator owns decomposed root cards and judges them when their children finish.
+            dispatch_profiles = roles ++ ["coordinator"];
+            # Triage cards are ready work: the decomposer routes them to roles by profile description.
+            # Mail never lands here; the assistant's cards are created blocked.
+            auto_decompose = true;
+            orchestrator_profile = "coordinator";
+            default_assignee = "coordinator";
+          };
+          auxiliary = let
+            astra = {
+              provider = "main";
+              model = "gpt-6-astra";
+              reasoning_effort = "medium";
+            };
+          in {
+            kanban_decomposer = astra;
+            triage_specifier = astra;
           };
         };
       soul = soul "default" "";
@@ -387,6 +429,11 @@ in {
     run = ["hermes" "-p" "coordinator"];
   };
   herdr.keys."super-s" = "terminal.open:hermes";
+  # The board helper runs unjailed in the App's environment: no HERMES_HOME, so ~/.hermes, the jail's root.
+  programs.hermes-shepherd = {
+    enable = true;
+    hermesPython = "${package.hermesVenv}/bin/python3";
+  };
   assertions = [
     {
       assertion = lib.all (skill: sharedSkills.skills ? ${skill}) (lib.concatLists (lib.attrValues launchSkills));

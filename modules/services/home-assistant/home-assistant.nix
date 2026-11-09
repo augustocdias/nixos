@@ -23,6 +23,7 @@
         customComponents = [
           berlin-transport
           gruenbeck-softliq
+          pkgs.home-assistant-custom-components.uix
           ha-mcp-tools
           laya
           snapmaker-u1
@@ -37,7 +38,6 @@
             battery-state-card
             bubble-card
             button-card
-            card-mod
             clock-weather-card
             decluttering-card
             fold-entity-row

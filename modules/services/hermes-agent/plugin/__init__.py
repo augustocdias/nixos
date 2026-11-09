@@ -43,17 +43,36 @@ LAUNCH_LABEL = "hermes.launch"
 CARD_LABEL = "hermes.card"
 SESSION_ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 SPACE_ID = re.compile(r"^sp[0-9a-f]{8,64}$")
-HEADER = re.compile(r"^(Repo|Tracker|Agents|Git|Herdr):[ \t]*(.*)$", re.M)
+# The run settings: a Markdown table row (`| Repo | `/x` |`), or a legacy `Repo: /x` line.
+HEADER = re.compile(
+    r"^(?:\|\s*\**(Repo|Tracker|Agents|Git|Herdr)\**\s*\|\s*(.*?)\s*\|\s*|(Repo|Tracker|Agents|Git|Herdr):[ \t]*(.*))$",
+    re.M,
+)
+SESSIONS_START, SESSIONS_END = "<!-- hermes:sessions -->", "<!-- /hermes:sessions -->"
+GIT_DECISIONS = [("branches", "Branches"), ("worktrees", "Worktrees"), ("commits", "Commits"), ("pushes", "Pushes"), ("prs", "Pull requests")]
+GIT_MEANING = {
+    "agent": "You do it yourself, without asking",
+    "ask": "Ask the user before each one",
+    "human": "The user does it: leave it to them and say so in your report",
+}
 SENDABLE = ("idle", "done")
 HARNESSES = ("claude", "omp")
 # Untrusted mail and calendar input: the assistant may file and read cards, nothing else.
 ASSISTANT_KANBAN = {"kanban_create", "kanban_list", "kanban_show"}
 LAUNCH_TTL = 300
-CARD_TEMPLATE = """Repo: <absolute repo path under ~/dev>
-Tracker: <spec reference>; ticket=<ticket reference>
-Agents: programmer=<claude|omp>, reviewer=<claude|omp>, qa=<claude|omp>, research=<claude|omp>
-Git: branch=<name>; branches=<agent|ask|human>; worktrees=<agent|ask|human>; commits=<agent|ask|human>; pushes=<agent|ask|human>; prs=<agent|ask|human>
-Herdr: space=<space id>; placement=<pane|tab>; close=<yes|no>"""
+CARD_TEMPLATE = """## Run settings
+
+| Setting | Value |
+|---|---|
+| Repo | `<absolute repo path under ~/dev>` |
+| Tracker | spec=<spec reference>; ticket=<ticket reference> |
+| Agents | programmer=<harness>, reviewer=<harness>, qa=<harness>, research=<harness> (harness: claude or omp) |
+| Git | branch=<name>; branches=<agent, ask or human>; worktrees=…; commits=…; pushes=…; prs=… |
+| Herdr | space=<space id>; placement=<pane or tab>; close=<yes or no> |
+
+## Task
+
+<What to do, or a pointer to the ticket that says it.>"""
 
 
 # --- helpers -------------------------------------------------------------
@@ -131,13 +150,18 @@ def _status(info):
 
 
 def _inside_dev(path):
-    """Resolved directory inside ~/dev (symlinks and .. resolved first), else None."""
+    """Resolved directory inside ~/dev or one of the extra repos (symlinks and .. resolved first), else None."""
     dev = Path(SETTINGS["dev"]).resolve()
+    extra = [Path(r).resolve() for r in SETTINGS.get("extra_repos", [])]
     try:
         resolved = Path(path).expanduser().resolve(strict=True)
     except (OSError, RuntimeError):
         return None
-    if resolved == dev or dev not in resolved.parents or not resolved.is_dir():
+    if not resolved.is_dir():
+        return None
+    if any(resolved == r or r in resolved.parents for r in extra):
+        return resolved
+    if resolved == dev or dev not in resolved.parents:
         return None
     return resolved
 
@@ -153,8 +177,11 @@ def _pairs(value):
 
 
 def card_fields(body):
-    """The card's header lines: repo, tracker, agents, git and herdr settings."""
-    fields = {key.lower(): value.strip() for key, value in HEADER.findall(body or "")}
+    """The card's run settings: repo, tracker, agents, git and herdr."""
+    fields = {
+        (row_key or line_key).lower(): (row_value or line_value).replace("`", "").replace("\\|", "|").strip()
+        for row_key, row_value, line_key, line_value in HEADER.findall(body or "")
+    }
     return {
         "repo": fields.get("repo", ""),
         "tracker": fields.get("tracker", ""),
@@ -164,6 +191,32 @@ def card_fields(body):
     }
 
 
+def inherited_fields(kb, conn, task, depth=3):
+    """The card's header, with lines it lacks taken from its parents (nearest first).
+
+    The triage decomposer writes child cards without our header; their parent,
+    the original card, carries it.
+    """
+    fields = card_fields(task.body)
+    frontier, seen = [task.id], {task.id}
+    for _ in range(depth):
+        parents = [p for card in frontier for p in kb.parent_ids(conn, card) if p not in seen]
+        if not parents:
+            break
+        for parent_id in parents:
+            seen.add(parent_id)
+            parent = kb.get_task(conn, parent_id)
+            if parent is None:
+                continue
+            theirs = card_fields(parent.body)
+            for key in ("repo", "tracker"):
+                fields[key] = fields[key] or theirs[key]
+            for key in ("agents", "git", "herdr"):
+                fields[key] = {**theirs[key], **fields[key]}
+        frontier = parents
+    return fields
+
+
 def _space(space_id):
     """The App space with this id, from `herdr-app ls`."""
     listing = json.loads(_run(SETTINGS["herdr_app"], "ls") or "{}")
@@ -171,16 +224,74 @@ def _space(space_id):
 
 
 def _place(space, placement, terminal, label, previous_pane):
-    """Show the agent's terminal in the card's space, as a pane or a tab."""
+    """Show the agent in the card's space in a new pane or tab; never reuse one."""
     argv = [SETTINGS["hc"], "attach", terminal]
     if placement == "pane":
         panes = [t["pane"] for tab in space.get("tabs", []) for t in tab.get("terminals", []) if t.get("pane")]
+        # Split next to the card's previous agent, so a card's agents stay together.
         target = previous_pane if previous_pane in panes else (panes[-1] if panes else None)
         if target:
-            reply = _app("pane.split", {"pane": target, "direction": "right", "argv": argv})
-            return reply.get("pane") or target
-    reply = _app("tab.new", {"space": space["id"], "name": label, "argv": argv})
-    return reply.get("pane")
+            return _app("pane.split", {"pane": target, "direction": "right", "argv": argv}).get("pane")
+    return _app("tab.new", {"space": space["id"], "name": label, "argv": argv}).get("pane")
+
+
+def _agent_name(profile, title):
+    """A readable, unique terminal name: `<role>-<card title>`, 32 characters at most."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (title or "").lower()).strip("-") or "card"
+    base = f"{profile}-{slug}"[:29].rstrip("-")
+    taken = {t.get("name") for t in json.loads(_hc("ls", "--json")).get("terminals", [])}
+    name, n = base, 2
+    while name in taken:
+        name, n = f"{base}-{n}", n + 1
+    return name
+
+
+def _when(ts):
+    return datetime.fromtimestamp(ts).strftime("%b %d %H:%M") if ts else ""
+
+
+def _sessions_table(iterations):
+    rows = [
+        "## Agent sessions",
+        "",
+        "| # | Role | Agent | Harness | Started | Ended | Outcome | Session | Resume |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for it in iterations:
+        rows.append(
+            f"| {it['n']} | {it['profile']} | `{it.get('name') or it['terminal']}` (`{it['terminal']}`) | {it['harness']} "
+            f"| {_when(it['started_at'])} | {_when(it.get('ended_at'))} | {it.get('outcome') or 'running'} "
+            f"| {'`' + it['session_id'] + '`' if it.get('session_id') else ''} "
+            f"| {'`' + it['resume'] + '`' if it.get('resume') else ''} |"
+        )
+    return "\n".join([SESSIONS_START, *rows, SESSIONS_END])
+
+
+def _sync_sessions(card):
+    """Rewrite the card body's Agent sessions table from the launch records."""
+    with _state() as data:
+        iterations = list((data.get(card) or {}).get("iterations") or [])
+    kb, connect = _kb()
+    with connect() as conn:
+        task = kb.get_task(conn, card)
+        if task is None:
+            return
+        body = task.body or ""
+        table = _sessions_table(iterations)
+        if SESSIONS_START in body and SESSIONS_END in body:
+            head, rest = body.split(SESSIONS_START, 1)
+            body = head + table + rest.split(SESSIONS_END, 1)[1]
+        else:
+            body = body.rstrip() + "\n\n" + table + "\n"
+        kb.edit_task(conn, card, body=body)
+
+
+def _description(body):
+    """The card body without its run settings and sessions table, for the agent's brief."""
+    body = re.sub(re.escape(SESSIONS_START) + ".*?" + re.escape(SESSIONS_END), "", body or "", flags=re.S)
+    body = HEADER.sub("", body)
+    body = re.sub(r"^## Run settings\s*$|^\|\s*Setting\s*\|.*$|^\|[-| ]+\|\s*$", "", body, flags=re.M)
+    return re.sub(r"\n{3,}", "\n\n", body).strip()
 
 
 def _comment(card, body):
@@ -199,6 +310,7 @@ def _start_iteration(data, card, profile, kind, detail):
         "profile": profile,
         "harness": agent["harness"],
         "terminal": agent["terminal"],
+        "name": agent.get("name", ""),
         "kind": kind,
         "detail": detail,
         "started_at": _now(),
@@ -208,9 +320,11 @@ def _start_iteration(data, card, profile, kind, detail):
 
 
 def _iteration_line(it):
+    detail = f": `{it['detail']}`" if it["detail"] else ""
     return (
-        f"Iteration {it['n']} started {_iso(it['started_at'])}: {it['profile']} on {it['harness']}, "
-        f"agent {it['terminal']}, {it['kind']} {it['detail']}."
+        f"### Iteration {it['n']} started\n\n"
+        f"**{it['profile']}** on **{it['harness']}**, agent `{it.get('name') or it['terminal']}` (`{it['terminal']}`), "
+        f"{it['kind']}{detail}. Times and sessions are in the card's *Agent sessions* table."
     )
 
 
@@ -254,16 +368,53 @@ def _owned_terminal(card, profile):
     return owner, agent, info
 
 
-def _message(harness, skill, args, card, token, fields):
+def _message(harness, skill, args, card, token, fields, foreground, title, description):
+    """The agent's first message: the skill call, then everything agreed for the card, in Markdown."""
     invoke = f"/{skill}" if harness == "claude" else f"/skill:{skill}"
-    git = "; ".join(f"{k}={v}" for k, v in fields["git"].items()) or "not agreed: ask the user"
-    return (
-        f"{invoke} {args}\n\n"
-        f"Hermes card {card}, task token {token}. Pass both to every report tool.\n"
-        f"Repo: {fields['repo']}\nTracker: {fields['tracker'] or 'none'}\n"
-        f"Git ownership agreed for this card (it satisfies the git-conventions agreement): {git}\n\n"
-        + SETTINGS["protocol"]
+    mode = (
+        "**Foreground**: the user can see this terminal. Ask them directly, and request approvals as usual."
+        if foreground
+        else "**Background**: request approvals as usual (the user is alerted); send questions to Hermes with `ask`."
     )
+    git = fields["git"]
+    if git:
+        rows = [f"| Branch | `{git['branch']}` | Work on this branch |"] if git.get("branch") else []
+        rows += [
+            f"| {label} | {git[key]} | {GIT_MEANING.get(git[key], git[key])} |"
+            for key, label in GIT_DECISIONS if key in git
+        ]
+        git_section = (
+            "These were agreed with the user for this card. They are your git-conventions agreement: "
+            "act on them and do not ask for them again.\n\n"
+            "| Decision | Value | Meaning |\n|---|---|---|\n" + "\n".join(rows)
+        )
+    else:
+        git_section = "No git decisions were agreed for this card. Ask the user before any branch, commit, push or PR."
+    return "\n".join([
+        f"{invoke} {args}",
+        "",
+        f"## Hermes card `{card}`: {title}",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+        f"| Run mode | {mode} |",
+        f"| Card | `{card}` |",
+        f"| Task token | `{token}` |",
+        f"| Repo | `{fields['repo']}` |",
+        f"| Tracker | {fields['tracker'] or 'none'} |",
+        "",
+        "Pass the card id and the task token to every report tool.",
+        "",
+        "## Agreed git decisions",
+        "",
+        git_section,
+        "",
+        "## Card description",
+        "",
+        description or "_The card has no description beyond the brief above._",
+        "",
+        SETTINGS["protocol"],
+    ])
 
 
 def make_tools(profile):
@@ -280,9 +431,10 @@ def make_tools(profile):
             kb, connect = _kb()
             with connect() as conn:
                 task = kb.get_task(conn, card)
-            if task is None:
-                return _error(f"no card {card}")
-            fields = card_fields(task.body)
+                if task is None:
+                    return _error(f"no card {card}")
+                fields = inherited_fields(kb, conn, task)
+                title, description = task.title, _description(task.body)
             # The card decides the harness; the coordinator may pass one for a card without it.
             harness = fields["agents"].get(profile) or (
                 str(args.get("harness") or "") if profile == "coordinator" else ""
@@ -294,7 +446,7 @@ def make_tools(profile):
                 )
             repo = _inside_dev(fields["repo"] or (args.get("repo") if profile == "coordinator" else ""))
             if repo is None:
-                return _error("the card's Repo line must name an existing directory inside ~/dev")
+                return _error("the card's Repo must be an existing directory inside ~/dev, or ~/nixos")
             cwd, space = repo, None
             space_id = fields["herdr"].get("space", "")
             if space_id and space_id != "none":
@@ -324,13 +476,16 @@ def make_tools(profile):
                     )
                 pending[token] = now
                 data["_launching"] = pending
+            name = _agent_name(profile, title)
             try:
                 started = json.loads(_hc(
                     "run", "--bg", "--outlive-parent", "--json",
                     "--cwd", str(cwd),
+                    "--name", name,
                     "--label", f"{LAUNCH_LABEL}=1",
                     "--label", f"{CARD_LABEL}={card}",
-                    template, _message(harness, skill, skill_args, card, token, fields),
+                    template,
+                    _message(harness, skill, skill_args, card, token, fields, space is not None, title, description),
                     timeout=120,
                 ))
             finally:
@@ -345,7 +500,7 @@ def make_tools(profile):
             if space is not None:
                 placement = fields["herdr"].get("placement", "pane")
                 try:
-                    pane = _place(space, placement, terminal, f"{profile} {card}", previous.get("pane"))
+                    pane = _place(space, placement, terminal, f"{profile.title()}: {title}"[:48], previous.get("pane"))
                 except Exception as e:  # the agent runs either way; the view is a convenience
                     logger.warning("herdr-agents could not place %s: %s", terminal, e)
             with _state() as data:
@@ -356,12 +511,15 @@ def make_tools(profile):
                     "cwd": str(cwd),
                     "token": token,
                     "pane": pane,
+                    "name": name,
                     "launched_at": _now(),
                 }
                 iteration = _start_iteration(data, card, profile, "skill", f"/{skill} {skill_args}".strip())
-            _comment(card, _iteration_line(iteration) + f" Template {template}, folder {cwd}.")
+            _comment(card, _iteration_line(iteration) + f"\n\nTemplate `{template}`, folder `{cwd}`.")
+            _sync_sessions(card)
             return _json({
                 "terminal": terminal,
+                "name": name,
                 "iteration": iteration["n"],
                 "first_message": started.get("first_message"),
                 "next": f"Park the card: kanban_schedule with reason 'awaiting agent: {terminal}'.",
@@ -402,6 +560,7 @@ def make_tools(profile):
             with _state() as data:
                 iteration = _start_iteration(data, card, owner, "follow-up", "")
             _comment(card, _iteration_line(iteration))
+            _sync_sessions(card)
             return _json({"sent": True, "terminal": agent["terminal"], "iteration": iteration["n"]})
         except Exception as e:
             return _error(str(e))
@@ -440,7 +599,7 @@ def make_tools(profile):
     if profile == "coordinator":
         launch["harness"] = {"type": "string", "enum": list(HARNESSES), "description": "Only for a card whose Agents line names none for you"}
         launch["repo"] = {"type": "string", "description": "Only for a card without a Repo line"}
-    return [
+    tools = [
         (agent_launch, "Launch a coding agent for a card. The card's header lines decide the harness, repo, git ownership and Herdr space; you choose the skill and its arguments. Then park the card with kanban_schedule.", launch, ["skill", "args"]),
         (agent_status, "Show the agent launched for a card, with every iteration's start, end, outcome, session and resume command.", {"card": card}, []),
         (agent_send, "Send a follow-up to the agent launched for a card, starting a new iteration. Only works when the agent is idle or done.", {
@@ -450,6 +609,104 @@ def make_tools(profile):
         (agent_kill, "Kill and remove the agent launched for a card.", {"card": card}, []),
         (agent_list, "List every agent Hermes launched, with card, state and status.", {}, []),
     ]
+    if profile == "coordinator":
+        blocked = {"type": "string", "description": "The blocked card's id (not your blocker-check card)"}
+        tools += [
+            (blocker_resolve, "Unblock a blocked card you can resolve: posts your guidance on it, then unblocks it so its role runs again with that guidance.", {
+                "card": blocked,
+                "guidance": {"type": "string", "description": "Markdown: what the agent got wrong or missed, and exactly what to do now"},
+            }, ["card", "guidance"]),
+            (blocker_note, "Comment on a legitimately blocked card and leave it blocked for the user: why it needs them and what they must decide or do.", {
+                "card": blocked,
+                "note": {"type": "string", "description": "Markdown"},
+            }, ["card", "note"]),
+        ]
+    return tools
+
+
+# --- Blocker checks (coordinator) --------------------------------------------
+
+
+def _blocked_card(kb, conn, card):
+    task = kb.get_task(conn, card)
+    if task is None:
+        raise ValueError(f"no card {card}")
+    if task.status != "blocked":
+        raise ValueError(f"card {card} is {task.status}, not blocked")
+    return task
+
+
+def blocker_resolve(args, **_):
+    """Kanban's own tools only let a worker change its own card; this one acts on the blocked card."""
+    try:
+        card, guidance = str(args.get("card") or ""), str(args.get("guidance") or "").strip()
+        if not guidance:
+            return _error("guidance is required")
+        kb, connect = _kb()
+        with connect() as conn:
+            _blocked_card(kb, conn, card)
+            kb.add_comment(conn, card, "coordinator", "### Unblocked by the coordinator\n\n" + guidance)
+            if not kb.unblock_task(conn, card):
+                return _error(f"could not unblock {card}")
+            return _json({"unblocked": card, "status": kb.get_task(conn, card).status})
+    except Exception as e:
+        return _error(str(e))
+
+
+def blocker_note(args, **_):
+    try:
+        card, note = str(args.get("card") or ""), str(args.get("note") or "").strip()
+        if not note:
+            return _error("note is required")
+        kb, connect = _kb()
+        with connect() as conn:
+            _blocked_card(kb, conn, card)
+            kb.add_comment(conn, card, "coordinator", "### Checked by the coordinator: needs you\n\n" + note)
+            return _json({"noted": card, "status": "blocked"})
+    except Exception as e:
+        return _error(str(e))
+
+
+CHECK_TITLE = "Check blocker: "
+
+
+def _check_blocks(kb, conn):
+    """File one coordinator check card per new block, and delete the ones the coordinator finished.
+
+    Mail cards, which wait for the user, are skipped. A finished check card is deleted, not
+    archived, so it leaves no history: the decision lives as a comment on the blocked card.
+    """
+    for task in kb.list_tasks(conn, status="done"):
+        if task.created_by == AUTHOR and task.title.startswith(CHECK_TITLE):
+            kb.delete_task(conn, task.id)
+    with _state() as data:
+        checked = dict(data.get("_checked") or {})
+    for task in kb.list_tasks(conn, status="blocked"):
+        if task.created_by in (AUTHOR, "assistant"):
+            continue  # check cards themselves, and mail cards
+        block = next((e for e in reversed(kb.list_events(conn, task.id)) if e.kind == "blocked"), None)
+        if block is None or checked.get(task.id) == block.id:
+            continue
+        reason = str((block.payload or {}).get("reason") or "No reason given.")
+        kb.create_task(
+            conn,
+            title=f"{CHECK_TITLE}{task.title}"[:120],
+            body=(
+                "## Blocked card\n\n| Field | Value |\n|---|---|\n"
+                f"| Card | `{task.id}` |\n| Title | {task.title} |\n| Role | {task.assignee or 'none'} |\n\n"
+                f"## Reason given\n\n{reason}\n\n"
+                "## What to do\n\nRead the blocked card and its thread. If it can be resolved without the user, "
+                "`blocker_resolve` it with guidance. Otherwise `blocker_note` it and leave it blocked. "
+                "Then `kanban_complete` this card with what you decided."
+            ),
+            assignee="coordinator",
+            created_by=AUTHOR,
+            tenant=task.tenant,
+            idempotency_key=f"blocker-{task.id}-{block.id}",
+        )
+        checked[task.id] = block.id
+    with _state() as data:
+        data["_checked"] = checked
 
 
 # --- Google, read-only (assistant) ------------------------------------------
@@ -695,7 +952,6 @@ def handle_report(payload):
     session_id = str(payload.get("session_id") or "")
     if not SESSION_ID.match(session_id):
         session_id = ""
-    notes = []
     with _state() as data:
         entry = data.get(card) or {}
         agent = next(
@@ -707,27 +963,24 @@ def handle_report(payload):
             return 403, {"error": "unknown card or wrong task token"}
         iterations = entry.get("iterations") or []
         current = iterations[agent["iteration"] - 1] if agent.get("iteration") else None
+        changed = False
         if current is not None and session_id and current.get("session_id") != session_id:
             current["session_id"] = session_id
             current["resume"] = _resume_command(agent["harness"], session_id, agent["cwd"])
-            notes.append(f"Iteration {current['n']} session {session_id}. Resume: {current['resume']}")
+            changed = True
         if kind != "comment":
             entry["pending_wake"] = True
             if current is not None and "ended_at" not in current:
                 current["ended_at"] = _now()
                 current["outcome"] = {"report_done": "done", "report_blocked": "blocked", "ask": "question"}[kind]
-                minutes = max(1, round((current["ended_at"] - current["started_at"]) / 60))
-                notes.append(
-                    f"Iteration {current['n']} ended {_iso(current['ended_at'])} after {minutes} min: "
-                    f"{current['outcome']}. Session {current.get('session_id') or 'not reported'}."
-                )
-        terminal = agent["terminal"]
+                changed = True
+        who = agent.get("name") or agent["terminal"]
+    if changed:
+        _sync_sessions(card)
     kb, connect = _kb()
     with connect() as conn:
-        for note in notes:
-            kb.add_comment(conn, card, AUTHOR, note)
         label = {"report_done": "Done", "report_blocked": "Blocked", "ask": "Question", "comment": "Note"}[kind]
-        kb.add_comment(conn, card, f"agent {terminal}", f"{label}: {text}")
+        kb.add_comment(conn, card, f"agent {who}", f"### {label}\n\n{text}")
         if kind != "comment":
             _settle(kb, conn, card)
     return 200, {"recorded": kind, "card": card}
@@ -743,14 +996,19 @@ def _settle(kb, conn, card):
 
 
 def _board_body(payload):
-    """A card body in CARD_TEMPLATE order from the board MCP's fields."""
-    lines = []
+    """A card body in CARD_TEMPLATE's shape from the board MCP's fields."""
+    rows = []
     for key, label in (("repo", "Repo"), ("tracker", "Tracker"), ("agents", "Agents"), ("git", "Git"), ("herdr", "Herdr")):
-        value = str(payload.get(key) or "").strip()
+        value = str(payload.get(key) or "").strip().replace("|", "\\|")
         if value:
-            lines.append(f"{label}: {value}")
+            rows.append(f"| {label} | {'`' + value + '`' if key == 'repo' else value} |")
     body = str(payload.get("body") or "").strip()
-    return "\n".join(lines) + ("\n\n" if lines and body else "") + body
+    parts = []
+    if rows:
+        parts.append("## Run settings\n\n| Setting | Value |\n|---|---|\n" + "\n".join(rows))
+    if body:
+        parts.append("## Task\n\n" + body)
+    return "\n\n".join(parts)
 
 
 def handle_board(method, path, query, payload):
@@ -889,11 +1147,11 @@ def watch(stop):
                     card for card, entry in data.items()
                     if not card.startswith("_") and entry.get("pending_wake")
                 ]
-            if pending:
-                kb, connect = _kb()
-                with connect() as conn:
-                    for card in pending:
-                        _settle(kb, conn, card)
+            kb, connect = _kb()
+            with connect() as conn:
+                for card in pending:
+                    _settle(kb, conn, card)
+                _check_blocks(kb, conn)
         except Exception:
             logger.exception("herdr-agents watcher pass failed")
 
@@ -916,6 +1174,60 @@ def _serve(ctx):
         server.server_close()
 
     ctx.on_unload(close)
+
+
+# --- Herdr status (interactive CLI in a Herdr terminal) ----------------------
+
+# Hermes's human waits, as Herdr's blocked kinds.
+HERDR_KINDS = {"approval": "permission", "clarify": "question", "sudo": "auth"}
+
+
+def _in_herdr_cli():
+    """An interactive CLI inside a Herdr terminal: not the gateway, not a kanban worker."""
+    return (
+        bool(os.environ.get("HC_TERMINAL_ID"))
+        and os.environ.get("_HERMES_GATEWAY") != "1"
+        and not os.environ.get("HERMES_KANBAN_TASK")
+    )
+
+
+def herdr_status(state, kind="", msg=""):
+    """Report this terminal's lifecycle to Herdr Core as OSC 7501, as Claude and omp do."""
+    import base64
+
+    fields = [f"state={state}", "app=hermes"]
+    if kind:
+        fields.append(f"kind={kind}")
+    if msg:
+        fields.append("msg=" + base64.b64encode(msg[:200].encode()).decode())
+    try:
+        # The controlling terminal, not stdout: the CLI's own renderer owns stdout.
+        with open("/dev/tty", "w") as tty:
+            tty.write("\x1b]7501;" + ":".join(fields) + "\x1b\\")
+    except OSError:
+        pass
+
+
+def _herdr_hooks(ctx):
+    def turn_started(parent_session_id="", **_):
+        if not parent_session_id:
+            herdr_status("working")
+
+    def turn_finished(parent_session_id="", **_):
+        if not parent_session_id:
+            herdr_status("done")
+
+    def waiting(kind="", prompt="", **_):
+        herdr_status("blocked", HERDR_KINDS.get(kind, ""), prompt)
+
+    def answered(**_):
+        herdr_status("working")
+
+    ctx.register_hook("pre_llm_call", turn_started)
+    ctx.register_hook("post_llm_call", turn_finished)
+    ctx.register_hook("on_human_input_request", waiting)
+    ctx.register_hook("on_human_input_resolved", answered)
+    herdr_status("idle")
 
 
 def register(ctx):
@@ -953,14 +1265,17 @@ def register(ctx):
                 handler=handler,
                 description=description,
             )
-    if settings.get("force_triage"):
-        # Untrusted input (mail, calendar) must never dispatch agents on its own.
+    if settings.get("force_blocked"):
+        # Untrusted input (mail, calendar) must never dispatch agents on its own. Triage
+        # would not do: the decomposer routes triage cards to roles automatically.
         def triage_only(tool_name=None, args=None, **_):
             if tool_name == "kanban_create":
-                return {"action": "modify", "args": {"triage": True}}
+                return {"action": "modify", "args": {"triage": False, "initial_status": "blocked"}}
             if tool_name and tool_name.startswith("kanban_") and tool_name not in ASSISTANT_KANBAN:
                 return {"action": "block", "message": f"{tool_name} is not available to the assistant"}
             return None
 
         ctx.register_hook("pre_tool_call", triage_only)
+    if _in_herdr_cli():
+        _herdr_hooks(ctx)
     _serve(ctx)

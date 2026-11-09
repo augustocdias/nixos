@@ -70,7 +70,7 @@ BOARD_TOOLS = [
             "properties": {
                 "title": {"type": "string"},
                 "body": {"type": "string", "description": "What to do, or a pointer to the ticket that says it"},
-                "repo": {"type": "string", "description": "Absolute repo path under ~/dev"},
+                "repo": {"type": "string", "description": "Absolute path of the one repository this card changes, under ~/dev. Cross-repo work is one card per repository."},
                 "tracker": {"type": "string", "description": "Spec and ticket references in the repo's tracker"},
                 "agents": {"type": "string", "description": "Harness per role, e.g. programmer=claude, reviewer=omp"},
                 "git": {"type": "string", "description": "The git-conventions decisions: branch and ownership of branches, worktrees, commits, pushes, PRs"},

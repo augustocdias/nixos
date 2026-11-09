@@ -40,6 +40,18 @@ The input's key fragment is merged with App defaults before local overrides. Its
 
 State filters match any agent in a tab rather than only its aggregate status. A tab with both a blocked agent and a working agent therefore appears under either filter. Done follows Herdr's attention semantics and becomes Idle when viewed.
 
+### Hermes Shepherd
+
+The `herdr-hermes-shepherd` input provides a Herdr App tab that shows the [Work Hermes](coding-agents.md#work-hermes-laptop) kanban board, plus a side panel running the coordinator ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_linux.nix` enables its Home Manager module and points `hermesPython` at the same `hermesVenv` Python that the `hermes` wrapper exports as `HERMES_PYTHON`. `herdr.nix` adds the rest only when the module is enabled, so the laptop gets it and the macmini does not:
+
+- A Smart Tabs pinned tab in every space, labelled `default`. The label selects Hermes's `default` board by name, so the toolbar shows no "no board has this name" hint.
+- A `shepherd` column after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default. Its terminal block is named `hermes-shepherd`, and Shepherd starts `hermes -p coordinator` there through the jailed `hermes` wrapper.
+- Ctrl+Shift+Y (`layout.toggle:shepherd`) in the global key set, so it also works while a terminal has focus.
+
+The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` jail sets `HERMES_HOME` to the same path and binds it read-write at the same location, so the CLI, the gateway and the tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
+
+The App deletes a layout's terminal block when that terminal ends: a Core stop or restart while the App is open, or `hc kill hermes-shepherd`. Herdr App 0.1.11 also collapses the parent around it. For the shipped `main` layout this happens only in memory. The App never writes structural edits to a shipped layout file and rewrites `layouts/main.json` from the package at every start (`save()` and `install_layouts()` in the App's `src/window.rs`). Relaunching the App therefore restores the panel. Sizes clicked into the collapsed layout can persist in `layouts/.state/main.json`; drag them back or run `herdr-app do layout.reset`. A cloned personal layout does not heal this way: the App writes the rewrite into its file.
+
 ### Package patches and verification
 
 The App regenerates `AGENTS.md` at startup. Its package patches the embedded guide to require declarative additions and a system rebuild. Keep the generated guide App-owned rather than installing a Home Manager symlink. Relaunch the App after activating package patches; restarting Core is not needed to refresh the guide or key-command handling.
@@ -55,6 +67,7 @@ herdr-app check ~/.config/herdr-app/mods/tabs-enriched
 herdr-app check ~/.config/herdr-app/mods/picker-enriched
 herdr-app check ~/.config/herdr-app/mods/spaces-enriched
 herdr-app check ~/.config/herdr-app/mods/space-open
+herdr-app check ~/.config/herdr-app/mods/hermes-shepherd
 ```
 
 `check` needs a compositor and does not prove key handling. Exercise keys in an isolated App/Core session and inspect `herdr-app shot`. Test the Home Manager symlinks, not only an unpacked source copy: App rejects relative JavaScript imports that resolve through those symlinks into the store, so the enriched mod is bundled into one file.

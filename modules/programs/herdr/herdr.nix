@@ -7,6 +7,7 @@
   # Keep the input's nixpkgs; local patches rebuild only herdr-app.
   flake-file.inputs.llm-agents.url = lib.mkDefault "github:numtide/llm-agents.nix";
   flake-file.inputs.herdr-navigation.url = "github:augustocdias/herdr-navigation";
+  flake-file.inputs.herdr-hermes-shepherd.url = "github:augustocdias/herdr-hermes-shepherd";
   flake-file.inputs.herdr-tmux-prefix = {
     url = "github:herdrdev/herdr-layout-examples";
     flake = false;
@@ -19,6 +20,32 @@
       lib,
       ...
     }: let
+      shepherd = config.programs.hermes-shepherd.enable;
+      # Shepherd's coordinator panel, a sibling of the Files/Changes column in work-body.
+      shepherdPanel = builtins.toJSON {
+        id = "shepherd";
+        type = "column";
+        hidden = true;
+        size.px = 460;
+        min = 280;
+        max = 1100;
+        children = [
+          {
+            id = "shepherd-bar";
+            type = "block";
+            size.px = 36;
+            content = {
+              mod = "hermes-shepherd";
+              props.panel = true;
+            };
+          }
+          {
+            id = "shepherd-terminal";
+            type = "block";
+            content.terminal = "hermes-shepherd";
+          }
+        ];
+      };
       herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
       herdrApp = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-app.overrideAttrs (old: {
         patches = (old.patches or []) ++ [./vim-navigation.patch];
@@ -39,6 +66,11 @@
               --replace-fail '"mod": "agents"' '"mod": "agents-enriched"' \
               --replace-fail '"mod": "tabs"' '"mod": "tabs-enriched"' \
               --replace-fail '"mod": "spaces"' '"mod": "spaces-enriched"'
+            ${lib.optionalString shepherd ''
+              substituteInPlace defaults/layouts/main.json \
+                --replace-fail ${lib.escapeShellArg "              ]\n            }\n          ]\n        },\n        {\n          \"id\": \"status\","} \
+                ${lib.escapeShellArg "              ]\n            },\n${shepherdPanel}\n          ]\n        },\n        {\n          \"id\": \"status\","}
+            ''}
             substituteInPlace defaults/AGENTS.md \
               --replace-fail '<!-- Written by the Herdr app on every start. Edits here are overwritten. -->' \
               ${lib.escapeShellArg ''
@@ -140,7 +172,10 @@
         "@workspace@" = "${workspace}/bin/herdr-workspace";
       };
     in {
-      imports = [inputs.herdr-navigation.homeManagerModules.default];
+      imports = [
+        inputs.herdr-navigation.homeManagerModules.default
+        inputs.herdr-hermes-shepherd.homeManagerModules.default
+      ];
 
       options.herdr = {
         programs = lib.mkOption {
@@ -157,6 +192,15 @@
 
       config = {
         home.packages = [workspace worktree herdrApp herdrCore];
+
+        # The label "default" names Hermes's default board, so the tab shows it without a fallback hint.
+        programs.herdr-navigation.pinnedTabs = lib.mkIf shepherd [
+          {
+            label = "default";
+            mod = "hermes-shepherd";
+          }
+        ];
+        herdr.keys = lib.mkIf shepherd {"ctrl-shift-y" = "layout.toggle:shepherd";};
 
         xdg.configFile = {
           "herdr-app/settings.json".text = builtins.toJSON {

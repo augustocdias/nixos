@@ -1,31 +1,38 @@
 --- a/src/commands.rs
 +++ b/src/commands.rs
-@@ -58,6 +58,7 @@
+@@ -59,6 +59,7 @@
      cmd("pane.zoom", &[opt("pane")], "Show only this pane of its tab, or all again."),
      cmd("pane.focus", &[opt("pane"), opt("terminal")], "Focus a pane (or the pane showing a terminal)."),
-     cmd("pane.go", &[req("direction")], "Focus the pane to the \"left\", \"right\", \"up\" or \"down\"."),
+     cmd("pane.go", &[req("direction")], "Focus the pane or focusable mod to the \"left\", \"right\", \"up\" or \"down\"."),
 +    cmd("pane.navigate", &[req("direction"), opt("terminal")], "Navigate Neovim windows or adjacent panes; terminal identifies an editor's edge handoff."),
-     cmd("pane.swap", &[req("direction")], "Swap the focused pane with its neighbor in a direction."),
+     cmd("pane.swap", &[opt("direction"), opt("pane"), opt("target")], "Swap a pane (default: the focused one) with its neighbor in a direction, or with another pane of its tab (target). Give exactly one of direction or target."),
      cmd("terminal.peek", &[req("terminal")], "Peek at a running terminal over the tab, with keep-as-tab and close controls."),
      cmd("terminal.show", &[opt("terminal"), opt("pane")], "Show a terminal in a pane for now, in place of its own (no terminal: back)."),
 --- a/src/terminal.rs
 +++ b/src/terminal.rs
-@@ -436,3 +436,3 @@
+@@ -566,7 +566,7 @@
+         self.shown_in.get() == FRAME.load(Ordering::Relaxed)
+     }
+ 
 -    fn send(&self, bytes: &[u8]) {
 +    pub(crate) fn send(&self, bytes: &[u8]) {
          self.typed_at.set(Some(Instant::now()));
          let mut g = self.grid.borrow_mut();
+         if let Some(ch) = g.channel
 --- a/src/window.rs
 +++ b/src/window.rs
-@@ -2820,6 +2820,21 @@
--            "pane.go" | "pane.swap" => {
-+            "pane.navigate" | "pane.go" | "pane.swap" => {
+@@ -3035,11 +3035,26 @@
+                 self.agent = self.model.address_of(&p);
+                 self.swapped.remove(&p);
+             }
+-            "pane.go" => {
++            "pane.navigate" | "pane.go" => {
                  let dir = Self::arg(a, "direction").unwrap_or_default();
                  if !matches!(dir, "left" | "right" | "up" | "down") {
                      return self.fail(format!("{name} direction is left, right, up or down, not {dir:?}"));
                  }
 +                if name == "pane.navigate" {
-+                    let Some(t) = self.focused_terminal(window) else { return };
++                    let Some(t) = self.focused_terminal(window, cx) else { return };
 +                    if let Some(origin) = a.get("terminal") {
 +                        // A delayed editor handoff must not move another pane or an open dialog.
 +                        if origin.as_str() != Some(t.address.as_str()) || !t.focus.is_focused(window) { return; }
@@ -39,7 +46,15 @@
 +                        return;
 +                    }
 +                }
-                 if let Some(from) = self.model.focused_pane()
-@@ -4274,1 +4289,1 @@
--        "pane.go" | "pane.swap" => true,
-+        "pane.navigate" | "pane.go" | "pane.swap" => true,
+                 return self.go(dir, window, cx);
+             }
+             "pane.swap" => {
+@@ -4630,7 +4645,7 @@
+ fn needs_model_pane(name: &str, args: &Value) -> bool {
+     match name {
+         "pane.split" | "pane.close" | "pane.zoom" | "pane.swap" | "terminal.show" => AppWindow::arg(args, "pane").is_none(),
+-        "pane.go" => true,
++        "pane.navigate" | "pane.go" => true,
+         "terminal.open" | "terminal.keep" => matches!(AppWindow::arg(args, "place"), Some("right" | "down")),
+         _ => false,
+     }

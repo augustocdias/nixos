@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from _bootstrap import atomic_write, enable_plugins, link_plugin, write_config
-from hermes_cli.profiles import create_profile, profile_exists
+from hermes_cli.profiles import create_profile, profile_exists, write_profile_meta
 
 
 def seed(home, managed, plugin, skins):
@@ -41,6 +41,8 @@ def bootstrap(manifest):
         if home.is_symlink():
             raise RuntimeError(f"Profile home must not be a symlink: {home}")
         seed(home, managed, manifest["plugin"], manifest["skins"])
+        # The triage decomposer routes cards to profiles by this description.
+        write_profile_meta(home, description=managed["description"], description_auto=False)
 
 
 if __name__ == "__main__":

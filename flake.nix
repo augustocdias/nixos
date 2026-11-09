@@ -53,6 +53,7 @@
       url = "github:vinceliuice/grub2-themes";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    herdr-hermes-shepherd.url = "github:augustocdias/herdr-hermes-shepherd";
     herdr-navigation.url = "github:augustocdias/herdr-navigation";
     herdr-tmux-prefix = {
       url = "github:herdrdev/herdr-layout-examples";
