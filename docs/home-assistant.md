@@ -38,6 +38,8 @@ HA always sets `skip_pip`, so the component never pip-installs or auto-updates t
 
 Version coupling: the component raises `component_outdated` or `server_update_held` repairs when it is the older half. The reverse case has no warning: a component newer than the nixpkgs server fails at server start with an `ImportError` from `embedded_server.py`. On every component bump, check its `from ha_mcp ...` imports against the server nixpkgs currently ships. The component also enforces a minimum HA version (`MIN_EMBEDDED_HOME_ASSISTANT_VERSION`).
 
+The component's `updateVersionRegex` holds it at its declared version so `update-system` cannot advance it past the packaged server. Change the component pin only after checking the server version, then build `hass-ha-mcp-tools` to validate the manifest requirements.
+
 Networking: the primary route is an HA webhook on port 8123, so `webhook` is in `_components.nix`. The server also binds a direct listener on port 9584 behind a random secret path. Port 9584 stays closed in `raspi.nix`, so the direct URL on the entry's Configure screen is unreachable from the LAN. Use the webhook URL with `ha_auth`; open 9584 only if the direct listener is wanted.
 
 ### Keeping the pins current (`pins.nix`)

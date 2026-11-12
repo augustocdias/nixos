@@ -78,9 +78,9 @@ Do NOT close or modify any parent issue.
 
 Run this step only when the workspace's `issue-tracker.md` says the repo is tied to the Hermes board.
 
-1. Agree the card header with the user once for the whole set: the harness per role, the `git-conventions` decisions (branch and the five ownership categories), and the Herdr space with its placement and whether it closes when the work is done. Leave the space out when the user wants the Hermes coordinator to create it.
-2. File one card per published ticket, in the same order, each naming the one repository its ticket changes, through the Hermes board MCP (`board_create`): the ticket reference in `tracker`, the agreed header fields, the spec slug as `tenant`, and the cards of the ticket's blockers as `parents`. Inside Hermes, the coordinator uses `kanban_create` with the same fields instead.
-3. Report the card ids beside the ticket references. Board cards land in `triage` until the user promotes them.
+1. Agree the card header with the user once for the whole set: the harness per role, the `git-conventions` decisions (branch and the five ownership categories), and visible or background execution. For visible execution, record the Herdr space, placement and whether it closes when done. "Do it in the background" means `hc run --bg` without a visible pane: set `herdr="space=none"` on every card. Future questions and approval needs go back to the coordinator, not to that terminal. If the user wants the coordinator to prepare a visible space, obtain its id before filing dispatchable cards; an omitted space would run them in the background.
+2. File one card per published ticket in dependency order through `board_create`, with `triage=false` and an explicit role in `assignee`. Each card names its ticket's repository, the ticket reference in `tracker`, the agreed header fields and the spec slug as `tenant`. Pass every blocking card in `parents` when creating the card, not afterwards: a card with no blockers may start immediately. Inside Hermes, use `kanban_create` with `triage=false` and the same settings.
+3. Report the card ids beside the ticket references and the returned statuses. Unfinished dependencies put cards in `todo`; satisfied dependencies put them in `ready`. These approved tickets must not be decomposed or triaged again.
 
 <local-ticket-template>
 

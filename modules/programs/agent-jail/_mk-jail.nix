@@ -115,6 +115,20 @@ in
         '')
       ]
       ++ pre jail.combinators
+      ++ lib.mapAttrsToList (variable: secret:
+        add-runtime ''
+          if [ -z "''${${variable}:-}" ]; then
+            if ! ${variable}=$(${lib.getExe' pkgs.coreutils "cat"} ${lib.escapeShellArg config.sops.secrets.${secret}.path}) || [ -z "''${${variable}}" ]; then
+              echo "${name}: could not load ${variable} from its sops secret" >&2
+              exit 1
+            fi
+          fi
+          export ${variable}
+        '') {
+        GH_TOKEN = "github_token";
+        TYPESAFE_API_KEY = "typesafe_api_key";
+        OLLAMA_CLOUD_API_KEY = "ollama_api_key";
+      }
       ++ [
         (set-env "AGENT_JAIL" name)
         (add-runtime ''

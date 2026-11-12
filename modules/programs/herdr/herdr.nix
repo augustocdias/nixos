@@ -24,27 +24,15 @@
       # Shepherd's coordinator panel, a sibling of the Files/Changes column in work-body.
       shepherdPanel = builtins.toJSON {
         id = "shepherd";
-        type = "column";
+        type = "block";
         hidden = true;
         size.px = 460;
         min = 280;
         max = 1100;
-        children = [
-          {
-            id = "shepherd-bar";
-            type = "block";
-            size.px = 36;
-            content = {
-              mod = "hermes-shepherd";
-              props.panel = true;
-            };
-          }
-          {
-            id = "shepherd-terminal";
-            type = "block";
-            content.terminal = "hermes-shepherd";
-          }
-        ];
+        content = {
+          mod = "hermes-shepherd";
+          props.panel = true;
+        };
       };
       herdrCore = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-core;
       herdrApp = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.herdr-app.overrideAttrs (old: {
@@ -181,7 +169,7 @@
             command = "layout.toggle";
             args = {
               id = "shepherd";
-              focus = "shepherd-terminal";
+              focus = "shepherd";
             };
           };
         };

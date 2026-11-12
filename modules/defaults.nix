@@ -39,6 +39,8 @@
   };
 in {
   den.schema.user.classes = lib.mkDefault ["homeManager"];
+  den.schema.user.includes = [(den.batteries.user-shell "fish")];
+  den.schema.host.includes = [den.batteries.user-aspects];
 
   den.schema.hm-host.includes = [
     {
@@ -87,7 +89,6 @@ in {
       den._.define-user
       den._.primary-user
       den._.hostname
-      (den._.user-shell "fish")
     ];
   };
 }

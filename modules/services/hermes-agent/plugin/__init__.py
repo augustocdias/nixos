@@ -531,7 +531,7 @@ def _message(harness, skill, args, card, token, fields, foreground, title, descr
     mode = (
         "**Foreground**: the user can see this terminal. Ask them directly, and request approvals as usual."
         if foreground
-        else "**Background**: request approvals as usual (the user is alerted); send questions to Hermes with `ask`."
+        else "**Background**: no visible terminal. Send decisions to Hermes with `ask`; report required human approvals with `report_blocked` before attempting the action. Follow the protocol below."
     )
     git = fields["git"]
     if git:
@@ -546,7 +546,7 @@ def _message(harness, skill, args, card, token, fields, foreground, title, descr
             "| Decision | Value | Meaning |\n|---|---|---|\n" + "\n".join(rows)
         )
     else:
-        git_section = "No git decisions were agreed for this card. Ask the user before any branch, commit, push or PR."
+        git_section = "No git decisions were agreed for this card. Obtain them through the run mode's question route before any branch, commit, push or PR."
     return "\n".join([
         f"{invoke} {args}",
         "",
@@ -631,7 +631,7 @@ def make_tools(profile):
                     cwd = _inside_dev(space.get("folder") or "")
                     if cwd is None:
                         return _error(f"Herdr space {space_id} is not a folder inside ~/dev")
-            # Only the programmer may commit or push with the agent key, and only when the card agreed to it.
+            # Implementers sign fixes; reviewers may push approved commits during publication.
             signing = profile in SETTINGS["writers"] and "agent" in (
                 fields["git"].get("commits"), fields["git"].get("pushes")
             )
@@ -707,7 +707,7 @@ def make_tools(profile):
                 "name": name,
                 "iteration": iteration["n"],
                 "first_message": started.get("first_message"),
-                "next": f"Park the card: kanban_schedule with reason 'awaiting agent: {terminal}'.",
+                "next": "Call agent_status and confirm state=live and status=working before parking. Handle a report if already done; block on failed or unconfirmed startup.",
             })
         except Exception as e:  # tool results, not crashes
             return _error(str(e))
@@ -799,7 +799,7 @@ def make_tools(profile):
         launch["harness"] = {"type": "string", "enum": list(HARNESSES), "description": "Only for a card whose Agents line names none for you"}
         launch["repo"] = {"type": "string", "description": "Only for a card without a Repo line"}
     tools = [
-        (agent_launch, "Launch a coding agent for a card. The card's header lines decide the harness, repo, git ownership and Herdr space; you choose the skill and its arguments. Then park the card with kanban_schedule.", launch, ["skill", "args"]),
+        (agent_launch, "Launch a coding agent for a card. Its header decides the harness, repo, git ownership and Herdr space. Inspect the result, then use agent_status to confirm live/working before kanban_schedule. Never park after a launch error.", launch, ["skill", "args"]),
         (agent_status, "Show the agent launched for a card, with every iteration's start, end, outcome, session and resume command.", {"card": card}, []),
         (agent_send, "Send a follow-up to the agent launched for a card, starting a new iteration. Only works when the agent is idle or done.", {
             "card": card,
@@ -1242,9 +1242,13 @@ def handle_board(method, path, query, payload):
             for parent in parents:
                 if kb.get_task(conn, parent) is None:
                     return 400, {"error": f"no parent card {parent}"}
-            # Untrusted local input: triage is never dispatched until the user promotes it.
+            triage = payload.get("triage", True)
+            if not isinstance(triage, bool):
+                return 400, {"error": "triage must be a boolean"}
+            if not triage and not assignee:
+                return 400, {"error": "assignee is required when bypassing triage"}
             card = kb.create_task(
-                conn, title=title, body=body, assignee=assignee, created_by="board-mcp", triage=True,
+                conn, title=title, body=body, assignee=assignee, created_by="board-mcp", triage=triage,
                 parents=parents, tenant=str(payload.get("tenant") or "").strip() or None,
             )
             return 200, {"card": card, "status": kb.get_task(conn, card).status}

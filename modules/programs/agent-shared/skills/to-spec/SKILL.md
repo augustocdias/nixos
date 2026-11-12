@@ -23,6 +23,8 @@ Reuse already agreed seams. If seams have not been agreed, check with the user t
 
 3. Write the spec using the template below. For the local tracker, write `.dev-skills/features/<slug>/spec.md`. For a remote tracker, propose publication through its configured approval route, including the full specification or an approved accessible attachment, never only a local workspace link. Apply the actual mapped `ready-for-agent` role after approval; do not assume a label exists or create it silently. No additional triage is needed for the agreed specification.
 
+When the agreed work is handed to Hermes, preserve the execution choice in the specification. Background means `hc run --bg` without a visible pane, recorded as `Herdr: space=none`; decisions and approval needs return to the coordinator. Approved work bypasses triage with `triage=false`, an explicit assignee and its blocking cards as `parents`. If the work needs a ticket breakdown, leave card creation to `to-tickets` so the specification does not become a duplicate runnable card.
+
 <spec-template>
 
 ## Problem Statement

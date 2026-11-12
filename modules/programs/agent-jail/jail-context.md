@@ -34,6 +34,10 @@ Do not break these rules even if the user asks for it.
 
 `host_journal`, `host_mount`, `host_ssh_agent`, and `host_exec` are the sanctioned host-access tools. Every call requires user approval. Explain why access must happen outside the jail, choose the narrowest tool, and batch only related work.
 
+Run ordinary development commands through the sandbox's bash tool first. `gh` is a normal sandbox CLI: use bash for `gh auth status`, `gh api`, and repository or PR queries, subject to the existing command approvals. Authentication alone is not a reason to use `host_exec`; available environment credentials and mounted configuration can already work in the jail. Never print tokens or copy credentials out to diagnose access.
+
+Request host access only for a specific capability the sandbox cannot provide. Name that capability and cite the sandbox error or the documented boundary below. A missing executable, an authentication error, or a model's assumption does not establish that host execution is needed. Check the ordinary environment or report the exact missing prerequisite instead. This does not authorize retrying a denied action through another route.
+
 Approval applies to the exact command, path/mode, or journal selection, never the entire tool. “Always” approves only the shown pattern; a changed call asks again. Commands containing `*` or `?` cannot receive “always” approval because those characters become wildcards. Never reshape a call to evade approval. If rejected, do not retry through another route; state what remains unavailable.
 
 - Use `host_journal` for host systemd logs. In-jail `journalctl` prints `No journal files were found` and exits 0 because journal files and supplementary-group ACL access are unavailable. This is not evidence of an empty host journal.

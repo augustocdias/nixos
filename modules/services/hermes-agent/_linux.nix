@@ -53,7 +53,7 @@
 
   roles = ["programmer" "reviewer" "qa" "research"];
   harnesses = ["claude" "omp"];
-  writers = ["programmer"];
+  writers = ["programmer" "reviewer"];
 
   sharedSkills = import ../../programs/agent-shared/_skills.nix {inherit lib pkgs;};
   # The skills each profile may start an agent with; the card's Agents line picks the harness.
@@ -61,7 +61,7 @@
     # setup-dev-skills writes the repo: always the user's own session.
     coordinator = lib.remove "setup-dev-skills" (builtins.attrNames sharedSkills.skills);
     programmer = ["implement" "diagnosing-bugs" "prototype"];
-    reviewer = ["code-review"];
+    reviewer = ["code-review" "pr"];
     qa = ["terminal-browser" "diagnosing-bugs"];
     research = ["research" "prototype"];
   };
@@ -171,89 +171,23 @@
     model = "gpt-6-luna";
     reasoning_effort = "low";
   };
-  # Every listed call costs more than the per-chat limit, so each one asks Allow Once or
-  # Deny, whatever the trust tier, YOLO or approvals mode; unattended runs refuse.
-  askEveryCall = tools: note: {
-    tool_costs = lib.genAttrs tools (_: {
-      credits = 2;
-      inherit note;
-    });
-    spend_limit = 1;
-    cost_unit = "approvals";
+  hostMcp = {
+    command = lib.getExe pkgs.python3;
+    args = ["${../../programs/agent-jail/host-mcp.py}"];
+    # Routed profiles resolve ${VAR} from profile secrets, not the jail environment.
+    env.HOST_QUERY_SOCKET = "/tmp/host-query.sock";
+    trust = "untrusted";
   };
-  hostMcp =
-    {
-      command = lib.getExe pkgs.python3;
-      args = ["${../../programs/agent-jail/host-mcp.py}"];
-      # Routed profiles resolve ${VAR} from profile secrets, not the jail environment.
-      env.HOST_QUERY_SOCKET = "/tmp/host-query.sock";
-    }
-    // askEveryCall ["host_exec" "host_mount" "host_journal" "host_ssh_agent"] "host access outside the jail";
   # Triage context for the coordinator. OAuth runs at runtime (`hermes -p coordinator mcp login <name>`).
-  # Known write tools ask every call; `untrusted` makes any other tool without a read-only hint ask too.
-  workMcp = url: writes:
-    {
-      inherit url;
-      auth = "oauth";
-      trust = "untrusted";
-    }
-    // askEveryCall writes "writes to a work system";
+  workMcp = url: {
+    inherit url;
+    auth = "oauth";
+    trust = "full";
+  };
   workMcps = {
-    linear = workMcp "https://mcp.linear.app/mcp" [
-      "save_issue"
-      "save_comment"
-      "save_document"
-      "save_project"
-      "save_milestone"
-      "save_initiative"
-      "save_status_update"
-      "save_release"
-      "save_release_note"
-      "save_issue_label"
-      "save_project_label"
-      "save_initiative_label"
-      "save_diff_comment"
-      "create_attachment"
-      "create_attachment_from_upload"
-      "create_issue_label"
-      "create_initiative_label"
-      "delete_attachment"
-      "delete_comment"
-      "delete_diff_comment"
-      "delete_status_update"
-      "update_diff"
-      "merge_diff"
-      "submit_diff_review"
-      "resolve_diff_thread"
-      "share_issue"
-      "unshare_issue"
-    ];
-    notion = workMcp "https://mcp.notion.com/mcp" [
-      "notion-create-pages"
-      "notion-update-page"
-      "notion-move-pages"
-      "notion-duplicate-page"
-      "notion-create-database"
-      "notion-update-data-source"
-      "notion-create-view"
-      "notion-update-view"
-      "notion-create-comment"
-      "notion-update-comment"
-      "notion-delete-comment"
-      "notion-delete-pages"
-      "notion-delete-databases"
-      "notion-create-suggested-edit"
-      "notion-resolve-suggested-edit"
-      "notion-calendar-create-events"
-      "notion-calendar-update-events"
-      "notion-calendar-cancel-events"
-    ];
-    datadog = workMcp "https://mcp.datadoghq.eu/v1/mcp" [
-      "create_datadog_notebook"
-      "edit_datadog_notebook"
-      "delete_datadog_notebook"
-      "upsert_datadog_dashboard"
-    ];
+    linear = workMcp "https://mcp.linear.app/mcp";
+    notion = workMcp "https://mcp.notion.com/mcp";
+    datadog = workMcp "https://mcp.datadoghq.eu/v1/mcp";
   };
   profileConfig = {
     model,

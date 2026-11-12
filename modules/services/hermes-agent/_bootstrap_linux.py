@@ -10,12 +10,20 @@ import os
 import sys
 from pathlib import Path
 
-from _bootstrap import atomic_write, enable_plugins, link_plugin, write_config
+from _bootstrap import atomic_write, enable_plugins, link_plugin, merge_config
+from hermes_cli.config import require_readable_config_before_write
 from hermes_cli.profiles import create_profile, profile_exists, write_profile_meta
 
 
 def seed(home, managed, plugin, skins):
-    write_config(home / "config.yaml", managed["config"])
+    path = home / "config.yaml"
+    config = merge_config(require_readable_config_before_write(path), managed["config"])
+    # Recursive merging would retain the removed artificial approval budgets.
+    for name in ("host", "linear", "notion", "datadog"):
+        if name in managed["config"].get("mcp_servers", {}):
+            for key in ("tool_costs", "spend_limit", "cost_unit"):
+                config["mcp_servers"][name].pop(key, None)
+    atomic_write(path, json.dumps(config))
     atomic_write(home / "SOUL.md", Path(managed["soul"]).read_text())
     for directory in ("plugins", "memories", "sessions", "skills", "cron", "skins"):
         (home / directory).mkdir(exist_ok=True)

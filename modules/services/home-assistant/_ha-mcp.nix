@@ -29,7 +29,7 @@ buildHomeAssistantComponent (finalAttrs: {
 
   passthru = {
     updateFile = "modules/services/home-assistant/_ha-mcp.nix";
-    updateVersionRegex = "^v?([0-9]+\\.[0-9]+\\.[0-9]+)$";
+    updateVersionRegex = "^v?(${lib.escapeRegex finalAttrs.version})$";
   };
 
   meta = {

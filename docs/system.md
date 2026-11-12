@@ -6,6 +6,8 @@
 
 Each host in `modules/hosts.nix` names a host aspect, plus a user aspect for `augusto` on laptop (`user-linux`) and macmini (`user-macos`). Both user aspects include `user-base`. raspi has a host aspect only.
 
+`modules/defaults.nix` explicitly lets hosts receive their users' OS content through `den.batteries.user-aspects`. This preserves system settings carried by the user aspects without relying on Den's transition default. Keep `user-shell` in `den.schema.user.includes`, not `den.default.includes`: the default runs in both host and user scopes and duplicates the shell provider.
+
 All Neovim plugin inputs carry the `nvim-` prefix, so `nix flake update nvim-*` updates them alone. Keep the prefix on new plugin inputs.
 
 To inspect built outputs, use the `nixos` MCP store interface: `{"action":"store","type":"ls","query":"/nix/store/..."}` lists a directory and `{"action":"store","type":"read","query":"/nix/store/..."}` reads a file, such as a wrapper, generated config, or `nix-support/` metadata.

@@ -5,7 +5,7 @@
 
 Report tools carry the card id and task token from the agent's first message,
 plus the harness session id, which the agent never has to know. Board tools
-need no credentials: the plugin files every card they create in `triage`.
+need no credentials. Prepared tickets can bypass triage with an explicit assignee.
 
 No dependencies on purpose, like agent-jail/host-mcp.py: initialize /
 tools/list / tools/call over newline-delimited JSON.
@@ -46,7 +46,7 @@ REPORT_TOOLS = [
     },
     {
         "name": "ask",
-        "description": "Ask your role, the coordinator or the user a question. Wait for the answer as your next input.",
+        "description": "Ask Hermes a question and end your turn. Your role answers from existing context or blocks the card for coordinator review. Wait for a follow-up message, not terminal input from the user.",
         "inputSchema": text_schema("question", "The question"),
     },
     {
@@ -62,7 +62,7 @@ BOARD_TOOLS = [
         "name": "board_create",
         "description": (
             "Ask the Hermes coordinator for work: file a card on the Hermes kanban board. "
-            "It lands in triage, where the user promotes it; nothing runs until then. "
+            "Defaults to triage for automatic decomposition. For approved tickets, set triage=false and an assignee; dependencies select todo or ready. "
             "Fill the header fields from board_template; leave a field out when it is not decided."
         ),
         "inputSchema": {
@@ -74,10 +74,11 @@ BOARD_TOOLS = [
                 "tracker": {"type": "string", "description": "Spec and ticket references in the repo's tracker"},
                 "agents": {"type": "string", "description": "Harness per role, e.g. programmer=claude, reviewer=omp"},
                 "git": {"type": "string", "description": "The git-conventions decisions: branch and ownership of branches, worktrees, commits, pushes, PRs"},
-                "herdr": {"type": "string", "description": "space=<id>; placement=pane|tab; close=yes|no"},
+                "herdr": {"type": "string", "description": "space=<id>|none; placement=pane|tab; close=yes|no. space=none means background with no visible terminal."},
                 "assignee": {"type": "string", "description": "programmer, reviewer, qa or research"},
                 "tenant": {"type": "string", "description": "Groups a spec's cards, e.g. the spec slug"},
                 "parents": {"type": "array", "items": {"type": "string"}, "description": "Cards that must finish first"},
+                "triage": {"type": "boolean", "description": "Default true. Set false for approved to-spec/to-tickets work, with an explicit assignee and all blocking parents."},
             },
             "required": ["title", "body"],
         },

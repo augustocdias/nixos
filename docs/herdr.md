@@ -42,17 +42,19 @@ State filters match any agent in a tab rather than only its aggregate status. A 
 
 ### Hermes Shepherd
 
-The `herdr-hermes-shepherd` input provides a Herdr App tab that shows the [Work Hermes](coding-agents.md#work-hermes-laptop) kanban board, plus a side panel running the coordinator ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_linux.nix` enables its Home Manager module and points `hermesPython` at the same `hermesVenv` Python that the `hermes` wrapper exports as `HERMES_PYTHON`. `herdr.nix` adds the rest only when the module is enabled, so the laptop gets it and the macmini does not:
+The `herdr-hermes-shepherd` input provides a Herdr App tab for the [Work Hermes](coding-agents.md#work-hermes-laptop) kanban board and a native coordinator chat panel ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_linux.nix` enables its Home Manager module and points `hermesPython` at the gateway's `hermesVenv` Python. The upstream module bundles the JavaScript and installs the board, cron and chat helpers. `herdr.nix` adds the layout and shortcut only when the module is enabled, so the laptop gets them and the macmini does not:
 
 - A Smart Tabs pinned tab in every space, labelled `default`. The label selects Hermes's `default` board by name, so the toolbar shows no "no board has this name" hint.
-- A `shepherd` column after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default. Its terminal block is named `hermes-shepherd`, and Shepherd starts `hermes -p coordinator` there through the jailed `hermes` wrapper.
-- Ctrl+Shift+Y in the global key set opens and focuses the coordinator terminal. If the panel is visible but focus is elsewhere, the shortcut focuses it without hiding it. Pressing it while the coordinator has the keyboard hides the panel.
+- A full-height `shepherd` mod block after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default.
+- Ctrl+Shift+Y opens and focuses the chat composer. If the panel is visible but focus is elsewhere, the shortcut focuses it without hiding it. Pressing it while the panel has the keyboard hides it.
 
-The key uses the packaged App's optional `layout.toggle` focus target, supplied by `layout-focus.patch`. Plain `layout.toggle:shepherd`, the tab button and Hide retain their visibility-only behavior.
+The key uses the packaged App's optional `layout.toggle` focus target, supplied by `layout-focus.patch`. The upstream App does not provide this argument. The patch supports terminal and focusable mod blocks; Shepherd consumes the mod's `focus` command to focus its composer. Plain `layout.toggle:shepherd`, the tab button and Hide retain their visibility-only behavior.
 
 The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` jail sets `HERMES_HOME` to the same path and binds it read-write at the same location, so the CLI, the gateway and the tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
 
-The App deletes a layout's terminal block when that terminal ends: a Core stop or restart while the App is open, or `hc kill hermes-shepherd`. Herdr App 0.1.11 also collapses the parent around it. For the shipped `main` layout this happens only in memory. The App never writes structural edits to a shipped layout file and rewrites `layouts/main.json` from the package at every start (`save()` and `install_layouts()` in the App's `src/window.rs`). Relaunching the App therefore restores the panel. Sizes clicked into the collapsed layout can persist in `layouts/.state/main.json`; drag them back or run `herdr-app do layout.reset`. A cloned personal layout does not heal this way: the App writes the rewrite into its file.
+Chat connects to the existing default-profile gateway, whose profile multiplexing serves `coordinator`. Execution uses that gateway's jail, credentials and approvals, not a CLI terminal. The panel never starts a gateway. Choose New or History on first use; hiding the panel or closing the App leaves gateway work running. Drafts live in App shared state, and private viewer state lives under `data/hermes-shepherd-chat/`.
+
+The App replaces the shipped `main` layout from the package on startup, so applying a layout change requires a rebuild and App relaunch. Personal layout clones need the [upstream layout migration](https://github.com/augustocdias/herdr-hermes-shepherd#layout-and-upgrade) applied separately. Existing coordinator terminals are not stopped by the migration; end them only after their work finishes.
 
 ### Package patches and verification
 
