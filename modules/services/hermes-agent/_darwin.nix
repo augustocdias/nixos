@@ -81,7 +81,10 @@
     exec ${lib.getExe package} gateway run
   '';
 in {
-  environment.systemPackages = [package];
+  environment.systemPackages = [
+    package
+    inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.desktop
+  ];
   sops.secrets = {
     hermes_host_api_key = {owner = "augusto";};
     hermes_augusto_api_key = {owner = "augusto";};

@@ -355,7 +355,10 @@
     PYTHONPATH=${bootstrapLib} exec ${package.hermesVenv}/bin/python ${./_bootstrap_linux.py} ${manifest}
   '';
 in {
-  home.packages = [hermes];
+  home.packages = [
+    hermes
+    inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.desktop
+  ];
 
   # The Herdr App's built-in Hermes entry, opening the coordinator. A sticky
   # `hermes profile use` would also turn the gateway unit into a named profile.

@@ -28,7 +28,7 @@
         config = patchConfig {
           src = pkgs.fetchurl {
             url = "https://huggingface.co/OpenVoiceOS/pipertts_pt-BR_dii/resolve/main/dii_pt-BR.onnx.json";
-            hash = "sha256-MGmYKVrJakSdQ6Gciq1lsx4EA0HhXey99Kpo2IZw7IQ=";
+            hash = "sha256-IxdgK9HLaInTcc/TQKQRcJMoh9OS3dZlAiYYtR25VKM=";
           };
           dataset = "Dii pt-BR";
           quality = "medium";

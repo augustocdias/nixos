@@ -14,6 +14,8 @@ Hermes completes the board card after independent approval and required automate
 
 ### Reports
 
+In every `comment`, `report_done`, `report_blocked` and `ask`, identify GitHub PRs as `owner/repo#123`, with branch names and exact commit SHAs when relevant. Apply this to predecessor PRs and quoted evidence too. Full GitHub PR URLs belong only in card descriptions or external trackers, never in these payloads, Markdown link targets or pasted logs. This reporting format takes precedence over a skill's request to return a PR URL; preserve the same PR identity and verification evidence.
+
 - Call `comment` with a one-line plan first; it records your session on the card. Use `comment` for progress, subtask results, policy rereads and responses to mid-task messages while the assignment continues.
 - **`report_done` is the final action of the entire assigned stage, not a subtask or follow-up acknowledgement.** A follow-up does not discard unfinished work from the original assignment. Later stages assigned to other roles are separate work, not permission to leave your own work pending.
 - Before reporting Done, collect every subagent result and resolve its actionable findings. Finish all edits, required checks, reviews, commits and other actions assigned to you. Wait for all background commands and checks to finish and inspect their outcomes. Stop owned temporary servers, browsers and other processes, and verify they stopped. No active or queued subagent, background job, pending result, unresolved finding, required check or approval may remain. Do not cancel required work to make this condition appear satisfied.

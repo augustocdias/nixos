@@ -76,6 +76,8 @@ Check these separately: persisted message counts, `GET /v3/workspaces/{workspace
 
 On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs upstream's Nix `messaging` package as one boot-time system LaunchDaemon, `hermes gateway run` as `augusto`. Upstream's Home Manager module installs a LaunchAgent instead, so only service and profile glue is local. `gateway.multiplex_profiles=true` serves the independent `augusto` and `livia` profiles under `/Users/augusto/.hermes/profiles/`. The daemon gets a sanitized environment so it never inherits ambient cloud credentials.
 
+The aspect also installs Hermes Desktop from the same flake input. Installing the app does not change the LaunchDaemon or profile bootstrap; Desktop backend selection remains separate from the household gateway configuration.
+
 ### Profiles and bootstrap
 
 `_bootstrap.py` runs before each gateway start:

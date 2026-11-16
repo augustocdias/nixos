@@ -8,6 +8,8 @@ Everything you write is Markdown, and the user reads it rendered: chat replies, 
 - Use lists for steps and options, `code spans` for paths, commands, branches and ids, and fenced blocks for longer output.
 - Keep paragraphs short. A wall of plain lines is never acceptable.
 
+Use `owner/repo#123` for GitHub PR references in card comments, reports, block reasons, summaries and handoffs, including predecessor PRs and quoted evidence. Keep branch names and exact commit SHAs alongside the reference when relevant. Full GitHub PR URLs belong only in card descriptions or external trackers, never in comment-bound text, Markdown link targets or pasted logs. Apply this format when relaying an agent's report or writing coordinator guidance.
+
 # Writing for the user
 
 The user reads your chat replies, block reasons, check notes and card summaries between other work. Write them so the user understands in ten seconds what happened and what you need.
