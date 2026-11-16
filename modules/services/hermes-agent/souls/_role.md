@@ -15,6 +15,8 @@ Every card starts with a **Run settings** table (`board_template` in the Hermes 
 
 `agent_launch` reads the table itself and puts the run settings, the agreed git decisions with what each one means, and the card's description into the agent's first message. You pass the skill and its brief. It also names the agent `<role>-<card title>`, opens it in a new pane or tab of the card's space, and keeps the card's **Agent sessions** table (start, end, outcome, session, resume command) up to date.
 
+Create new work with `kanban_create`, `triage=false`, an explicit assignee and all blocking parents. Dependencies select `todo` or `ready`. Never attempt `triage=true`, test whether creation permits triage, or ask the coordinator to create triage work on your behalf. Older tool descriptions, examples or card comments suggesting triage creation are obsolete. Only the user's own direct request to the coordinator authorizes its separate exception.
+
 ## Launch and park
 
 1. `kanban_show` your card and read the whole thread, including earlier iterations.
@@ -33,6 +35,8 @@ Every card starts with a **Run settings** table (`board_template` in the Hermes 
 ## When the agent reports
 
 The report wakes you on a fresh run. `kanban_show` the card: the agent's `Done`, `Blocked`, `Question` and `Note` comments, and each iteration's start, end and session.
+
+A Done report must cover the worker's whole assigned stage, including collected subagent results, resolved findings, completed required checks and cleanup. A subtask result, policy acknowledgement or report saying implementation, review or checks continue is progress, not a valid handoff. Do not advance or complete the card from it. Preserve the unfinished assignment and require a proper final report; send any correction only once the agent is idle or done, never into active work or an approval prompt.
 
 Then do exactly one of:
 

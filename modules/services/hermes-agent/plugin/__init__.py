@@ -748,10 +748,15 @@ def make_tools(profile):
                 _show_agent(card, owner, agent, task.title if task else card)
             except Exception as e:  # the follow-up goes out either way; the view is a convenience
                 logger.warning("herdr-agents could not reopen the view of %s: %s", agent["terminal"], e)
-            # Every round ends with a report, or the card waits forever: remind the agent each time.
+            # Mid-task follow-ups do not make an unfinished assignment complete.
             reminder = (
-                f"\n\n---\nWhen you finish this, call `report_done` (or `report_blocked`) with card `{card}` "
-                f"and task token `{agent['token']}`. It does not close the card: it hands your result back to Hermes."
+                f"\n\n---\nUse card `{card}` and task token `{agent['token']}` for reports. "
+                "Use `comment` for this follow-up if the original assignment is still in progress. "
+                "Call `report_done` only as the final action after the entire assigned stage is complete: "
+                "all subagents and background jobs settled, findings resolved, required checks and assigned actions finished, "
+                "and owned temporary processes stopped. Nothing may remain running or pending. "
+                "Never batch it with another call; after success, end the turn immediately with no further tools or work. "
+                "Use `report_blocked` for unmet requirements or approvals, not Done with a disclaimer."
             )
             _hc("send", *(["--if", "idle"] if status == "idle" else []), agent["terminal"], text + reminder)
             with _state() as data:
@@ -1231,6 +1236,8 @@ def handle_board(method, path, query, payload):
     kb, connect = _kb()
     with connect() as conn:
         if method == "POST" and path == "/board/create":
+            if "triage" in payload:
+                return 400, {"error": "board_create does not accept triage; only the user or their explicitly instructed coordinator may create triage cards"}
             title = str(payload.get("title") or "").strip()
             body = _board_body(payload)
             if not title or not body:
@@ -1242,13 +1249,10 @@ def handle_board(method, path, query, payload):
             for parent in parents:
                 if kb.get_task(conn, parent) is None:
                     return 400, {"error": f"no parent card {parent}"}
-            triage = payload.get("triage", True)
-            if not isinstance(triage, bool):
-                return 400, {"error": "triage must be a boolean"}
-            if not triage and not assignee:
-                return 400, {"error": "assignee is required when bypassing triage"}
+            if not assignee:
+                return 400, {"error": "assignee is required"}
             card = kb.create_task(
-                conn, title=title, body=body, assignee=assignee, created_by="board-mcp", triage=triage,
+                conn, title=title, body=body, assignee=assignee, created_by="board-mcp", triage=False,
                 parents=parents, tenant=str(payload.get("tenant") or "").strip() or None,
             )
             return 200, {"card": card, "status": kb.get_task(conn, card).status}
@@ -1486,17 +1490,23 @@ def register(ctx):
                 handler=handler,
                 description=description,
             )
-    if settings.get("force_blocked"):
-        # Untrusted input (mail, calendar) must never dispatch agents on its own. Triage
-        # would not do: the decomposer routes triage cards to roles automatically.
-        def triage_only(tool_name=None, args=None, **_):
+    def guard_kanban(tool_name=None, args=None, **_):
+        if settings.get("force_blocked"):
+            # Untrusted input (mail, calendar) must never dispatch agents on its own. Triage
+            # would not do: the decomposer routes triage cards to roles automatically.
             if tool_name == "kanban_create":
                 return {"action": "modify", "args": {"triage": False, "initial_status": "blocked"}}
             if tool_name and tool_name.startswith("kanban_") and tool_name not in ASSISTANT_KANBAN:
                 return {"action": "block", "message": f"{tool_name} is not available to the assistant"}
-            return None
+        if tool_name == "kanban_create":
+            if (args or {}).get("triage"):
+                if profile != "coordinator" or os.environ.get("HERMES_KANBAN_TASK"):
+                    return {"action": "block", "message": "Only the coordinator, at the user's explicit request outside a card run, may create triage cards. Create assigned work with triage=false instead."}
+            else:
+                return {"action": "modify", "args": {"triage": False}}
+        return None
 
-        ctx.register_hook("pre_tool_call", triage_only)
+    ctx.register_hook("pre_tool_call", guard_kanban)
     if _in_herdr_cli():
         _herdr_hooks(ctx)
     _serve(ctx)

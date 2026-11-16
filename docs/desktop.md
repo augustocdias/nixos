@@ -44,6 +44,10 @@ DMS runs as a systemd user service. Hyprland binds call it through `dms ipc call
 
 Flake inputs: `dms` (Home Manager module), `dms-plugins` (plugin registry), `dank-greeter`, and `dank-pinentry`.
 
+### Calendar daemon detection
+
+Dank Calendar checks its daemon socket by launching `test -S` directly. A running daemon can appear offline if another package shadows the standard `test` executable. `modules/packages/development.nix` removes the unrelated test runner shipped by `gh-stack` to prevent this collision. After activating that package change, restart `dcal.service` because the UI probes the socket only once at startup.
+
 ### Greeter
 
 The greeter comes from the `dank-greeter` flake (`programs.dms-greeter`), with greetd and Hyprland as its compositor. It copies the user's DMS theme, wallpaper, and settings into `/var/lib/dms-greeter` via `configHome` before greetd starts.

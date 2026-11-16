@@ -9,7 +9,7 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 const URL = "@url@";
 
 const TOOLS = [
-  ["report_done", "result", "Hand your finished work back to Hermes. Call it every time you finish a task, the first one and every follow-up, even mid-review. It does not close the card: it records your result and wakes the role, which decides the next step (review, another round, done). Without it the card waits forever."],
+  ["report_done", "result", "Final action for a fully completed assignment. Before calling, collect all subagent results, resolve findings, finish required checks and assigned actions, and stop owned temporary processes. Nothing may remain running or pending. Use comment for subtask/follow-up progress, ask for decisions, or report_blocked for unmet requirements. Never batch with another call. After success, end the turn immediately with no further tools or work until a new explicit assignment. Reports completion of this stage, not the whole card."],
   ["report_blocked", "reason", "Report that you cannot go on without help, with the reason."],
   ["ask", "question", "Ask Hermes a question and end your turn. Your role answers from existing context or blocks the card for coordinator review. Wait for a follow-up message, not terminal input from the user."],
   ["comment", "text", "Add a progress note to the card. Call it first thing, then whenever useful."],

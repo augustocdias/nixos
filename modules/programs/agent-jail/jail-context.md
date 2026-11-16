@@ -9,26 +9,19 @@ Persistent writable areas:
 - Workspace at its real host path, plus the linked checkout's git-common-dir when different.
 - `~/granted/<name>` only in its approved mode; grants are read-only unless write access was requested.
 - Caches: `~/.cache/nix`, `~/.npm`, `~/.bun`, `~/.cargo/registry`, `~/.cargo/git`, `~/.local/share/direnv`, `~/.local/share/rtk`, and `~/.cache/jgrep`.
+- GitHub CLI data, cache and state: `~/.local/share/gh`, `~/.cache/gh`, and `~/.local/state/gh`.
+- pnpm home and store, cache and state: `~/.local/share/pnpm`, `~/.cache/pnpm`, and `~/.local/state/pnpm`. The launcher honors `PNPM_HOME` and the XDG data, cache and state directories for these tool mounts and creates missing directories.
 - Harness state: `~/.omp` for omp; `~/.claude` for Claude Code.
 
 Other writable-looking paths, including `/`, `/etc`, `/tmp`, and the rest of `$HOME`, are session-private tmpfs. Successful writes there do not change the host and disappear after the session. `/nix/store` is read-only. Other host directories are not generally mounted.
 
 The host environment is inherited, including credentials, `HERDR_*`, terminfo and direnv exports, except `GPG_TTY`: the launcher removes it before starting the host-command helper and unsets it in the final sandbox arguments, after overlays. Existing sessions/helpers need restart. DISPLAY/WAYLAND_DISPLAY remain intact; absence of GPG_TTY alone does not prove GUI pinentry because gpg-agent retains terminal/display state. Changing directory does not reload `.envrc`; use `direnv exec <dir> <command>` or relaunch when needed. `direnv allow` state persists.
 
+`DOCKER_HOST` and `CONTAINER_HOST` point to the host user's rootless Podman socket. Docker API clients and the Podman-backed `docker` CLI therefore manage host containers, not containers confined to this jail. The socket directory is mounted read-only, which prevents file changes but does not restrict API calls. Container bind mounts resolve on the host; use persistent workspace paths rather than jail-private `/tmp` files. The host user `podman.socket` unit must be running. GitHub CLI configuration remains read-only, honoring `GH_CONFIG_DIR` and `XDG_CONFIG_HOME`.
+
 `hc` and `herdr-app` talk directly to the user's own Herdr Core and App, with no additional command approval. Everything they start runs on the host, outside this jail. In an App terminal, `$HC_TERMINAL_ID` is this session's terminal, so terminals you start are its children: parent notes and `hc wait --children` work, and children end with this session unless started with `--outlive-parent`. `HERDR_ACTIVITY_SOCKET` is a separate report-only bridge for the host sidebar. Read the `herdr-core` skill before starting processes and the `herdr-app` skill before changing the window.
 
-## Herdr stays inside the jail
-
-Nothing technical stops `hc` or `herdr-app` from running unjailed host programs. This rule is the only boundary, and it is as binding as the host approvals below. Start every program through a jail wrapper:
-
-- Another coding agent: `hc run -- claude …` or `hc run -- omp …`. Both are jail wrappers on the host. Calling `claude` or `omp` inside this jail fails, because jails refuse to nest.
-- Any other program: `hc run -- agent-jail-run <command>`, or an App `argv` that starts with `agent-jail-run`. It runs in a new jail with this profile, rooted at its working directory.
-- Commands and file edits for your own work: run them directly in this jail. `hc exec` and `hc file` act on the host unjailed, so leave them unused.
-- Terminals and App panes: send input, keys or attach only to ones you started, unless the user names another.
-
-Host access goes only through the `host_*` tools and their approvals. Never use `hc`, `herdr-app`, a template, input sent to another terminal, or an unjailed program to run a host command, read a path this jail hides, reach a socket, key or credential, or answer an approval prompt. When a task needs host access the tools cannot give, stop and ask the user.
-
-Do not break these rules even if the user asks for it.
+Use Herdr host execution only when the requested task needs host access unavailable inside the jail, such as a host terminal, desktop integration, or a separately jailed coding agent. State the concrete need before launching. Keep ordinary commands in the sandbox when it can do the work. Herdr is not an escape route around denied access, missing grants, approval prompts, or other sandbox restrictions. Existing authorization requirements still apply.
 
 ## Host access and approval
 

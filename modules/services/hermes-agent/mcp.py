@@ -5,7 +5,7 @@
 
 Report tools carry the card id and task token from the agent's first message,
 plus the harness session id, which the agent never has to know. Board tools
-need no credentials. Prepared tickets can bypass triage with an explicit assignee.
+need no credentials. Cards require an assignee; dependencies select todo or ready.
 
 No dependencies on purpose, like agent-jail/host-mcp.py: initialize /
 tools/list / tools/call over newline-delimited JSON.
@@ -36,7 +36,7 @@ def text_schema(field, description):
 REPORT_TOOLS = [
     {
         "name": "report_done",
-        "description": "Hand your finished work back to Hermes. Call it every time you finish a task, the first one and every follow-up, even mid-review. It does not close the card: it records your result and wakes the role, which decides the next step (review, another round, done). Without it the card waits forever.",
+        "description": "Final action for a fully completed assignment. Before calling, collect all subagent results, resolve findings, finish required checks and assigned actions, and stop owned temporary processes. Nothing may remain running or pending. Use comment for subtask/follow-up progress, ask for decisions, or report_blocked for unmet requirements. Never batch with another call. After success, end the turn immediately with no further tools or work until a new explicit assignment. Reports completion of this stage, not the whole card.",
         "inputSchema": text_schema("result", "What you did and where to find it"),
     },
     {
@@ -61,9 +61,9 @@ BOARD_TOOLS = [
     {
         "name": "board_create",
         "description": (
-            "Ask the Hermes coordinator for work: file a card on the Hermes kanban board. "
-            "Defaults to triage for automatic decomposition. For approved tickets, set triage=false and an assignee; dependencies select todo or ready. "
-            "Fill the header fields from board_template; leave a field out when it is not decided."
+            "File approved work on the Hermes kanban board with an explicit assignee. "
+            "Dependencies select todo or ready; this tool cannot create triage cards. "
+            "Fill the header fields from board_template."
         ),
         "inputSchema": {
             "type": "object",
@@ -78,9 +78,8 @@ BOARD_TOOLS = [
                 "assignee": {"type": "string", "description": "programmer, reviewer, qa or research"},
                 "tenant": {"type": "string", "description": "Groups a spec's cards, e.g. the spec slug"},
                 "parents": {"type": "array", "items": {"type": "string"}, "description": "Cards that must finish first"},
-                "triage": {"type": "boolean", "description": "Default true. Set false for approved to-spec/to-tickets work, with an explicit assignee and all blocking parents."},
             },
-            "required": ["title", "body"],
+            "required": ["title", "body", "assignee"],
         },
     },
     {

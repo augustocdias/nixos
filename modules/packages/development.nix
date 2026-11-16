@@ -65,7 +65,14 @@
         git-cliff
         git-extras
         gh
-        gh-stack
+        (gh-stack.overrideAttrs (old: {
+          # The upstream test runner shadows coreutils test and breaks Dank Calendar's socket probe.
+          postInstall =
+            (old.postInstall or "")
+            + ''
+              rm -f "$out/bin/test"
+            '';
+        }))
 
         jq
         yq-go

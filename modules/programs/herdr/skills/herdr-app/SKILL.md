@@ -11,7 +11,7 @@ For persistent mod, layout, theme, setting or keybinding changes, read [Mod deve
 
 ## 1. Know the route
 
-`herdr-app` drives the user's App directly, and programs it starts run on the host. In a Linux agent jail it runs with no host approval, and nothing technical keeps those programs jailed. Start each one through a jail wrapper, as the jail contract requires: `claude` or `omp` by name, anything else with `agent-jail-run` first in `argv`. Outside the Linux jail, including Darwin, follow the harness's approval policy.
+`herdr-app` drives the user's App directly, and programs it starts run on the host. Use it for requested desktop operations and programs that need host access unavailable inside the jail. State that need before launching; keep ordinary commands in the sandbox when it can do the work. Pass the program's normal command and arguments in `argv`, subject to the harness's command approval policy. Never use App commands to bypass denied access, missing grants, approval prompts, or sandbox restrictions.
 
 `herdr-app --help`, `herdr-app --skill` and `herdr-app commands` are local reference. Running bare `herdr-app` opens or raises the window, so use `ls` and `status` to inspect.
 
@@ -34,7 +34,7 @@ herdr-app do terminal.open --place right --name web --argv '["npm","run","dev"]'
 herdr-app do tab.new --name tests --folder /path/to/project --argv '["cargo","test"]'
 ```
 
-`terminal.open`, `tab.new`, `pane.split` and `space.new` accept `argv`, plus `folder` and `task` where `herdr-app commands` lists them. Without `argv` the pane gets a host shell; in the jail, give `["agent-jail-run"]` for a jailed shell instead. The reply's `terminal` is the program's Core terminal: use it for App commands such as `agent.focus` or `terminal.kill`, and for `hc read`, `hc wait`, `hc send` and `hc kill`.
+`terminal.open`, `tab.new`, `pane.split` and `space.new` accept `argv`, plus `folder` and `task` where `herdr-app commands` lists them. Without `argv` the pane gets a host shell. The reply's `terminal` is the program's Core terminal: use it for App commands such as `agent.focus` or `terminal.kill`, and for `hc read`, `hc wait`, `hc send` and `hc kill`.
 
 ### Show a terminal you already started with `hc`
 

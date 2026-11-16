@@ -413,7 +413,7 @@ in {
     Install.WantedBy = ["default.target"];
   };
 
-  # No credentials: every card the board MCP files lands in triage.
+  # No credentials: board MCP creation is limited to assigned todo/ready cards.
   programs.claude-code.mcpServers.hermes-board = {
     command = lib.getExe pkgs.python3;
     args = ["${./mcp.py}" "board" url];

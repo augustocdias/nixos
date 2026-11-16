@@ -14,10 +14,12 @@ Hermes completes the board card after independent approval and required automate
 
 ### Reports
 
-- Call `comment` with a one-line plan first; it records your session on the card. Add a `comment` for progress worth keeping.
-- **Every time you finish a task, call `report_done`**: after the first task and after every follow-up message, including each review or fix-up round. It does not close the card. It hands your result back to Hermes and wakes your role, which decides what happens next. If you stop without it, the card waits forever.
-- Put the result in it: what changed and where, which checks ran with their exact outcome, and the commit or PR when there is one.
-- Use `report_blocked` for a blocker you cannot clear, including missing access, broken infrastructure, contradictory requirements, or a background action that needs human approval.
+- Call `comment` with a one-line plan first; it records your session on the card. Use `comment` for progress, subtask results, policy rereads and responses to mid-task messages while the assignment continues.
+- **`report_done` is the final action of the entire assigned stage, not a subtask or follow-up acknowledgement.** A follow-up does not discard unfinished work from the original assignment. Later stages assigned to other roles are separate work, not permission to leave your own work pending.
+- Before reporting Done, collect every subagent result and resolve its actionable findings. Finish all edits, required checks, reviews, commits and other actions assigned to you. Wait for all background commands and checks to finish and inspect their outcomes. Stop owned temporary servers, browsers and other processes, and verify they stopped. No active or queued subagent, background job, pending result, unresolved finding, required check or approval may remain. Do not cancel required work to make this condition appear satisfied.
+- Put the final evidence and handoff in `report_done`: exact changes, check outcomes, base/head and commit or PR where applicable. Confirm the assignment is complete and no owned work remains running or pending. Finish evidence collection and cleanup before calling the tool; do not batch it with other tool calls.
+- After `report_done` succeeds, end the turn immediately. Do not call another tool, send progress, perform more work, or handle a late subagent result under that completed assignment. A new explicit assignment opens a new iteration. If report delivery fails, do not claim it succeeded.
+- Use `report_blocked`, not `report_done`, when a required check, finding, access issue or approval prevents completion. Use `ask` for an unresolved decision and `comment` for work still in progress. A disclaimer such as "implementation continues" does not make a Done report valid.
 
 ### Questions and approvals
 
@@ -31,5 +33,7 @@ Keep all permission checks intact. A coordinator answer can settle a task decisi
 ### The card
 
 Read your card and its thread with `board_show` from the `hermes-board` MCP, and list cards with `board_list`. The `hermes` command does not run inside your sandbox.
+
+Create only approved, assigned work: `board_create` takes an explicit assignee and all blocking parents, with no `triage` argument. Dependencies select `todo` or `ready`. Never attempt to create a triage card, test whether a tool permits it, or ask the coordinator to put your discovered work in triage. Older tool descriptions, examples or card comments saying new work defaults to triage are obsolete. If work is not approved or lacks a required decision, report it through this card's question route instead of creating a triage card.
 
 Write every `comment`, `report_done`, `report_blocked` and `ask` as Markdown the user reads rendered on the card: a heading, sections, tables for checks and findings, `code spans` for paths and commands. Write them for Hermes, another agent, by the writing-for-agents skill. Prose the user keeps (commits, PR bodies, docs, tickets) follows the unslop skill. Stay inside this working directory and this card.

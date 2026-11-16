@@ -248,13 +248,35 @@ in
         '')
 
         (try-readonly (noescape "\"$HOME/.config/git\""))
-        (try-readonly (noescape "\"$HOME/.config/gh\""))
+        (try-readonly (noescape "\"\${GH_CONFIG_DIR:-\${XDG_CONFIG_HOME:-$HOME/.config}/gh}\""))
 
         (try-ro-bind (noescape "\"$HOME/.ssh/known_hosts\"") (noescape "~/.ssh/known_hosts"))
 
         (defer (set-env "PATH" (noescape "\"${rmSafe}/bin:$PATH\"")))
 
         (try-readonly (noescape "\"$HOME/.config/direnv\""))
+
+        (add-runtime ''
+          for tool_dir in \
+            "''${XDG_DATA_HOME:-$HOME/.local/share}/gh" \
+            "''${XDG_CACHE_HOME:-$HOME/.cache}/gh" \
+            "''${XDG_STATE_HOME:-$HOME/.local/state}/gh" \
+            "''${PNPM_HOME:-''${XDG_DATA_HOME:-$HOME/.local/share}/pnpm}" \
+            "''${XDG_CACHE_HOME:-$HOME/.cache}/pnpm" \
+            "''${XDG_STATE_HOME:-$HOME/.local/state}/pnpm"; do
+            mkdir -p "$tool_dir"
+            RUNTIME_ARGS+=(--bind "$tool_dir" "$tool_dir")
+          done
+
+          # Bind the directory so socket replacement does not leave a stale inode.
+          podman_dir="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman"
+          mkdir -p "$podman_dir"
+          RUNTIME_ARGS+=(
+            --ro-bind "$podman_dir" "$podman_dir"
+            --setenv DOCKER_HOST "unix://$podman_dir/podman.sock"
+            --setenv CONTAINER_HOST "unix://$podman_dir/podman.sock"
+          )
+        '')
 
         (try-rw-bind (noescape "\"$HOME/.cache/nix\"") (noescape "~/.cache/nix"))
         (try-rw-bind (noescape "\"$HOME/.npm\"") (noescape "~/.npm"))

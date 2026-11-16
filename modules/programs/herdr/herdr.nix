@@ -4,7 +4,6 @@
   lib,
   ...
 }: {
-  # Keep the input's nixpkgs; local patches rebuild only herdr-app.
   flake-file.inputs.llm-agents.url = lib.mkDefault "github:numtide/llm-agents.nix";
   flake-file.inputs.herdr-navigation.url = "github:augustocdias/herdr-navigation";
   flake-file.inputs.herdr-hermes-shepherd.url = "github:augustocdias/herdr-hermes-shepherd";

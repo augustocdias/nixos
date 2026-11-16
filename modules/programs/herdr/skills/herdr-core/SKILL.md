@@ -11,9 +11,9 @@ Use `hc` for processes that need an inspectable terminal or must keep running wh
 
 `hc` talks to the user's own Core. Every program it starts runs on the host, shows up in the user's App and can outlive this session with `--outlive-parent`. In an App terminal, `$HC_TERMINAL_ID` is this session's terminal: programs you start are its children, so parent notes and `hc wait --children` work, and by default they end when this session ends. A session started outside the App has no terminal ID; record explicit terminal addresses or names instead.
 
-In a Linux agent jail, Core runs programs outside the jail and nothing technical stops an unjailed one. Keep everything you start jailed, as the jail contract requires. Start `claude` and `omp` by name, since both are jail wrappers on the host, and put `agent-jail-run` in front of every other program. Leave `hc exec` and `hc file` unused there, because they act on the host unjailed. Outside the Linux jail, including Darwin, treat Core as host authority and follow the harness's host approval policy. Remote machines require separate authorization and are not confined by the local jail.
+Use host execution only when the requested task needs access unavailable inside the jail, such as a host terminal, desktop integration, or a separately jailed coding agent. State that need before launching; keep ordinary commands in the sandbox when it can do the work. Start programs with their normal command and arguments, subject to the harness's command approval policy. Never use Core to bypass denied access, missing grants, approval prompts, or sandbox restrictions. Remote machines require separate authorization.
 
-Proceed when you know which jail, if any, each program will run in and which project directory it can access.
+Proceed when you know the target host and project directory.
 
 ## 2. Start the requested processes
 
@@ -22,8 +22,6 @@ Read the project's existing start commands, required services and ports. Use an 
 ```sh
 hc run --bg --name web --cwd /path/to/project -- npm run dev
 ```
-
-In the Linux jail, the same service is `hc run --bg --name web --cwd /path/to/project -- agent-jail-run npm run dev`.
 
 To start another coding agent, run it with its prompt as the task:
 

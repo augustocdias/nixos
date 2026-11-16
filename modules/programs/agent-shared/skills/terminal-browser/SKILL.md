@@ -19,7 +19,7 @@ hc run --bg --name web-browser --cwd /path/to/project -- terminal-browser open h
 
 On Linux inside the agent jail, put `env -u DISPLAY -u WAYLAND_DISPLAY` before `terminal-browser`. This selects the browser's headless display backend while retaining terminal rendering. It does not require access to the host desktop.
 
-Use Core rather than `terminal-browser open --split`. The packaged browser's Herdr adapter targets the legacy TUI, not Herdr App. To show the sandbox terminal in the App, load `herdr-app` through the harness's skill mechanism and follow its viewer workflow.
+Use Core rather than `terminal-browser open --split`. The packaged browser's Herdr adapter targets the legacy TUI, not Herdr App. To show the Core terminal in the App, load `herdr-app` through the harness's skill mechanism and follow its viewer workflow.
 
 Run `terminal-browser ls --all --json` again. Record the new browser key and tab ID, and verify the requested URL before acting. If launch fails, inspect your Core terminal's output. Never choose an unrelated browser to bypass a failed launch.
 
@@ -39,4 +39,4 @@ Check the actual page state after each action relevant to the task. For visual v
 
 ## 3. Finish owned work
 
-Clear the activity indicator with `terminal-browser action --browser <key> --tab <id> done`. Close only tabs you opened, then stop and remove your Core terminal using the `herdr-core` workflow. `terminal-browser shutdown` closes every browser sharing the daemon, so use it only when you own all of them. Leave browsers running only when the user asks, and state their sandbox lifetime.
+Clear the activity indicator with `terminal-browser action --browser <key> --tab <id> done`. Close only tabs you opened, then stop and remove your Core terminal using the `herdr-core` workflow. `terminal-browser shutdown` closes every browser sharing the daemon, so use it only when you own all of them. Leave browsers running only when the user asks, and state whether they end with this session.
