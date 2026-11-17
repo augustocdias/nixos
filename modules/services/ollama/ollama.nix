@@ -16,7 +16,13 @@
     ollama = (pkgs.callPackage ./_package.nix {}).package;
     ollamaHome = "/var/lib/ollama";
     ollamaPort = 11434;
-    ollamaModels = with config.services.ollama; [model memoryModel "qwen3-embedding:0.6b"];
+    hermesModels =
+      builtins.attrValues (import ../hermes-agent/_models.nix).macmini
+      ++ lib.concatLists (builtins.attrValues (import ../hermes-agent/_fallbacks.nix).macmini);
+    ollamaModels = lib.unique ([config.services.ollama.memoryModel "qwen3-embedding:0.6b"]
+      ++ map (model: model.default or model.model) (builtins.filter
+        (model: model.provider == "custom" && (model.base_url or "") == "http://127.0.0.1:11434/v1")
+        hermesModels));
     # launchd has no ordering, so poll the server instead of racing it.
     ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
       set -u
@@ -35,11 +41,6 @@
       exit "$status"
     '';
   in {
-    options.services.ollama.model = lib.mkOption {
-      type = lib.types.str;
-      default = "deepseek-v4-pro:cloud";
-      description = "Ollama generation model for Hermes.";
-    };
     options.services.ollama.memoryModel = lib.mkOption {
       type = lib.types.str;
       default = "deepseek-v4.1-flash:cloud";

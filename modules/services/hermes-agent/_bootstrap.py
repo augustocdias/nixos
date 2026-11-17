@@ -50,7 +50,12 @@ def merge_config(existing, managed):
 
 def write_config(path, managed):
     existing = require_readable_config_before_write(path)
-    atomic_write(path, json.dumps(merge_config(existing, managed)))
+    config = merge_config(existing, managed)
+    if "model" in managed:
+        config["model"] = managed["model"]
+    if "fallback_providers" in managed:
+        config.pop("fallback_model", None)
+    atomic_write(path, json.dumps(config))
 
 
 def write_env(path, managed):
@@ -158,13 +163,14 @@ def bootstrap(manifest):
                     if attempt == 59:
                         raise
                     time.sleep(2)
-        write_config(home / "config.yaml", manifest["profile_config"])
+        write_config(home / "config.yaml", manifest["profile_configs"][person])
         write_env(
             home / ".env",
             {
                 "API_SERVER_KEY": key,
                 "API_SERVER_MODEL_NAME": "hermes-agent",
                 "OPENAI_API_KEY": "ollama",
+                **manifest["profile_env"],
                 **mcp_env,
             },
         )

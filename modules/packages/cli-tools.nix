@@ -31,6 +31,7 @@
           exiftool
           poppler-utils
           tesseract
+          viu
         ]
         ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
           dragon-drop

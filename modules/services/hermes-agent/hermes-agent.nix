@@ -2,7 +2,10 @@
   inputs,
   lib,
   ...
-}: {
+}: let
+  models = import ./_models.nix;
+  fallbacks = import ./_fallbacks.nix;
+in {
   # Share a current builder with Honcho; flake.lock owns the exact revision.
   flake-file.inputs.uv2nix = {
     url = "github:pyproject-nix/uv2nix";
@@ -17,8 +20,14 @@
     url = "github:plastic-labs/honcho";
     flake = false;
   };
-  den.aspects.hermes-agent = {
-    darwin = import ./_darwin.nix {inherit inputs lib;};
-    homeManager = import ./_linux.nix {inherit inputs lib;};
+  flake-file.inputs.hermes-official-plugins = {
+    url = "github:NousResearch/hermes-official-plugins";
+    flake = false;
   };
+  flake-file.inputs.hermes-plugin-office-3d = {
+    url = "github:oslook/hermes-desktop-plugin-office-3d";
+    flake = false;
+  };
+  den.aspects.hermes-agent.darwin = import ./_darwin.nix {inherit inputs lib models fallbacks;};
+  den.aspects.hermes-work.homeManager = import ./_work.nix {inherit inputs models fallbacks;};
 }

@@ -2,6 +2,8 @@
 {
   inputs,
   lib,
+  models,
+  fallbacks,
 }: {
   config,
   pkgs,
@@ -15,46 +17,44 @@
     honchoSource = inputs.honcho;
     system = pkgs.stdenv.hostPlatform.system;
   };
-  localModel = {
-    model = {
-      provider = "custom";
-      default = config.services.ollama.model;
-      base_url = "http://127.0.0.1:11434/v1";
-      context_length = 65536;
-    };
-    auxiliary.compression = {
-      provider = "main";
-      model = "";
-    };
-  };
-  manifest = pkgs.writeText "hermes-profiles.json" (builtins.toJSON {
-    host_config = localModel // {gateway.multiplex_profiles = true;};
-    profile_config =
-      localModel
-      // {
-        memory.provider = "honcho";
-        mcp_servers = {
-          context7 = {
-            url = "https://mcp.context7.com/mcp";
-            trust = "untrusted";
-          };
+  userHome = config.home-manager.users.augusto.home;
+  manifest = pkgs.writeText "hermes-household-profiles.json" (builtins.toJSON {
+    host_config.gateway.multiplex_profiles = true;
+    profile_configs = lib.genAttrs ["augusto" "livia"] (name: {
+      model = models.macmini.${name};
+      auxiliary.compression = {
+        provider = "main";
+        model = "";
+      };
+      fallback_providers = fallbacks.macmini.${name};
+      memory.provider = "honcho";
+      mcp_servers = {
+        context7 = {
+          url = "https://mcp.context7.com/mcp";
+          trust = "untrusted";
         };
       };
+    });
     soul = ./SOUL.md;
     host_key = config.sops.secrets.hermes_host_api_key.path;
+    mcp_secrets = {};
+    profile_env.HASS_URL = "http://home.local:8123";
     profile_keys = {
       augusto = config.sops.secrets.hermes_augusto_api_key.path;
       livia = config.sops.secrets.hermes_livia_api_key.path;
     };
     plugins = {
       honcho = "${inputs.hermes-plugin-honcho}/hermes-plugin-honcho";
+      advanced-delegation = "${inputs.hermes-official-plugins}/advanced-delegation";
+      homeassistant = "${inputs.hermes-official-plugins}/homeassistant";
+      office-3d = "${inputs.hermes-plugin-office-3d}";
       ponytail = "${inputs.ponytail}";
       # Upstream's adapter, version-matched to the binary: rewrites `terminal`
       # commands through `rtk rewrite`. Hermes's dangerous-command checks run
       # on the rewritten command.
       rtk-rewrite = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";
     };
-    enabled_plugins = ["rtk-rewrite" "ponytail"];
+    enabled_plugins = ["rtk-rewrite" "ponytail" "advanced-delegation" "homeassistant" "office-3d"];
     skills = {
       caveman-bundle = "${inputs.caveman}/skills";
     };
@@ -78,13 +78,9 @@
     set -eu
     umask 077
     ${package.hermesVenv}/bin/python ${./_bootstrap.py} ${manifest}
-    exec ${lib.getExe package} gateway run
+    exec ${userHome.profileDirectory}/bin/hermes -p default gateway run
   '';
 in {
-  environment.systemPackages = [
-    package
-    inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.desktop
-  ];
   sops.secrets = {
     hermes_host_api_key = {owner = "augusto";};
     hermes_augusto_api_key = {owner = "augusto";};
@@ -92,7 +88,7 @@ in {
   };
   launchd.daemons.hermes-agent = {
     # launchd must not lend the host gateway ambient cloud credentials.
-    command = "/usr/bin/env -i HOME=${home} HERMES_HOME=${root} PATH=${pkgs.rtk}/bin:/usr/bin:/bin:/usr/sbin:/sbin ${start}";
+    command = "/usr/bin/env -i HOME=${home} HERMES_HOME=${root} PATH=${userHome.profileDirectory}/bin:${config.system.path}/bin:${pkgs.rtk}/bin:/usr/bin:/bin:/usr/sbin:/sbin ${start}";
     serviceConfig = {
       UserName = "augusto";
       RunAtLoad = true;

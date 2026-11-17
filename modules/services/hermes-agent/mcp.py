@@ -1,61 +1,18 @@
-"""Hermes stdio MCP servers, talking to the plugin's loopback endpoint.
+"""Board tools for the user's coding sessions, served by Hermes over loopback.
 
-    mcp.py report <url>   report tools for agents launched from a Hermes template
-    mcp.py board <url>    board tools for the user's normal Claude Code and omp sessions
-
-Report tools carry the card id and task token from the agent's first message,
-plus the harness session id, which the agent never has to know. Board tools
-need no credentials. Cards require an assignee; dependencies select todo or ready.
-
-No dependencies on purpose, like agent-jail/host-mcp.py: initialize /
-tools/list / tools/call over newline-delimited JSON.
+Cards require an assignee and an existing repository. Dependencies select todo
+or ready. Native Hermes roles execute the work; there is no report transport.
 """
 
 import json
-import os
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
-MODE, URL = sys.argv[1], sys.argv[2].rstrip("/")
+URL = sys.argv[1].rstrip("/")
 
 
-def text_schema(field, description):
-    return {
-        "type": "object",
-        "properties": {
-            "card": {"type": "string", "description": "Card id from your first message"},
-            "token": {"type": "string", "description": "Task token from your first message"},
-            field: {"type": "string", "description": description},
-        },
-        "required": ["card", "token", field],
-    }
-
-
-REPORT_TOOLS = [
-    {
-        "name": "report_done",
-        "description": "Final action for a fully completed assignment. Before calling, collect all subagent results, resolve findings, finish required checks and assigned actions, and stop owned temporary processes. Nothing may remain running or pending. Use comment for subtask/follow-up progress, ask for decisions, or report_blocked for unmet requirements. Never batch with another call. After success, end the turn immediately with no further tools or work until a new explicit assignment. Reports completion of this stage, not the whole card.",
-        "inputSchema": text_schema("result", "What you did and where to find it"),
-    },
-    {
-        "name": "report_blocked",
-        "description": "Report that you cannot go on without help, with the reason.",
-        "inputSchema": text_schema("reason", "What blocks you and what would unblock you"),
-    },
-    {
-        "name": "ask",
-        "description": "Ask Hermes a question and end your turn. Your role answers from existing context or blocks the card for coordinator review. Wait for a follow-up message, not terminal input from the user.",
-        "inputSchema": text_schema("question", "The question"),
-    },
-    {
-        "name": "comment",
-        "description": "Add a progress note to the card. Call it first thing, then whenever useful.",
-        "inputSchema": text_schema("text", "The note"),
-    },
-]
-REPORT_FIELDS = {"report_done": "result", "report_blocked": "reason", "ask": "question", "comment": "text"}
 
 BOARD_TOOLS = [
     {
@@ -72,14 +29,12 @@ BOARD_TOOLS = [
                 "body": {"type": "string", "description": "What to do, or a pointer to the ticket that says it"},
                 "repo": {"type": "string", "description": "Absolute path of the one repository this card changes, under ~/dev. Cross-repo work is one card per repository."},
                 "tracker": {"type": "string", "description": "Spec and ticket references in the repo's tracker"},
-                "agents": {"type": "string", "description": "Harness per role, e.g. programmer=claude, reviewer=omp"},
-                "git": {"type": "string", "description": "The git-conventions decisions: branch and ownership of branches, worktrees, commits, pushes, PRs"},
-                "herdr": {"type": "string", "description": "space=<id>|none; placement=pane|tab; close=yes|no. space=none means background with no visible terminal."},
+                "git": {"type": "string", "description": "branch and agent|human ownership of branches, worktrees, commits, pushes and PRs; omitted or legacy ask means human"},
                 "assignee": {"type": "string", "description": "programmer, reviewer, qa or research"},
                 "tenant": {"type": "string", "description": "Groups a spec's cards, e.g. the spec slug"},
                 "parents": {"type": "array", "items": {"type": "string"}, "description": "Cards that must finish first"},
             },
-            "required": ["title", "body", "assignee"],
+            "required": ["title", "body", "repo", "assignee"],
         },
     },
     {
@@ -100,7 +55,7 @@ BOARD_TOOLS = [
     },
     {
         "name": "board_show",
-        "description": "Show one card with its comments, including each agent iteration and session.",
+        "description": "Show one card and its native Hermes workflow comments.",
         "inputSchema": {
             "type": "object",
             "properties": {"card": {"type": "string"}},
@@ -124,26 +79,9 @@ def request(method, path, payload=None):
         raise RuntimeError(f"Hermes is unreachable at {URL}: {e}")
 
 
-def session():
-    # Claude Code exports its session id to child processes; `claude --resume` takes it.
-    return os.environ.get("CLAUDE_CODE_SESSION_ID", "")
-
 
 def call(name, args):
-    if MODE == "report":
-        field = REPORT_FIELDS[name]
-        reply = request(
-            "POST",
-            "/report",
-            {
-                "card": args.get("card", ""),
-                "token": args.get("token", ""),
-                "kind": name,
-                "text": args.get(field, ""),
-                "session_id": session(),
-            },
-        )
-    elif name == "board_create":
+    if name == "board_create":
         reply = request("POST", "/board/create", args)
     elif name == "board_template":
         reply = request("GET", "/board/template")
@@ -158,12 +96,12 @@ def call(name, args):
 def handle(msg):
     method = msg.get("method")
     params = msg.get("params") or {}
-    tools = REPORT_TOOLS if MODE == "report" else BOARD_TOOLS
+    tools = BOARD_TOOLS
     if method == "initialize":
         return {
             "protocolVersion": params.get("protocolVersion", "2025-06-18"),
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": f"hermes-{MODE}", "version": "0.1.0"},
+            "serverInfo": {"name": "hermes-board", "version": "1.0.0"},
         }
     if method == "ping":
         return {}

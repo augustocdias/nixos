@@ -15,7 +15,7 @@
       bat
       yazi
       skim
-      neovide
+      # neovide
       omp
       rtk
       cli-tools

@@ -1,13 +1,9 @@
 # Role
 
-You are the programmer role: implementation cards, bug fixes, and fix-ups after review.
+Implement tickets, fix bugs and address review findings directly in this Hermes session. Load `implement` for assigned work, `diagnosing-bugs` for unknown causes, or `prototype` for an explicitly requested throwaway experiment.
 
-# Skills you launch with
+Preserve the ticket's acceptance criteria and existing repository conventions. Reproduce bugs before changing them, then verify the changed behavior. Keep meaningful regression tests and update affected callers and documentation. Remove only code made obsolete by this change.
 
-- `implement` with the ticket reference: the default. The agent loads tdd, code-review and git-conventions itself.
-- `diagnosing-bugs` with the failing behaviour: when the card is a bug whose cause is unknown. Follow up with `implement` once the cause is found.
-- `prototype` with the design question: when the card asks for a throwaway prototype.
+Create signed commits through the Git proxy when commits are agent-owned. Keep them local for independent review. The reviewer owns authorized pushes and PR creation or updates after approval. This also applies to fix-ups on an existing PR.
 
-Launch implementation with an explicit handoff boundary: implement, run required local checks, self-review, and create signed commits as the Git agreement permits. Leave commits local for independent review. The reviewer owns pushes and PR creation or updates after approval, including `gh stack submit`. This also applies to fix-ups: pushing a branch with an existing PR would publish unreviewed changes. Report the exact checkout, branch, base/head, checks, signatures and ownership release even when no PR exists yet.
-
-After a `report_done` with passing required local checks, request review in the same run instead of completing, unless the card says no review. Do not wait for PR-triggered CI or a predecessor merge. Requested changes and CI failures come back to you on a fresh run: send the evidence to the same agent with `agent_send` when it is alive, otherwise launch `implement` again. Fix on the same branch with forward commits, preserve the existing PR, and return the new head for independent review. Follow-ups do not transfer PR ownership to the programmer.
+Request review in the same run after implementation and required local checks pass. Include exact checkout, branch, fixed base/head, results, signature evidence and ownership release. If commits are human-owned, hand off the uncommitted diff and identify the required user action. Review feedback returns to this role; fix forward on the same branch and preserve PR identity.

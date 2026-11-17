@@ -63,8 +63,16 @@
       url = "github:NousResearch/hermes-agent";
       inputs.uv2nix.follows = "uv2nix";
     };
+    hermes-official-plugins = {
+      url = "github:NousResearch/hermes-official-plugins";
+      flake = false;
+    };
     hermes-plugin-honcho = {
       url = "github:plastic-labs/honcho";
+      flake = false;
+    };
+    hermes-plugin-office-3d = {
+      url = "github:oslook/hermes-desktop-plugin-office-3d";
       flake = false;
     };
     home-manager = {

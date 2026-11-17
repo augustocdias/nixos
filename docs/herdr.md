@@ -42,7 +42,7 @@ State filters match any agent in a tab rather than only its aggregate status. A 
 
 ### Hermes Shepherd
 
-The `herdr-hermes-shepherd` input provides a Herdr App tab for the [Work Hermes](coding-agents.md#work-hermes-laptop) kanban board and a native coordinator chat panel ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_linux.nix` enables its Home Manager module and points `hermesPython` at the gateway's `hermesVenv` Python. The upstream module bundles the JavaScript and installs the board, cron and chat helpers. `herdr.nix` adds the layout and shortcut only when the module is enabled, so the laptop gets them and the macmini does not:
+The `herdr-hermes-shepherd` input provides a Herdr App tab for the [Work Hermes](coding-agents.md#work-hermes-laptop-and-macmini) kanban board and a native coordinator chat panel ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_work.nix` enables its Home Manager module on both hosts and points `hermesPython` at the gateway's `hermesVenv` Python. The upstream module bundles the JavaScript and installs the board, cron and chat helpers. `herdr.nix` adds the layout and shortcut when the module is enabled:
 
 - A Smart Tabs pinned tab in every space, labelled `default`. The label selects Hermes's `default` board by name, so the toolbar shows no "no board has this name" hint.
 - A full-height `shepherd` mod block after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default.
@@ -50,9 +50,9 @@ The `herdr-hermes-shepherd` input provides a Herdr App tab for the [Work Hermes]
 
 The key uses the packaged App's optional `layout.toggle` focus target, supplied by `layout-focus.patch`. The upstream App does not provide this argument. The patch supports terminal and focusable mod blocks; Shepherd consumes the mod's `focus` command to focus its composer. Plain `layout.toggle:shepherd`, the tab button and Hide retain their visibility-only behavior.
 
-The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` jail sets `HERMES_HOME` to the same path and binds it read-write at the same location, so the CLI, the gateway and the tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
+The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` wrapper sets `HERMES_HOME` to the same path, so the CLI, gateway and tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
 
-Chat connects to the existing default-profile gateway, whose profile multiplexing serves `coordinator`. Execution uses that gateway's jail, credentials and approvals, not a CLI terminal. The panel never starts a gateway. Choose New or History on first use; hiding the panel or closing the App leaves gateway work running. Drafts live in App shared state, and private viewer state lives under `data/hermes-shepherd-chat/`.
+Chat connects to the existing default-profile gateway, whose profile multiplexing serves `coordinator`. Execution uses that gateway's configured terminal backend, credentials and approvals, not a CLI terminal. The panel never starts a gateway. Choose New or History on first use; hiding the panel or closing the App leaves gateway work running. Drafts live in App shared state, and private viewer state lives under `data/hermes-shepherd-chat/`.
 
 The App replaces the shipped `main` layout from the package on startup, so applying a layout change requires a rebuild and App relaunch. Personal layout clones need the [upstream layout migration](https://github.com/augustocdias/herdr-hermes-shepherd#layout-and-upgrade) applied separately. Existing coordinator terminals are not stopped by the migration; end them only after their work finishes.
 

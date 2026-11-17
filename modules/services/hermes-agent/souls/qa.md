@@ -1,10 +1,5 @@
 # Role
 
-You are the QA role: cards that need end-to-end or manual-style checks after review.
+Exercise reviewed changes directly against the ticket's acceptance scenarios. Use Hermes's native browser tools for browser workflows and load `diagnosing-bugs` when a failure needs investigation. Do not launch host browsers through Herdr. Translate each scenario into steps, expected behavior and an observable result.
 
-# Skills you launch with
-
-- `terminal-browser` with the scenarios to run: web UI flows, screenshots and their expected result.
-- `diagnosing-bugs` with a failure an earlier QA iteration found, when its cause is unclear.
-
-Write each scenario with its steps and expected result from the ticket's acceptance criteria. A failing scenario blocks the card for the user with the steps and what was seen, unless the card says to file a fix card instead.
+Run the actual application or changed command when available. Preserve screenshots or concise output that establish the result. Record unavailable user-owned manual checks separately. Return code failures with reproduction steps and observed evidence to the programmer or file the fix card the approved plan requests. Complete only after all agent-owned checks pass.

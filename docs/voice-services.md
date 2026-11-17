@@ -2,7 +2,7 @@
 
 The [macmini host reference](system.md#macos-nix-darwin-host--macmini) owns launchd daemon setup, model loading, and logging failure modes.
 
-All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Generation for Hermes and Honcho goes to loopback Ollama, using `services.ollama.model` and `services.ollama.memoryModel` from `modules/services/ollama/ollama.nix`. Change the models there, not in each consumer.
+All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Hermes primary models are selected per host and profile in `modules/services/hermes-agent/_models.nix`, with ordered fallback chains in `_fallbacks.nix`; macmini uses loopback Ollama for both. Honcho uses `services.ollama.memoryModel` from `modules/services/ollama/ollama.nix`.
 
 ## Laya
 
@@ -74,16 +74,16 @@ Check these separately: persisted message counts, `GET /v3/workspaces/{workspace
 
 ## Hermes Agent
 
-On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs upstream's Nix `messaging` package as one boot-time system LaunchDaemon, `hermes gateway run` as `augusto`. Upstream's Home Manager module installs a LaunchAgent instead, so only service and profile glue is local. `gateway.multiplex_profiles=true` serves the independent `augusto` and `livia` profiles under `/Users/augusto/.hermes/profiles/`. The daemon gets a sanitized environment so it never inherits ambient cloud credentials.
+On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs one boot-time system LaunchDaemon as `augusto`. It bootstraps household profiles, then starts the shared Home Manager `hermes` wrapper with `-p default gateway run`. The wrapper uses upstream's Nix `messaging` package. `gateway.multiplex_profiles=true` serves the independent `augusto`, `livia` and work profiles under `/Users/augusto/.hermes/profiles/`. The daemon gets a sanitized environment so it never inherits ambient cloud credentials. No user LaunchAgent is installed.
 
-The aspect also installs Hermes Desktop from the same flake input. Installing the app does not change the LaunchDaemon or profile bootstrap; Desktop backend selection remains separate from the household gateway configuration.
+The `hermes-work` Home Manager aspect installs Hermes Desktop and Office 3D on both hosts. Desktop backend selection remains separate from the household gateway configuration. See [Work Hermes](coding-agents.md#work-hermes-laptop-and-macmini) for engineering profiles, the model map and host execution boundaries.
 
 ### Profiles and bootstrap
 
-`_bootstrap.py` runs before each gateway start:
+`_bootstrap.py` runs before each gateway start, followed by the wrapper's `_bootstrap_work.py`:
 
-- It merges Nix-owned settings into each existing YAML and `.env`, preserving channel tokens, sender allowlists, and other local settings. Malformed YAML fails closed without being overwritten. The `API_SERVER_*` keys are Nix-owned.
-- It adds Nix plugins to `plugins.enabled` without removing locally enabled ones. Linked plugins include the Honcho directory plugin, Ponytail, and rtk's `rtk-rewrite`, which rewrites `terminal` commands before Hermes's dangerous-command check runs. See [Coding agents](coding-agents.md#rtk-shell-output-compression).
+- Household bootstrap merges Nix-owned settings into each existing YAML and `.env`, preserving channel tokens, sender allowlists, and other local settings. Model records come from `_models.nix` and replace stale provider settings. Malformed YAML fails closed without being overwritten. The `API_SERVER_*` keys are Nix-owned; work bootstrap preserves the root listener.
+- Household bootstrap adds Nix plugins to `plugins.enabled` without removing locally enabled ones. `_darwin.nix` owns their links and consent, including advanced delegation, Home Assistant and Office 3D. Existing Honcho, Ponytail and rtk integration remains. rtk's `rtk-rewrite` rewrites household `terminal` commands before Hermes's dangerous-command check; work profiles do not enable it. See [Coding agents](coding-agents.md#rtk-shell-output-compression).
 - It links the Caveman skill bundle as `skills/caveman-bundle`. Learned skills stay writable outside it, and bootstrap refuses to replace an unmanaged directory at a managed link path.
 - It writes a mode-0600 copy of `modules/services/hermes-agent/SOUL.md` into each profile. Local edits are replaced on the next start. Edit the tracked file, rebuild, and start a fresh chat.
 - Each profile gets its own SOPS-managed API key and Honcho workspace key. Memories, sessions, skills, and cron state stay per profile. Missing credentials or failed Honcho access block startup.
@@ -104,9 +104,13 @@ Static channel credentials such as Telegram bot tokens belong in SOPS, wired to 
 
 ### MCP servers
 
-Both profiles get Context7 (anonymous public endpoint) and the Home Assistant MCP server over its authenticated webhook.
+Both household profiles get Context7 through its anonymous public endpoint, with `trust: untrusted`. Tools without a read-only annotation need approval and unattended calls fail closed. Open WebUI's chat route cannot answer approvals.
 
-Both servers use `trust: untrusted`, so tools without a read-only annotation need approval and unattended calls fail closed. Open WebUI's chat route cannot answer approvals; make HA changes from an approval-capable Hermes surface.
+### Home Assistant
+
+The official Home Assistant plugin is installed for macmini's household and work profiles. Its tools are enabled for `augusto`, `livia` and `coordinator`. Nix sets `HASS_URL`; authentication requires a long-lived `HASS_TOKEN` in each authorized profile's private `.env`. Bootstrap preserves that token. No token is currently provisioned by Nix; installation alone does not authenticate the plugin.
+
+These are native REST tools, not MCP tools, so Context7's approval policy does not govern service calls. Upstream blocks dangerous service domains, but ordinary device-control services remain available to authorized profiles. No event-watch domains or entities are configured.
 
 ### Latency
 

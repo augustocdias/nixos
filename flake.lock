@@ -929,11 +929,11 @@
     },
     "herdr-navigation": {
       "locked": {
-        "lastModified": 1794258436,
-        "narHash": "sha256-tTE4md5ytC/YLl3S1Sn2TgHDnDXOGabFbEyFhoxjrkI=",
+        "lastModified": 1794902541,
+        "narHash": "sha256-Mqtl7geM3NUX7359/1AHB3D3xh7riqU/Mfvk4dhqGDE=",
         "owner": "augustocdias",
         "repo": "herdr-navigation",
-        "rev": "c9cd224ef00fea9aca4fa139405631e1ebab34a2",
+        "rev": "2acb402dba5ed6246d7afa7fb84e8b32d176de86",
         "type": "github"
       },
       "original": {
@@ -983,6 +983,22 @@
         "type": "github"
       }
     },
+    "hermes-official-plugins": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794705640,
+        "narHash": "sha256-KuvMHXc95JsI64wMYHvt7CrEHs+AuhMeNuuo4XFWdGI=",
+        "owner": "NousResearch",
+        "repo": "hermes-official-plugins",
+        "rev": "3b721f978f786b61bece7a038e90562595da53ce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NousResearch",
+        "repo": "hermes-official-plugins",
+        "type": "github"
+      }
+    },
     "hermes-plugin-honcho": {
       "flake": false,
       "locked": {
@@ -996,6 +1012,22 @@
       "original": {
         "owner": "plastic-labs",
         "repo": "honcho",
+        "type": "github"
+      }
+    },
+    "hermes-plugin-office-3d": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794273926,
+        "narHash": "sha256-swactZxGyMgqBhNm1HHoiWmX+3mK1411DQd3M498jco=",
+        "owner": "oslook",
+        "repo": "hermes-desktop-plugin-office-3d",
+        "rev": "127c28accc950d1a10ff55ced992538eda656f16",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oslook",
+        "repo": "hermes-desktop-plugin-office-3d",
         "type": "github"
       }
     },
@@ -2751,7 +2783,9 @@
         "herdr-navigation": "herdr-navigation",
         "herdr-tmux-prefix": "herdr-tmux-prefix",
         "hermes-agent": "hermes-agent",
+        "hermes-official-plugins": "hermes-official-plugins",
         "hermes-plugin-honcho": "hermes-plugin-honcho",
+        "hermes-plugin-office-3d": "hermes-plugin-office-3d",
         "home-manager": "home-manager_2",
         "honcho": "honcho",
         "hyprland": "hyprland",
