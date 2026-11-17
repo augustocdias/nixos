@@ -5,6 +5,7 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
 ## Credits
 
 - **Matt Pocock**: [mattpocock/skills](https://github.com/mattpocock/skills). The curated skills in `modules/programs/agent-shared/skills/` (all except `git-conventions` and `unslop`). MIT, see `mattpocock-skills/LICENSE`; provenance and local adaptations are in `mattpocock-skills/UPSTREAM.md`.
+- **Aleksei Ulianov / Sprut_AI**: [hermes-researcher-agent](https://github.com/AlekseiUL/hermes-researcher-agent). The research method, mode reference and brief template in `agent-shared/skills/research/` adapt this source alongside the existing Matt Pocock workflow. MIT, see `hermes-researcher-agent/LICENSE`; revision and adaptations are in `hermes-researcher-agent/UPSTREAM.md`.
 - **Dex Horthy**: the `show-me` skill from [humanlayer](https://github.com/humanlayer/humanlayer). The visual menu in the `pr` skill, see `mattpocock-skills/pr-CREDITS.md`.
 - **Lauren Tan**: [pstack](https://github.com/cursor/plugins/tree/main/pstack). The `unslop` skill in `modules/programs/agent-shared/skills/`. MIT, see `pstack/LICENSE`.
 - **Julius Brussee**: [Caveman](https://github.com/JuliusBrussee/caveman). The chat-style rules (`agent-shared/style/caveman.md`), the one-line finding format in `skills/code-review`, and the commit rules in `skills/git-conventions`. Apache-2.0, see `caveman/`.
