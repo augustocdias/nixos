@@ -70,3 +70,19 @@ The `omniwm` aspect is Home Manager (`programs.omniwm`) and is included by `user
 - Float rules may set `bundleId = ""` when another matcher is set. Each rule needs an explicit `id` UUID; `mkFloat` generates them.
 - `settings.toml` is Nix-owned, and the GUI fights it. OmniWM rewrites the file from its Settings window and on version migration; the Home Manager module relinks it with `force = true` on every switch. Mirror any GUI change worth keeping into Nix. Add hotkey ids introduced by an upgrade by hand.
 - OmniWM requires macOS 26+, Accessibility and Input Monitoring permissions, and "Displays have separate Spaces" on. It pauses until that setting is on.
+
+## Obsidian (laptop and macmini)
+
+`modules/programs/obsidian.nix` (aspect `obsidian`, in `user-base`) configures Augusto's wiki vault, `~/obsidian-vault`, through Home Manager `programs.obsidian`. The file owns the settings, core and community plugins, theme and graph colors. Community plugins and the Catppuccin theme are release assets pinned by hash. The wiki itself is described in [Coding agents](coding-agents.md#llm-wiki).
+
+- **Host tree.** The laptop opens the `work` tree's review inbox on start and the macmini the `home` tree's. The sync job creates `<tree>/review/inbox.base`; until it exists the homepage has nothing to open.
+- **Rename-safe.** Link updates on rename are off, so a rename in the UI never rewrites gold pages.
+- **Omnisearch** gets no Nix settings, because it keeps its cache in its own writable `data.json`. Media Extended gets none either: it records the last-seen release there on start.
+- **Media Extended daemon.** The plugin loads `mx-main-daemon-<version>.asar` from Obsidian's userData folder (`~/.config/obsidian`, or `~/Library/Application Support/obsidian` on Darwin) into Obsidian's Electron main process. No separate process or service runs. When the file is missing it opens a setup dialog that downloads it from GitHub. Activation copies the pinned file there instead, as a real file, because the daemon extracts its bundled browser extension from its own location. The build fails if the plugin manifest's `versions."@mx/main-daemon"` stops matching the pinned daemon, so bump both together. After a bump the plugin deletes the older daemon files once the new one initializes.
+- **obsidian-git and the checkout.** obsidian-git pulls but never commits or pushes on its own, and activation creates `.obsidian/` inside the vault, so clone it before the first switch. [Coding agents](coding-agents.md#llm-wiki) explains both under manual edits and vault checkout.
+
+### Web Clipper
+
+The laptop's Firefox gets the clipper from `modules/programs/firefox/extensions.json`, updated by `update-firefox`. The macmini's Safari gets it as a Mac App Store app in `modules/hardware/macmini/macmini.nix`. Sign the Apple ID in to the App Store before that switch, or activation fails.
+
+The clipper keeps its templates in extension sync storage and never reads managed storage, so neither Firefox policies nor Home Manager extension settings can set them. `obsidian.nix` renders the clipper's import-all-settings file at `~/.config/obsidian-clipper/settings.json`. Import it once in each browser, and again after changing the templates. The host's own tree comes first in the template list: the first template is the default and wins shared triggers, such as YouTube URLs. Clips land in the tree's `raw/` folder with the frontmatter the librarian expects.

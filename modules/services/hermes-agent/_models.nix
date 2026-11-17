@@ -16,6 +16,7 @@ let
 in {
   laptop = {
     default = codex "gpt-6-luna";
+    librarian = codex "gpt-6-astra";
     coordinator = codex "gpt-6-astra";
     programmer = claude "claude-opus-5-5[1m]";
     reviewer = codex "gpt-6-astra";
@@ -33,5 +34,7 @@ in {
     assistant = ollama;
     augusto = ollama;
     livia = ollama;
+    librarian = ollama;
+    librarian-livia = ollama;
   };
 }

@@ -57,6 +57,35 @@ def seed(home, managed, plugin, skins, provider):
         link_plugin(home / "plugins" / "hermes-workflow", Path(plugin))
     if provider is not None:
         link_plugin(home / "plugins" / "claude-subscription-directsdk", provider)
+    if "hwiki" in managed:
+        hwiki = home / "hwiki.json"
+        local = json.loads(hwiki.read_text()) if hwiki.exists() else {}
+        atomic_write(hwiki, json.dumps({**local, **managed["hwiki"]}))
+    for name, source in managed.get("scripts", {}).items():
+        # Cron runs only scripts that resolve inside scripts/, so a store symlink would be refused.
+        (home / "scripts").mkdir(exist_ok=True)
+        atomic_write(home / "scripts" / name, Path(source).read_text())
+    if managed.get("cron"):
+        schedule(home, managed["cron"])
+
+
+def schedule(home, jobs):
+    """Create the Nix-owned cron jobs by name and update them only when Nix changed them."""
+    from cron.jobs import create_job, list_jobs, parse_schedule, update_job, use_cron_store
+
+    with use_cron_store(home):
+        existing = {job.get("name"): job for job in list_jobs(include_disabled=True)}
+        for job in jobs:
+            current = existing.get(job["name"])
+            if current is None:
+                create_job(**job)
+                continue
+            wanted = {key: job[key] for key in ("prompt", "skills", "deliver", "script") if key in job}
+            if parse_schedule(job["schedule"]).get("display", job["schedule"]) != current.get("schedule_display"):
+                wanted["schedule"] = job["schedule"]
+            changed = {key: value for key, value in wanted.items() if current.get(key) != value}
+            if changed:
+                update_job(current["id"], changed)
 
 
 def bootstrap(manifest):
@@ -82,10 +111,14 @@ def bootstrap(manifest):
             raise RuntimeError(f"Profile home must not be a symlink: {home}")
         if not profile_exists(name):
             if home.exists():
-                # Home Manager installs plugin links before the first profile bootstrap.
+                # Home Manager installs plugin and avatar links before the first profile bootstrap.
                 plugins = home / "plugins"
-                if set(p.name for p in home.iterdir()) != {"plugins"} or not plugins.is_dir() or not all(
-                    p.is_symlink() and str(p.resolve()).startswith("/nix/store/") for p in plugins.iterdir()
+                linked = [plugins, *([home / "assets"] if (home / "assets").exists() else [])]
+                if set(p.name for p in home.iterdir()) - {"plugins", "assets"} or not plugins.is_dir() or not all(
+                    directory.is_dir() and not directory.is_symlink() and all(
+                        p.is_symlink() and str(p.resolve()).startswith("/nix/store/") for p in directory.iterdir()
+                    )
+                    for directory in linked
                 ):
                     raise RuntimeError(f"Refusing to adopt an unmanaged profile directory: {home}")
                 write_profile_meta(home, description=managed["description"], description_auto=False)

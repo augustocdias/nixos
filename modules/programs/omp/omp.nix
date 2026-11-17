@@ -5,10 +5,6 @@
   ...
 }: {
   flake-file.inputs.llm-agents.url = lib.mkDefault "github:numtide/llm-agents.nix";
-  flake-file.inputs.caveman = {
-    url = lib.mkDefault "github:JuliusBrussee/caveman";
-    flake = false;
-  };
 
   den.aspects.omp = {
     includes = [den.aspects.agent-shared];

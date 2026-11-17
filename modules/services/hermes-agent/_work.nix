@@ -27,12 +27,82 @@
   package = import ./_package.nix {
     inherit lib;
     hermesInput = inputs.hermes-agent;
-    honchoSource = inputs.honcho;
     system = pkgs.stdenv.hostPlatform.system;
     whatsappBridge = !isLinux;
   };
   roles = ["programmer" "reviewer" "qa" "research"];
   sharedSkills = import ../../programs/agent-shared/_skills.nix {inherit lib pkgs;};
+  # Each librarian curates one tree of this host. On the laptop the coordinator files sources
+  # into the work tree and default and the roles only recall it; the macmini household profiles live in _darwin.nix.
+  wikis = import ./_wikis.nix;
+  librarians = lib.mapAttrs' (_: wiki: lib.nameValuePair wiki.librarian (wiki // {path = "${homeDirectory}/${wiki.vault}";})) wikis.trees.${host};
+  wikiReaders = lib.optionals isLinux (["default"] ++ roles);
+  wikiOf = librarians // lib.optionalAttrs isLinux (lib.genAttrs (["coordinator"] ++ wikiReaders) (_: librarians.librarian));
+  wikiProfiles = builtins.attrNames wikiOf;
+  wikiWriters = lib.optionals isLinux ["coordinator" "librarian"];
+  wikiGate = import ./_wiki-gate.nix {
+    inherit pkgs lib host;
+    home = homeDirectory;
+    recallOnly = wikiReaders;
+  };
+  # The default profile is the root Hermes home, not profiles/default.
+  homeOf = name:
+    if name == "default"
+    then ".hermes"
+    else ".hermes/profiles/${name}";
+  # hwiki reads per-profile settings from $HERMES_HOME/hwiki.json.
+  hwikiOf = name:
+    lib.optionalAttrs (wikiOf ? ${name}) {
+      hwiki =
+        {
+          wiki_path = wikiOf.${name}.path;
+          memory_dir = "${wikiOf.${name}.tree}/memory";
+          untrusted_dirs = lib.concatMap (tree: ["${tree}/raw" "${tree}/review"]) (wikis.treesIn wikiOf.${name}.vault);
+          demote_paths = ["log.md" "${wikiOf.${name}.tree}/memory/builtin-mirror.md"];
+        }
+        // lib.optionalAttrs (lib.elem name wikiReaders) {mirror_builtin_memory = false;};
+    };
+  inboxBase = tree:
+    pkgs.writeText "inbox.base" ''
+      filters:
+        and:
+          - file.inFolder("${tree}/review")
+          - not:
+              - file.inFolder("${tree}/review/applied")
+          - file.ext == "md"
+      views:
+        - type: table
+          name: Inbox
+          groupBy:
+            property: note.status
+            direction: ASC
+          order:
+            - file.name
+            - note.status
+            - note.revision
+            - note.target
+            - note.operation
+            - note.contested
+            - note.updated
+    '';
+  vaultSync = pkgs.writeShellApplication {
+    name = "vault-sync";
+    runtimeInputs = [pkgs.git pkgs.coreutils pkgs.gnugrep];
+    text = builtins.readFile ./_vault-sync.sh;
+  };
+  # Cron scripts must be real files under the profile's scripts/; the bootstrap copies this one there.
+  syncReport = wiki:
+    pkgs.writeText "wiki-sync-report.sh" ''
+      # The vault-sync timer's current failure; empty output is a silent run.
+      ${pkgs.coreutils}/bin/cat ${lib.escapeShellArg "${wiki.path}/.git/vault-sync-report"} 2>/dev/null || true
+    '';
+  syncEnv = wiki:
+    {
+      WIKI_GATE = "${wikiGate}/gate.py";
+      WIKI_PYTHON = lib.getExe pkgs.python3;
+      WIKI_INBOX_BASE = "${inboxBase wiki.tree}";
+    }
+    // lib.optionalAttrs (!(wiki.local or false)) {WIKI_TOKEN_FILE = config.sops.secrets.github_token.path;};
   agentPublicKey = lib.removeSuffix "\n" (builtins.readFile ../../programs/agent-jail/agent-ssh-key.pub);
   allowedSigners = pkgs.writeText "hermes-git-signers" ''
     ${config.programs.git.settings.user.email} ${agentPublicKey}
@@ -72,13 +142,18 @@
     ../../programs/agent-shared/style/ponytail.md
   ];
   soul = name:
-    pkgs.writeText "${name}-SOUL.md" (builtins.readFile ./souls/${name}.md
+    pkgs.writeText "${name}-SOUL.md" ((
+        if librarians ? ${name}
+        then wikis.soul ./souls/librarian.md librarians.${name}
+        else builtins.readFile ./souls/${name}.md
+      )
       + lib.optionalString (lib.elem name (roles ++ ["coordinator"])) (builtins.readFile ./souls/_role.md)
       + lib.optionalString (lib.elem name (roles ++ ["coordinator" "default"])) (builtins.readFile (
         if isLinux
         then ./souls/_linux.md
         else ./souls/_darwin.md
       ))
+      + lib.optionalString (isLinux && name == "coordinator") (wikis.soul ./souls/_wiki.md wikiOf.coordinator)
       + builtins.readFile ./souls/_formatting.md
       + "\n# Global rules\n"
       + globalContext
@@ -183,7 +258,7 @@
     skills.external_dirs = ["${sharedSkills.package}" "${./skills}"];
     plugins = {
       enabled =
-        ["hermes-workflow" "advanced-delegation" "office-3d"]
+        ["hermes-workflow" "advanced-delegation" "office-3d" "wiki-gate"]
         ++ lib.optional isLinux "bubblewrap"
         ++ lib.optional (isLinux && security) "hermes-security"
         ++ lib.optional (isLinux && rea) "rea"
@@ -193,6 +268,15 @@
           profile = "network";
           home_default_deny = "all";
           hide = ["/run/secrets" "${homeDirectory}/.config/sops" "${config.sops.secrets.agent_ssh_key.path}"];
+          # File tools run in this sandbox too. Only the folders a profile writes are bound,
+          # so no sandbox can plant Git hooks or config that the sync timer would run.
+          binds = lib.optional (lib.elem name wikiWriters) {
+            src =
+              if name == "librarian"
+              then "${librarians.librarian.path}/${librarians.librarian.tree}"
+              else "${librarians.librarian.path}/${librarians.librarian.tree}/raw";
+            readonly = false;
+          };
           memory_mb = 4096;
           cpu_seconds = 600;
           max_procs = 256;
@@ -210,8 +294,9 @@
         if delegate
         then "profile_routes"
         else "default";
-      backends.profile_routes.profiles = lib.optionals delegate (map (name: {inherit name;}) roles);
+      backends.profile_routes.profiles = lib.optionals delegate (map (route: {name = route;}) (roles ++ lib.optional (isLinux && name == "coordinator") "librarian"));
     };
+    memory = lib.optionalAttrs (lib.elem name wikiProfiles) {provider = "hwiki";};
     mcp_servers =
       {
         host.enabled = false;
@@ -271,6 +356,58 @@
         plugin = true;
       };
     }
+    // lib.mapAttrs (name: wiki: {
+      description = "Curates the ${wiki.tree} wiki: turns raw sources into proposals, sends the digest and applies approved proposals.";
+      config =
+        lib.recursiveUpdate (profileConfig {
+          inherit name;
+          toolsets = ["file" "skills" "memory"];
+        }) {
+          skills.external_dirs = ["${sharedSkills.package}" "${./skills}" "${./wiki-skills}"];
+        };
+      soul = soul name;
+      plugin = true;
+      scripts."wiki-sync-report.sh" = "${syncReport wiki}";
+      # Output goes to the librarian's Bot Chat plus every home channel connected at runtime. Telegram
+      # is set up by hand; `all` resolves at fire time and skips pre-dispatch checks, so an
+      # unconfigured channel never blocks a run. llm-wiki-review keeps these turns verdict-free.
+      cron =
+        map (job:
+          job
+          // {
+            skills = ["llm-wiki" "llm-wiki-review" "writing-for-agents"];
+            deliver = "bot-chat,all";
+          }) [
+          {
+            name = "wiki-ingest";
+            schedule = "0 7 * * *";
+            prompt = "Run the llm-wiki-review ingest on the ${wiki.tree} tree and reply with the digest.";
+          }
+          {
+            name = "wiki-lint";
+            schedule = "0 8 * * 1";
+            prompt = "Run the read-only llm-wiki-review lint on the ${wiki.tree} tree and reply with the report.";
+          }
+          {
+            name = "wiki-memory";
+            schedule = "0 9 * * 3";
+            prompt = "Run the llm-wiki-review memory maintenance on the ${wiki.tree} tree and reply with a terse summary.";
+          }
+        ]
+        ++ [
+          {
+            # Reports the sync timer's failure each quarter hour until a sync succeeds.
+            name = "wiki-sync-report";
+            schedule = "5,20,35,50 * * * *";
+            prompt = "";
+            skills = [];
+            deliver = "bot-chat,all";
+            no_agent = true;
+            script = "wiki-sync-report.sh";
+          }
+        ];
+    })
+    librarians
     // lib.genAttrs roles (name: {
       description =
         {
@@ -313,33 +450,41 @@
       // {
         env =
           lib.optionalAttrs ((hostModels.${name}.base_url or "") == "http://127.0.0.1:11434/v1") {OPENAI_API_KEY = "ollama";}
-          // lib.optionalAttrs (!isLinux && name == "coordinator") {HASS_URL = "http://home.local:8123";};
-      })
+          // lib.optionalAttrs (!isLinux && name == "coordinator") {HASS_URL = "http://home.local:8123";}
+          // lib.optionalAttrs (wikiOf ? ${name}) {
+            OBSIDIAN_VAULT_PATH = wikiOf.${name}.path;
+            WIKI_PATH = "${wikiOf.${name}.path}/${wikiOf.${name}.tree}";
+          };
+      }
+      // hwikiOf name)
     profiles;
-    root = {
-      config =
-        lib.recursiveUpdate (profileConfig {
-          name = "default";
-          toolsets = ["browser" "clarify" "cronjob" "delegation" "terminal" "web" "kanban" "todo" "skills" "session_search" "a2a" "office-3d"];
-          delegate = true;
-        }) {
-          gateway.multiplex_profiles = true;
-          kanban = {
-            dispatch_in_gateway = true;
-            dispatch_profiles = roles ++ ["coordinator"];
-            max_in_progress = 1;
-            auto_decompose = true;
-            orchestrator_profile = "coordinator";
-            default_assignee = "coordinator";
+    root =
+      {
+        config =
+          lib.recursiveUpdate (profileConfig {
+            name = "default";
+            # hwiki exposes its tools and recall prompt only with the memory toolset.
+            toolsets = ["browser" "clarify" "cronjob" "delegation" "terminal" "web" "kanban" "todo" "skills" "session_search" "a2a" "office-3d"] ++ lib.optional (wikiOf ? default) "memory";
+            delegate = true;
+          }) {
+            gateway.multiplex_profiles = true;
+            kanban = {
+              dispatch_in_gateway = true;
+              dispatch_profiles = roles ++ ["coordinator"];
+              max_in_progress = 1;
+              auto_decompose = true;
+              orchestrator_profile = "coordinator";
+              default_assignee = "coordinator";
+            };
+            auxiliary = {
+              kanban_decomposer = auxiliaryModel hostModels.coordinator;
+              triage_specifier = auxiliaryModel hostModels.coordinator;
+            };
           };
-          auxiliary = {
-            kanban_decomposer = auxiliaryModel hostModels.coordinator;
-            triage_specifier = auxiliaryModel hostModels.coordinator;
-          };
-        };
-      soul = soul "default";
-      plugin = true;
-    };
+        soul = soul "default";
+        plugin = true;
+      }
+      // hwikiOf "default";
   });
   bootstrapLib = pkgs.linkFarm "hermes-bootstrap" [
     {
@@ -370,7 +515,8 @@ in {
     ]
     ++ lib.optionals isLinux [pkgs.bubblewrap pkgs.util-linux pkgs.nodejs]
     ++ [
-      inputs.hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.desktop
+      # Upstream's desktop runs its own 0.0.0 build, whose plugin version gate skips bubblewrap: no terminal backend, no file tools.
+      (package.hermesDesktop.override {extraEnv.HERMES_DESKTOP_HERMES = lib.getExe hermes;})
     ];
   herdr.programs.hermes = {
     name = "Hermes";
@@ -392,27 +538,33 @@ in {
       officialPlugins)
       ++ [
         (lib.nameValuePair "${home}/plugins/office-3d" {source = inputs.hermes-plugin-office-3d;})
+        (lib.nameValuePair "${home}/plugins/wiki-gate" {source = wikiGate;})
       ])
     ([".hermes"] ++ map (name: ".hermes/profiles/${name}") (builtins.attrNames profiles)))
-    // lib.mapAttrs' (name: image:
-      lib.nameValuePair "${
-        if name == "default"
-        then ".hermes"
-        else ".hermes/profiles/${name}"
-      }/assets/avatar.png" {source = ./assets/${image};}) {
-      default = "hermes.png";
-      coordinator = "hermes-manager.png";
-      assistant = "hermes-assistant.png";
-      programmer = "hermes-programmer.png";
-      reviewer = "hermes-reviewer.png";
-      qa = "hermes-qa.png";
-      research = "hermes-researcher.png";
-    }
+    // lib.listToAttrs (map (name: lib.nameValuePair "${homeOf name}/plugins/hwiki" {source = inputs.hermes-plugin-hwiki;}) wikiProfiles)
+    // lib.mapAttrs' (name: image: lib.nameValuePair "${homeOf name}/assets/avatar.png" {source = ./assets/${image};}) ({
+        default = "hermes.png";
+        coordinator = "hermes-manager.png";
+        assistant = "hermes-assistant.png";
+        programmer = "hermes-programmer.png";
+        reviewer = "hermes-reviewer.png";
+        qa = "hermes-qa.png";
+        research = "hermes-researcher.png";
+      }
+      // lib.mapAttrs (_: _: "hermes-librarian.png") librarians)
     // {
       ".hermes/nix/plugins/hermes-workflow".source = plugin;
       # Desktop cannot stamp its package marker into a copy of a read-only store directory.
       ".hermes/desktop-plugins/office-3d/plugin.js".source = "${inputs.hermes-plugin-office-3d}/desktop/plugin.js";
     };
+  # A local vault has no clone to start from; the sync timer adds the baseline and commits.
+  home.activation.wiki-vaults = lib.hm.dag.entryAfter ["writeBoundary"] (lib.concatMapStrings (wiki:
+    lib.optionalString (wiki.local or false) ''
+      if [ ! -e ${lib.escapeShellArg "${wiki.path}/.git"} ]; then
+        run install -d -m 0700 ${lib.escapeShellArg wiki.path}
+        run ${lib.getExe pkgs.git} init -q -b main ${lib.escapeShellArg wiki.path}
+      fi
+    '') (builtins.attrValues librarians));
   home.activation.hermes-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
     run mkdir -p ${lib.escapeShellArg root} ${lib.escapeShellArg dev}
     run chmod 0700 ${lib.escapeShellArg root}
@@ -435,7 +587,38 @@ in {
       };
       Install.WantedBy = ["default.target"];
     };
+    wiki-sync = {
+      Unit.Description = "Audit, commit and sync the wiki vault";
+      Service = {
+        Type = "oneshot";
+        Environment = lib.mapAttrsToList (name: value: "${name}=${value}") (syncEnv librarians.librarian);
+        ExecStart = "${lib.getExe vaultSync} ${librarians.librarian.path} ${librarians.librarian.tree}";
+      };
+    };
   };
+  systemd.user.timers = lib.optionalAttrs isLinux {
+    wiki-sync = {
+      Unit.Description = "Sync the wiki vault every 15 minutes";
+      Timer = {
+        OnCalendar = "*:0/15";
+        Persistent = true;
+      };
+      Install.WantedBy = ["timers.target"];
+    };
+  };
+  launchd.agents = lib.optionalAttrs (!isLinux) (lib.mapAttrs' (_: wiki:
+    lib.nameValuePair "wiki-sync-${wiki.tree}" {
+      enable = true;
+      config = {
+        ProgramArguments = [(lib.getExe vaultSync) wiki.path wiki.tree];
+        EnvironmentVariables = syncEnv wiki;
+        StartInterval = 900;
+        RunAtLoad = true;
+        StandardOutPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
+        StandardErrorPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
+      };
+    })
+  librarians);
   programs.claude-code.mcpServers.hermes-board = {
     command = lib.getExe pkgs.python3;
     args = ["${./mcp.py}" url];

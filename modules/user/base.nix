@@ -23,6 +23,7 @@
       development
       applications
       zapfast
+      obsidian
       update-system
     ];
   };

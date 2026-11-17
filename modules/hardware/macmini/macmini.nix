@@ -13,7 +13,6 @@
     includes = with den.aspects; [
       ollama
       wyoming
-      honcho
       hermes-agent
       open-webui
       laya
@@ -225,7 +224,8 @@
           "freecad"
         ];
 
-        masApps = {};
+        # Obsidian Web Clipper (App Store id from obsidianmd/obsidian-clipper README); needs the Apple ID signed in.
+        masApps."Obsidian Web Clipper" = 6720708363;
       };
 
       programs.fish.enable = true;

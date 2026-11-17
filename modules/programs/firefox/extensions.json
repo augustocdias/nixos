@@ -52,5 +52,11 @@
     "name": "Open in Notion app",
     "url": "https://addons.mozilla.org/firefox/downloads/file/4967099/open_in_notion_app-1.4.1.xpi",
     "addonId": "{58023c2f-0bbe-4f8e-abc5-12f8abf98c7e}"
+  },
+  "obsidian-web-clipper": {
+    "slug": "web-clipper-obsidian",
+    "name": "Obsidian Web Clipper",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/4913872/web_clipper_obsidian-1.7.1.xpi",
+    "addonId": "clipper@obsidian.md"
   }
 }

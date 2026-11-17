@@ -1,0 +1,3 @@
+name: wiki-gate
+version: 1.0.0
+description: Wiki vault write gate (raw, review and gold tiers) and the sync audit.

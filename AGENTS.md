@@ -17,10 +17,10 @@ Declarative Den/aspect configuration for `augusto` across three hosts:
 | Hosts, aspects, inputs, layout; deployment; boot, networking, power, security | [System](docs/system.md) |
 | Home Assistant integrations, components, resources; broker consumers; hand-pinned sources | [Home Assistant](docs/home-assistant.md) |
 | Voice routing, models, translation, Laya, Open WebUI | [Voice services](docs/voice-services.md) |
-| Compositor, greeter, window manager, keyboard, session, desktop shell | [Desktop](docs/desktop.md) |
+| Compositor, greeter, window manager, keyboard, session, desktop shell; Obsidian, web clipper | [Desktop](docs/desktop.md) |
 | Herdr panes, workspaces, worktrees, plugins, sidebar, agent lifecycle | [Herdr](docs/herdr.md) |
 | Neovim plugins, LSP, formatters, linters | [Neovim](docs/neovim.md) |
-| Harness prompts, settings, skills, models, MCPs, approvals, sandbox, jail; work Hermes delegator | [Coding agents](docs/coding-agents.md) |
+| Harness prompts, settings, skills, models, MCPs, approvals, sandbox, jail; work Hermes delegator; LLM wiki, librarians, wiki gate | [Coding agents](docs/coding-agents.md) |
 
 Topic docs are a snapshot of the current system. Source files win when they disagree. When a change alters documented behavior, load the `writing-for-agents` skill and edit the owning topic in the same change:
 

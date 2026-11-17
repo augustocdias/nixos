@@ -121,22 +121,6 @@
         "type": "github"
       }
     },
-    "caveman": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1794801912,
-        "narHash": "sha256-1X2DjYa4xqO1ZqwxdFjCmaypp0+HYncEpXaut4i9LkE=",
-        "owner": "JuliusBrussee",
-        "repo": "caveman",
-        "rev": "9b243662ff98d392bc0a95b865a554583d71be75",
-        "type": "github"
-      },
-      "original": {
-        "owner": "JuliusBrussee",
-        "repo": "caveman",
-        "type": "github"
-      }
-    },
     "dank-greeter": {
       "inputs": {
         "dank-qml-common": "dank-qml-common",
@@ -929,11 +913,11 @@
     },
     "herdr-navigation": {
       "locked": {
-        "lastModified": 1794902541,
-        "narHash": "sha256-Mqtl7geM3NUX7359/1AHB3D3xh7riqU/Mfvk4dhqGDE=",
+        "lastModified": 1794905929,
+        "narHash": "sha256-rbImABVspDIWhFuSJ3QHPwRL1+8S1B+eNgoQItWT0Zg=",
         "owner": "augustocdias",
         "repo": "herdr-navigation",
-        "rev": "2acb402dba5ed6246d7afa7fb84e8b32d176de86",
+        "rev": "157e212fb33296a876fe47c33be0eb1449b04583",
         "type": "github"
       },
       "original": {
@@ -999,19 +983,20 @@
         "type": "github"
       }
     },
-    "hermes-plugin-honcho": {
+    "hermes-plugin-hwiki": {
       "flake": false,
       "locked": {
-        "lastModified": 1794496641,
-        "narHash": "sha256-D9dvhTK7zdg3fv1gHvUfiaPc5re1TT4ZtpRQcX0793M=",
-        "owner": "plastic-labs",
-        "repo": "honcho",
-        "rev": "5c7d24b32d275bce38daedbe81feaebc31393587",
+        "lastModified": 1791576628,
+        "narHash": "sha256-x+PPaRDWiWbJKwEGaOslsy2DcJQXo+qDUl1rRg2W/Iw=",
+        "owner": "ottosulin",
+        "repo": "hwiki",
+        "rev": "d1961956eaafbd64fef71cb7135d475efcc8f954",
         "type": "github"
       },
       "original": {
-        "owner": "plastic-labs",
-        "repo": "honcho",
+        "owner": "ottosulin",
+        "repo": "hwiki",
+        "rev": "d1961956eaafbd64fef71cb7135d475efcc8f954",
         "type": "github"
       }
     },
@@ -1069,22 +1054,6 @@
       "original": {
         "owner": "nix-community",
         "repo": "home-manager",
-        "type": "github"
-      }
-    },
-    "honcho": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1794496641,
-        "narHash": "sha256-D9dvhTK7zdg3fv1gHvUfiaPc5re1TT4ZtpRQcX0793M=",
-        "owner": "plastic-labs",
-        "repo": "honcho",
-        "rev": "5c7d24b32d275bce38daedbe81feaebc31393587",
-        "type": "github"
-      },
-      "original": {
-        "owner": "plastic-labs",
-        "repo": "honcho",
         "type": "github"
       }
     },
@@ -2765,7 +2734,6 @@
     },
     "root": {
       "inputs": {
-        "caveman": "caveman",
         "dank-greeter": "dank-greeter",
         "dank-pinentry": "dank-pinentry",
         "dankcalendar": "dankcalendar",
@@ -2784,10 +2752,9 @@
         "herdr-tmux-prefix": "herdr-tmux-prefix",
         "hermes-agent": "hermes-agent",
         "hermes-official-plugins": "hermes-official-plugins",
-        "hermes-plugin-honcho": "hermes-plugin-honcho",
+        "hermes-plugin-hwiki": "hermes-plugin-hwiki",
         "hermes-plugin-office-3d": "hermes-plugin-office-3d",
         "home-manager": "home-manager_2",
-        "honcho": "honcho",
         "hyprland": "hyprland",
         "import-tree": "import-tree",
         "jail-nix": "jail-nix",

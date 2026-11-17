@@ -4,10 +4,11 @@ Dendritic NixOS configuration using [Den](https://github.com/vic/den) + [flake-p
 
 ## Hosts
 
-| Host | Platform | Profile | Description |
-|------|----------|---------|-------------|
-| `laptop` | x86_64-linux | workstation | Hyprland desktop with DMS shell |
-| `macmini` | darwin | workstation | MacMini desktop |
+| Host      | Platform      | Profile     | Description                           |
+| --------- | ------------- | ----------- | ------------------------------------- |
+| `laptop`  | x86_64-linux  | workstation | Hyprland desktop with DMS shell       |
+| `macmini` | darwin        | workstation | MacMini desktop                       |
+| `raspi`   | aarch64-linux | server      | Home Assistant server on Raspberry Pi |
 
 ## Building the NixOs Installer ISO
 
@@ -119,6 +120,8 @@ nix-shell -p age sops yq-go --run "fish ~/nixos/modules/security/secrets/sops-se
 ```
 
 Cleanup some potential unused age keys from the `.sops.yaml` file.
+
+Clone the private obsidian vault to `~/obsidian-vault`.
 
 #### Adding new secrets
 

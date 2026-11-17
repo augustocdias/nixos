@@ -2,7 +2,7 @@
 
 The [macmini host reference](system.md#macos-nix-darwin-host--macmini) owns launchd daemon setup, model loading, and logging failure modes.
 
-All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Hermes primary models are selected per host and profile in `modules/services/hermes-agent/_models.nix`, with ordered fallback chains in `_fallbacks.nix`; macmini uses loopback Ollama for both. Honcho uses `services.ollama.memoryModel` from `modules/services/ollama/ollama.nix`.
+All services here run on `macmini` except the Laya client, which is a Home Assistant component on the Pi. Hermes primary models are selected per host and profile in `modules/services/hermes-agent/_models.nix`, with ordered fallback chains in `_fallbacks.nix`; macmini uses loopback Ollama for both.
 
 ## Laya
 
@@ -43,7 +43,7 @@ Open WebUI listens on `0.0.0.0:8080`, LAN-bound with password authentication. LA
 - **Routing.** Two OpenAI-compatible connections point at loopback Hermes `/p/augusto/v1` and `/p/livia/v1`, giving models `augusto.hermes-agent` and `livia.hermes-agent`. Direct Ollama access is off. Keys enter only the runtime environment, never plists or store paths.
 - **Fail-closed bootstrap.** The start wrapper waits for the signing secret, both initial passwords, and both Hermes profile keys. `_bootstrap.py` refuses to run while an old listener is up, backs up the database to `webui.db.pre-hermes.bak`, migrates, and reconciles accounts. Augusto keeps a fixed UUID and history as `augusto@localhost`; Livia is an ordinary user, `livia@localhost`. An identity journal makes bootstrap resumable without resetting later password changes. Any missing credential or identity conflict keeps the listener down.
 - **Private models.** Each base model belongs to its user, with no access grants, and admin bypasses are off. This separates the two people inside the app only. Augusto remains the server administrator, and WebUI still lets admins call other models through its API. Livia must stay denied Augusto's model.
-- **System-level sops.** This aspect imports `sops-nix.darwinModules.sops` for all of macmini and points `age.keyFile` at the key the Home Manager `secrets` aspect provisions. Hermes and Honcho secrets depend on that import. Activation therefore depends on a path inside the user's home.
+- **System-level sops.** This aspect imports `sops-nix.darwinModules.sops` for all of macmini and points `age.keyFile` at the key the Home Manager `secrets` aspect provisions. Hermes secrets depend on that import. Activation therefore depends on a path inside the user's home.
 
 ### Tools
 
@@ -54,27 +54,9 @@ Tools are rows in WebUI's `tool` table. `_tools.nix` pins their sources, and the
 - **The importer mints its own session token.** It signs with `WEBUI_SECRET_KEY` and reads the admin id and current `session_stamp` read-only from SQLite. Password changes invalidate older tokens even without Redis.
 - **Frontmatter pip installs are off**, because they would install into the read-only store. Supply a tool's `requirements` through the package's Python environment instead, as `osm` does.
 
-## Honcho
-
-The `honcho` aspect runs native PostgreSQL 17 with pgvector, the Honcho API on `127.0.0.1:8001`, and one deriver worker. The Python environment is built with uv2nix from the locked source, sharing the builder with Hermes.
-
-PostgreSQL has no TCP listener. Peer mappings let `_postgres` bootstrap as `postgres` and `augusto` connect as non-superuser `honcho` to database `honcho` only. Unexpected ownership, privileges, or major version fail closed. Initialization never overwrites a nonempty directory.
-
-**The database must be UTF-8.** macOS with locale `C` otherwise defaults to `SQL_ASCII`, and psycopg then breaks the extension checks. Bootstrap and API readiness reject an existing non-UTF-8 database. Never reinitialize a populated store. To repair an empty failed first deployment: stop the API, worker, and Hermes; rename the old database as a rollback copy; create the UTF-8 replacement and extensions; then restart those jobs. This needs privileged PostgreSQL access.
-
-API startup checks that the local embedding model returns 1024 finite numbers, runs migrations, then sets the vector dimension on empty tables. Populated embeddings cannot be resized, so changing the embedding model or its dimension needs a memory migration. The worker creates workspaces `hermes-augusto` and `hermes-livia`, persists scoped keys under `/var/lib/honcho/app/keys`, and verifies cross-workspace rejection before deriving.
-
-`DERIVER_MODEL_CONFIG__THINKING_EFFORT=none` is required: with thinking on, fact extraction spends its output budget on reasoning and returns no JSON. `honcho_jwt_secret` is SOPS-managed and readable by `augusto`. Admin JWTs are transient bootstrap credentials, never profile credentials.
-
-### Diagnosing empty memory
-
-Check these separately: persisted message counts, `GET /v3/workspaces/{workspace_id}/queue/status`, conclusion counts, and terminal queue errors. Terminal failures are marked processed, and restarting the worker does not replay them. To recover, fix the cause first. Then reset the processed and error fields of only the specific failed queue rows, after checking their workspace, task type, message ids, and failure. Do not resend introductions or reset unrelated queue rows.
-
-`hermes -p <person> honcho status` shows peer cards and a representation preview, not the full stored conclusions. Cards come from a later dream stage that needs many observations and session inactivity. An empty card alone does not prove ingestion failed.
-
 ## Hermes Agent
 
-On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs one boot-time system LaunchDaemon as `augusto`. It bootstraps household profiles, then starts the shared Home Manager `hermes` wrapper with `-p default gateway run`. The wrapper uses upstream's Nix `messaging` package. `gateway.multiplex_profiles=true` serves the independent `augusto`, `livia` and work profiles under `/Users/augusto/.hermes/profiles/`. The daemon gets a sanitized environment so it never inherits ambient cloud credentials. No user LaunchAgent is installed.
+On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs one boot-time system LaunchDaemon as `augusto`. It bootstraps household profiles, then starts the shared Home Manager `hermes` wrapper with `-p default gateway run`. The wrapper uses upstream's Nix `messaging` package. `gateway.multiplex_profiles=true` serves the independent `augusto`, `livia` and work profiles under `/Users/augusto/.hermes/profiles/`. The daemon gets a sanitized environment so it never inherits ambient cloud credentials. The only user LaunchAgents are the wiki sync agents (see [LLM wiki](#llm-wiki)).
 
 The `hermes-work` Home Manager aspect installs Hermes Desktop and Office 3D on both hosts. Desktop backend selection remains separate from the household gateway configuration. See [Work Hermes](coding-agents.md#work-hermes-laptop-and-macmini) for engineering profiles, the model map and host execution boundaries.
 
@@ -83,10 +65,9 @@ The `hermes-work` Home Manager aspect installs Hermes Desktop and Office 3D on b
 `_bootstrap.py` runs before each gateway start, followed by the wrapper's `_bootstrap_work.py`:
 
 - Household bootstrap merges Nix-owned settings into each existing YAML and `.env`, preserving channel tokens, sender allowlists, and other local settings. Model records come from `_models.nix` and replace stale provider settings. Malformed YAML fails closed without being overwritten. The `API_SERVER_*` keys are Nix-owned; work bootstrap preserves the root listener.
-- Household bootstrap adds Nix plugins to `plugins.enabled` without removing locally enabled ones. `_darwin.nix` owns their links and consent, including advanced delegation, Home Assistant and Office 3D. Existing Honcho, Ponytail and rtk integration remains. rtk's `rtk-rewrite` rewrites household `terminal` commands before Hermes's dangerous-command check; work profiles do not enable it. See [Coding agents](coding-agents.md#rtk-shell-output-compression).
-- It links the Caveman skill bundle as `skills/caveman-bundle`. Learned skills stay writable outside it, and bootstrap refuses to replace an unmanaged directory at a managed link path.
-- It writes a mode-0600 copy of `modules/services/hermes-agent/SOUL.md` into each profile. Local edits are replaced on the next start. Edit the tracked file, rebuild, and start a fresh chat.
-- Each profile gets its own SOPS-managed API key and Honcho workspace key. Memories, sessions, skills, and cron state stay per profile. Missing credentials or failed Honcho access block startup.
+- Household bootstrap adds Nix plugins to `plugins.enabled` without removing locally enabled ones. `_darwin.nix` owns their links and consent, including hwiki, the wiki gate, advanced delegation, Home Assistant and Office 3D. Existing Ponytail and rtk integration remains. rtk's `rtk-rewrite` rewrites household `terminal` commands before Hermes's dangerous-command check; work profiles do not enable it. See [Coding agents](coding-agents.md#rtk-shell-output-compression).
+- It writes a mode-0600 `SOUL.md` into each profile: `modules/services/hermes-agent/SOUL.md`, that person's wiki section from `souls/_wiki.md`, and the Caveman style rules from `agent-shared/style/caveman.md`. Local edits are replaced on the next start. Edit the tracked file, rebuild, and start a fresh chat.
+- Each profile gets its own SOPS-managed API key. Memories, sessions, skills, and cron state stay per profile. Missing credentials block startup.
 
 Only the host config enables the API listener on `127.0.0.1:8650`. Profile endpoints are `/p/augusto/v1` and `/p/livia/v1`. Their `/models` responses advertise profile names, so WebUI connections must declare `model_ids=["hermes-agent"]` explicitly.
 
@@ -96,7 +77,16 @@ Only the host config enables the API listener on `127.0.0.1:8650`. Profile endpo
 - After changing channel settings, run `sudo launchctl kickstart -k system/org.nixos.hermes-agent`.
 - After a model change, rebuild, restart the affected services, and start a fresh Hermes conversation.
 - HA's own Ollama conversation and AI-task models are UI-managed config subentries outside this repo. Check them separately.
-- Hermes, Honcho, the Honcho plugin, and uv2nix track upstream default branches through unversioned GitHub inputs. `nix flake update` advances them; `flake.lock` holds the exact revisions.
+- Hermes and uv2nix track upstream default branches through unversioned GitHub inputs. `nix flake update` advances them; `flake.lock` holds the exact revisions. `hermes-plugin-hwiki` is pinned to the commit in Hermes's plugin catalog; move it by hand when the catalog does.
+
+### LLM wiki
+
+The shared wiki design (gate, terminal gap, sync audit, vault checkout) is in [Coding agents](coding-agents.md#llm-wiki). This section covers the macmini's side.
+
+- **Profiles.** `augusto` files sources into the `home` tree of Augusto's vault and `livia` into the `livia` tree of her own vault. Each hands ingest, verdicts, apply and lint to its librarian through a profile route: `librarian` and `librarian-livia`, both defined in `_work.nix` from `_wikis.nix` and served by the same gateway. The librarians have no WhatsApp chat. Their digests and weekly `memory/` reports arrive in each librarian's Bot Chat in the macmini's Hermes Desktop and in any channel connected to it at runtime, such as a Telegram bot set up by hand; Augusto and Livia reply there with verdicts (see [Delivery](coding-agents.md#llm-wiki)).
+- **hwiki** is the memory provider for both household profiles and both librarians. `_darwin.nix` owns the household profiles' `hwiki.json`; recall treats every `raw/` and `review/` folder as untrusted.
+- **Livia's vault** stays on the macmini with local Git history and no remote. The `wiki-vaults` activation runs `git init` on it, and the first sync writes its baseline. Livia files sources through her WhatsApp profile and reviews digests from `librarian-livia` in its Bot Chat or connected channel; Obsidian is configured for Augusto's vault alone.
+- **Sync** runs one launchd agent per tree, `wiki-sync-home` and `wiki-sync-livia`. Failures reach the tree's librarian through its `wiki-sync-report` cron.
 
 ### Secrets
 
@@ -114,4 +104,4 @@ These are native REST tools, not MCP tools, so Context7's approval policy does n
 
 ### Latency
 
-Separate startup, memory retrieval, model scheduling, prompt processing, and output generation. With cloud generation models, prompt processing and output run on ollama.com, and Hermes and Honcho no longer share a local runner. If either model is switched back to a local one, a large Hermes prompt is slow to process on this host, and the MLX runner serializes requests, so background Honcho work delays foreground chat. See [MLX scheduling](system.md#macos-nix-darwin-host--macmini). Collect metadata-only timing; raw prompts, messages, credentials, and Honcho request URLs can contain private data.
+Separate startup, memory retrieval, model scheduling, prompt processing, and output generation. With cloud generation models, prompt processing and output run on ollama.com. If a model is switched back to a local one, a large Hermes prompt is slow to process on this host, and the MLX runner serializes requests, so background work such as librarian cron runs delays foreground chat. See [MLX scheduling](system.md#macos-nix-darwin-host--macmini). Collect metadata-only timing; raw prompts, messages, and credentials can contain private data.

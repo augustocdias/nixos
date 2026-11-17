@@ -6,7 +6,7 @@
   models = import ./_models.nix;
   fallbacks = import ./_fallbacks.nix;
 in {
-  # Share a current builder with Honcho; flake.lock owns the exact revision.
+  # Keep Hermes on a current uv2nix builder; flake.lock owns the exact revision.
   flake-file.inputs.uv2nix = {
     url = "github:pyproject-nix/uv2nix";
     inputs.nixpkgs.follows = "hermes-agent/nixpkgs";
@@ -16,8 +16,9 @@ in {
     url = "github:NousResearch/hermes-agent";
     inputs.uv2nix.follows = "uv2nix";
   };
-  flake-file.inputs.hermes-plugin-honcho = {
-    url = "github:plastic-labs/honcho";
+  # Pinned to the sha in Hermes's plugin catalog (plugin-catalog/hwiki.yaml).
+  flake-file.inputs.hermes-plugin-hwiki = {
+    url = "github:ottosulin/hwiki/d1961956eaafbd64fef71cb7135d475efcc8f954";
     flake = false;
   };
   flake-file.inputs.hermes-official-plugins = {

@@ -14,20 +14,31 @@
   package = import ./_package.nix {
     inherit lib;
     hermesInput = inputs.hermes-agent;
-    honchoSource = inputs.honcho;
     system = pkgs.stdenv.hostPlatform.system;
   };
   userHome = config.home-manager.users.augusto.home;
+  wikiGate = import ./_wiki-gate.nix {
+    inherit pkgs lib home;
+    host = "macmini";
+  };
+  persons = ["augusto" "livia"];
+  # Each person files sources into their own tree and hands the rest to its librarian.
+  wikis = import ./_wikis.nix;
+  wikiFor = person: lib.findFirst (wiki: wiki.writer == person) (throw "no wiki tree has writer ${person}") (builtins.attrValues wikis.trees.macmini);
   manifest = pkgs.writeText "hermes-household-profiles.json" (builtins.toJSON {
     host_config.gateway.multiplex_profiles = true;
-    profile_configs = lib.genAttrs ["augusto" "livia"] (name: {
+    profile_configs = lib.genAttrs persons (name: {
       model = models.macmini.${name};
       auxiliary.compression = {
         provider = "main";
         model = "";
       };
       fallback_providers = fallbacks.macmini.${name};
-      memory.provider = "honcho";
+      memory.provider = "hwiki";
+      delegation = {
+        backend = "profile_routes";
+        backends.profile_routes.profiles = [{name = (wikiFor name).librarian;}];
+      };
       mcp_servers = {
         context7 = {
           url = "https://mcp.context7.com/mcp";
@@ -35,16 +46,24 @@
         };
       };
     });
-    soul = ./SOUL.md;
+    souls =
+      lib.genAttrs persons (person:
+        pkgs.writeText "${person}-SOUL.md" (builtins.readFile ./SOUL.md + "\n" + wikis.soul ./souls/_wiki.md (wikiFor person) + "\n" + builtins.readFile ../../programs/agent-shared/style/caveman.md));
     host_key = config.sops.secrets.hermes_host_api_key.path;
     mcp_secrets = {};
-    profile_env.HASS_URL = "http://home.local:8123";
+    profile_env = lib.genAttrs persons (person: let
+      wiki = wikiFor person;
+    in {
+      HASS_URL = "http://home.local:8123";
+      OBSIDIAN_VAULT_PATH = "${home}/${wiki.vault}";
+      WIKI_PATH = "${home}/${wiki.vault}/${wiki.tree}";
+    });
     profile_keys = {
       augusto = config.sops.secrets.hermes_augusto_api_key.path;
       livia = config.sops.secrets.hermes_livia_api_key.path;
     };
     plugins = {
-      honcho = "${inputs.hermes-plugin-honcho}/hermes-plugin-honcho";
+      hwiki = "${inputs.hermes-plugin-hwiki}";
       advanced-delegation = "${inputs.hermes-official-plugins}/advanced-delegation";
       homeassistant = "${inputs.hermes-official-plugins}/homeassistant";
       office-3d = "${inputs.hermes-plugin-office-3d}";
@@ -53,26 +72,18 @@
       # commands through `rtk rewrite`. Hermes's dangerous-command checks run
       # on the rewritten command.
       rtk-rewrite = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";
+      wiki-gate = "${wikiGate}";
     };
-    enabled_plugins = ["rtk-rewrite" "ponytail" "advanced-delegation" "homeassistant" "office-3d"];
-    skills = {
-      caveman-bundle = "${inputs.caveman}/skills";
-    };
-    honcho_keys = "/var/lib/honcho/app/keys";
-    honcho_config = {
-      baseUrl = "http://127.0.0.1:8001";
-      enabled = true;
-      pinUserPeer = true;
-      recallMode = "hybrid";
-      contextTokens = 2048;
-      contextCadence = 1;
-      dialecticCadence = 5;
-      dialecticDepth = 1;
-      dialecticReasoningLevel = "low";
-      reasoningLevelCap = "low";
-      writeFrequency = "async";
-      sessionStrategy = "per-session";
-    };
+    enabled_plugins = ["rtk-rewrite" "ponytail" "advanced-delegation" "homeassistant" "office-3d" "wiki-gate"];
+    # Per profile: hwiki's env overrides are process-wide, and one gateway serves both people.
+    hwiki = lib.genAttrs persons (person: let
+      wiki = wikiFor person;
+    in {
+      wiki_path = "${home}/${wiki.vault}";
+      memory_dir = "${wiki.tree}/memory";
+      untrusted_dirs = lib.concatMap (tree: ["${tree}/raw" "${tree}/review"]) (wikis.treesIn wiki.vault);
+      demote_paths = ["log.md" "${wiki.tree}/memory/builtin-mirror.md"];
+    });
   });
   start = pkgs.writeShellScript "hermes-gateway-start" ''
     set -eu

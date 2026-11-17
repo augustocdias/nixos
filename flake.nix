@@ -6,10 +6,6 @@
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    caveman = {
-      url = "github:JuliusBrussee/caveman";
-      flake = false;
-    };
     dank-greeter = {
       url = "github:duxlabs-dev/dux-greeter";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -67,8 +63,8 @@
       url = "github:NousResearch/hermes-official-plugins";
       flake = false;
     };
-    hermes-plugin-honcho = {
-      url = "github:plastic-labs/honcho";
+    hermes-plugin-hwiki = {
+      url = "github:ottosulin/hwiki/d1961956eaafbd64fef71cb7135d475efcc8f954";
       flake = false;
     };
     hermes-plugin-office-3d = {
@@ -78,10 +74,6 @@
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-    honcho = {
-      url = "github:plastic-labs/honcho";
-      flake = false;
     };
     hyprland.url = "github:hyprwm/Hyprland";
     import-tree.url = "github:vic/import-tree";

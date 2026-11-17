@@ -21,6 +21,7 @@ let
 in {
   laptop = {
     default = claude "claude-sonnet-5-5[1m]";
+    librarian = claude "claude-fable-5-2[1m]";
     coordinator = claude "claude-fable-5-2[1m]";
     programmer = codex "gpt-6.1-sol";
     reviewer = claude "claude-fable-5-2[1m]";
@@ -38,5 +39,7 @@ in {
     assistant = ollama;
     augusto = ollama;
     livia = ollama;
+    librarian = ollama;
+    librarian-livia = ollama;
   };
 }

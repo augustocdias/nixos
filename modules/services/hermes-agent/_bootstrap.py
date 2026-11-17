@@ -7,7 +7,6 @@ import tempfile
 import time
 from pathlib import Path
 
-import httpx
 from dotenv import dotenv_values, set_key, unset_key
 from hermes_cli.config import require_readable_config_before_write
 from hermes_cli.profiles import create_profile, profile_exists
@@ -140,29 +139,6 @@ def bootstrap(manifest):
                 "Personal profile home must not be shared through a symlink"
             )
         key = keys[person]
-        honcho_key = read_secret(Path(manifest["honcho_keys"]) / person)
-        with httpx.Client(timeout=10, trust_env=False) as client:
-            for attempt in range(60):
-                try:
-                    response = client.post(
-                        "http://127.0.0.1:8001/v3/workspaces",
-                        json={"name": f"hermes-{person}"},
-                        headers={"Authorization": f"Bearer {honcho_key}"},
-                    )
-                    response.raise_for_status()
-                    other = "livia" if person == "augusto" else "augusto"
-                    denied = client.post(
-                        "http://127.0.0.1:8001/v3/workspaces",
-                        json={"name": f"hermes-{other}"},
-                        headers={"Authorization": f"Bearer {honcho_key}"},
-                    )
-                    if denied.status_code not in (401, 403):
-                        raise RuntimeError("Honcho key must be scoped to one workspace")
-                    break
-                except httpx.HTTPError:
-                    if attempt == 59:
-                        raise
-                    time.sleep(2)
         write_config(home / "config.yaml", manifest["profile_configs"][person])
         write_env(
             home / ".env",
@@ -170,19 +146,21 @@ def bootstrap(manifest):
                 "API_SERVER_KEY": key,
                 "API_SERVER_MODEL_NAME": "hermes-agent",
                 "OPENAI_API_KEY": "ollama",
-                **manifest["profile_env"],
+                **manifest["profile_env"][person],
                 **mcp_env,
             },
         )
-        atomic_write(home / "SOUL.md", Path(manifest["soul"]).read_text())
-        honcho = dict(
-            manifest["honcho_config"],
-            workspace=f"hermes-{person}",
-            aiPeer=f"hermes-{person}",
-            peerName=person,
-            apiKey=honcho_key,
-        )
-        atomic_write(home / "honcho.json", json.dumps(honcho))
+        atomic_write(home / "SOUL.md", Path(manifest["souls"][person]).read_text())
+        hwiki = home / "hwiki.json"
+        local = json.loads(hwiki.read_text()) if hwiki.exists() else {}
+        atomic_write(hwiki, json.dumps({**local, **manifest["hwiki"][person]}))
+        # Honcho is gone; drop its key file and plugin link from older deployments.
+        (home / "honcho.json").unlink(missing_ok=True)
+        if (home / "plugins" / "honcho").is_symlink():
+            (home / "plugins" / "honcho").unlink()
+        # The Caveman skill bundle is no longer linked; drop the old managed link.
+        if (home / "skills" / "caveman-bundle").is_symlink():
+            (home / "skills" / "caveman-bundle").unlink()
         for directory in ("plugins", "memories", "sessions", "skills", "cron"):
             (home / directory).mkdir(exist_ok=True)
         for name in ("MEMORY.md", "USER.md"):
@@ -192,8 +170,6 @@ def bootstrap(manifest):
         for name, target in manifest["plugins"].items():
             link_plugin(home / "plugins" / name, Path(target))
         enable_plugins(home / "config.yaml", manifest["enabled_plugins"])
-        for name, target in manifest["skills"].items():
-            link_plugin(home / "skills" / name, Path(target))
 
 
 if __name__ == "__main__":

@@ -8,21 +8,16 @@
         ollama-bin = release.package;
       };
   };
-  den.aspects.ollama.darwin = {
-    config,
-    pkgs,
-    ...
-  }: let
+  den.aspects.ollama.darwin = {pkgs, ...}: let
     ollama = (pkgs.callPackage ./_package.nix {}).package;
     ollamaHome = "/var/lib/ollama";
     ollamaPort = 11434;
     hermesModels =
       builtins.attrValues (import ../hermes-agent/_models.nix).macmini
       ++ lib.concatLists (builtins.attrValues (import ../hermes-agent/_fallbacks.nix).macmini);
-    ollamaModels = lib.unique ([config.services.ollama.memoryModel "qwen3-embedding:0.6b"]
-      ++ map (model: model.default or model.model) (builtins.filter
-        (model: model.provider == "custom" && (model.base_url or "") == "http://127.0.0.1:11434/v1")
-        hermesModels));
+    ollamaModels = lib.unique (map (model: model.default or model.model) (builtins.filter
+      (model: model.provider == "custom" && (model.base_url or "") == "http://127.0.0.1:11434/v1")
+      hermesModels));
     # launchd has no ordering, so poll the server instead of racing it.
     ollamaModelLoader = pkgs.writeShellScript "ollama-model-loader" ''
       set -u
@@ -41,11 +36,6 @@
       exit "$status"
     '';
   in {
-    options.services.ollama.memoryModel = lib.mkOption {
-      type = lib.types.str;
-      default = "deepseek-v4.1-flash:cloud";
-      description = "Ollama generation model for every Honcho role.";
-    };
     config = {
       launchd.daemons.ollama = {
         command = "${lib.getExe ollama} serve";
