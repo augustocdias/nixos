@@ -5,7 +5,7 @@ description: "Use when a process needs its own terminal: a service or dev server
 
 # Services and E2E checks
 
-Use `hc` for processes that need an inspectable terminal or must keep running while you do other work. Use the harness's native delegation tools for subagents. For exact CLI arguments, read `hc <command> --help`; consult `hc --skill` only for a missing capability, subject to the local rules below.
+Use `hc` for processes that need an inspectable terminal or must keep running while you do other work. Use the harness's native delegation tools for internal subagents; the explicitly invoked `orchestrator` skill instead uses Core terminals for separate omp or Claude workers. For exact CLI arguments, read `hc <command> --help`; consult `hc --skill` only for a missing capability, subject to the local rules below.
 
 ## 1. Establish the execution boundary
 

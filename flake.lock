@@ -896,21 +896,6 @@
         "type": "github"
       }
     },
-    "herdr-hermes-shepherd": {
-      "locked": {
-        "lastModified": 1794336462,
-        "narHash": "sha256-O1MuDDirIMkSmQ0tOS54Vx88GR+Q+nE2Se9DKrpR9So=",
-        "owner": "augustocdias",
-        "repo": "herdr-hermes-shepherd",
-        "rev": "6923cad26bfd1adf272a709d0d498252522c1ea6",
-        "type": "github"
-      },
-      "original": {
-        "owner": "augustocdias",
-        "repo": "herdr-hermes-shepherd",
-        "type": "github"
-      }
-    },
     "herdr-navigation": {
       "locked": {
         "lastModified": 1794905929,
@@ -2747,7 +2732,6 @@
         "flake-file": "flake-file",
         "flake-parts": "flake-parts",
         "grub2-themes": "grub2-themes",
-        "herdr-hermes-shepherd": "herdr-hermes-shepherd",
         "herdr-navigation": "herdr-navigation",
         "herdr-tmux-prefix": "herdr-tmux-prefix",
         "hermes-agent": "hermes-agent",

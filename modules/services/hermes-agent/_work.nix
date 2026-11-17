@@ -31,7 +31,10 @@
     whatsappBridge = !isLinux;
   };
   roles = ["programmer" "reviewer" "qa" "research"];
-  sharedSkills = import ../../programs/agent-shared/_skills.nix {inherit lib pkgs;};
+  sharedSkills = import ../../programs/agent-shared/_skills.nix {
+    inherit lib pkgs;
+    exclude = ["orchestrator"];
+  };
   # Each librarian curates one tree of this host. On the laptop the coordinator files sources
   # into the work tree and default and the roles only recall it; the macmini household profiles live in _darwin.nix.
   wikis = import ./_wikis.nix;
@@ -527,10 +530,6 @@ in {
     run = ["hermes" "-p" "coordinator"];
   };
   herdr.keys."super-s" = "terminal.open:hermes";
-  programs.hermes-shepherd = {
-    enable = true;
-    hermesPython = "${package.hermesVenv}/bin/python3";
-  };
   home.file =
     lib.listToAttrs (lib.concatMap (home:
       (map (name:

@@ -40,22 +40,6 @@ The input's key fragment is merged with App defaults before local overrides. Its
 
 State filters match any agent in a tab rather than only its aggregate status. A tab with both a blocked agent and a working agent therefore appears under either filter. Done follows Herdr's attention semantics and becomes Idle when viewed.
 
-### Hermes Shepherd
-
-The `herdr-hermes-shepherd` input provides a Herdr App tab for the [Work Hermes](coding-agents.md#work-hermes-laptop-and-macmini) kanban board and a native coordinator chat panel ([standalone repository](https://github.com/augustocdias/herdr-hermes-shepherd)). `hermes-agent/_work.nix` enables its Home Manager module on both hosts and points `hermesPython` at the gateway's `hermesVenv` Python. The upstream module bundles the JavaScript and installs the board, cron and chat helpers. `herdr.nix` adds the layout and shortcut when the module is enabled:
-
-- A Smart Tabs pinned tab in every space, labelled `default`. The label selects Hermes's `default` board by name, so the toolbar shows no "no board has this name" hint.
-- A full-height `shepherd` mod block after the Files/Changes `panel` column in the packaged main layout's `work-body`, hidden by default.
-- Ctrl+Shift+Y opens and focuses the chat composer. If the panel is visible but focus is elsewhere, the shortcut focuses it without hiding it. Pressing it while the panel has the keyboard hides it.
-
-The key uses the packaged App's optional `layout.toggle` focus target, supplied by `layout-focus.patch`. The upstream App does not provide this argument. The patch supports terminal and focusable mod blocks; Shepherd consumes the mod's `focus` command to focus its composer. Plain `layout.toggle:shepherd`, the tab button and Hide retain their visibility-only behavior.
-
-The board helpers (`hermes-shepherd-board`, `hermes-shepherd-cron`) run unjailed in the App's environment. That environment has no `HERMES_HOME`, so they use `~/.hermes`. The `hermes` wrapper sets `HERMES_HOME` to the same path, so the CLI, gateway and tab share one board database (`~/.hermes/kanban.db` for `default`). Setting `HERMES_HOME` or `HERMES_KANBAN_HOME` in the App's environment would split them.
-
-Chat connects to the existing default-profile gateway, whose profile multiplexing serves `coordinator`. Execution uses that gateway's configured terminal backend, credentials and approvals, not a CLI terminal. The panel never starts a gateway. Choose New or History on first use; hiding the panel or closing the App leaves gateway work running. Drafts live in App shared state, and private viewer state lives under `data/hermes-shepherd-chat/`.
-
-The App replaces the shipped `main` layout from the package on startup, so applying a layout change requires a rebuild and App relaunch. Personal layout clones need the [upstream layout migration](https://github.com/augustocdias/herdr-hermes-shepherd#layout-and-upgrade) applied separately. Existing coordinator terminals are not stopped by the migration; end them only after their work finishes.
-
 ### Package patches and verification
 
 The App regenerates `AGENTS.md` at startup. Its package patches the embedded guide to require declarative additions and a system rebuild. Keep the generated guide App-owned rather than installing a Home Manager symlink. Relaunch the App after activating package patches; restarting Core is not needed to refresh the guide or key-command handling.
@@ -71,7 +55,6 @@ herdr-app check ~/.config/herdr-app/mods/tabs-enriched
 herdr-app check ~/.config/herdr-app/mods/picker-enriched
 herdr-app check ~/.config/herdr-app/mods/spaces-enriched
 herdr-app check ~/.config/herdr-app/mods/space-open
-herdr-app check ~/.config/herdr-app/mods/hermes-shepherd
 ```
 
 `check` needs a compositor and does not prove key handling. Exercise keys in an isolated App/Core session and inspect `herdr-app shot`. Test the Home Manager symlinks, not only an unpacked source copy: App rejects relative JavaScript imports that resolve through those symlinks into the store, so the enriched mod is bundled into one file.

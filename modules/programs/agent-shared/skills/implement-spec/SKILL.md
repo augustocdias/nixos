@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Complete the supplied specification through its ticket **task graph**. The parent orchestrates; it does not implement tickets itself. Start every implementer with fresh context, including when only one ticket is ready. Communicate through accessible context pointers rather than duplicated payloads.
 
+When the user invokes `orchestrator`, follow this workflow in the same parent session and use that skill's Herdr worker lifecycle for dispatch and supervision. Direct `implement-spec` invocation retains native delegation. Both modes use the same acceptance gates and ownership rules.
+
 ## Steps
 
 1. **Load and agree.** Read the full spec, ticket bodies/comments, acceptance criteria, blocking graph and existing work through the actual configured tracker. Resolve the absolute workspace and its `issue-tracker.md`, `domain.md` and standards. Missing required setup needs the user's manual `setup-dev-skills` invocation. Load `git-conventions`; agree five-category ownership, reviewable branch/PR topology, unsettled test seams and publication timing. Read [Stack and worktree procedure](STACKS.md) before preparing checkouts or publication. Inspect transport and intended remote actions: when Git-over-SSH is needed, obtain dedicated `host_ssh_agent` approval **before starting any subagent**. A refusal pauses affected remote work without another credential route.
