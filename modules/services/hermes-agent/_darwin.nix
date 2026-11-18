@@ -88,8 +88,9 @@
       # on the rewritten command.
       rtk-rewrite = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";
       wiki-gate = "${wikiGate}";
+      kanban-transcripts = "${import ./_kanban-transcripts.nix {inherit lib;}}";
     };
-    enabled_plugins = ["rtk-rewrite" "advanced-delegation" "homeassistant" "office-3d" "wiki-gate"];
+    enabled_plugins = ["rtk-rewrite" "advanced-delegation" "homeassistant" "office-3d" "wiki-gate" "kanban-transcripts"];
     # Per profile: hwiki's env overrides are process-wide, and one gateway serves both people.
     hwiki = lib.genAttrs persons (person: let
       wiki = wikiFor person;

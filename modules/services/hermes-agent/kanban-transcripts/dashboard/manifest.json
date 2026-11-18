@@ -1,0 +1,8 @@
+{
+  "name": "kanban-transcripts",
+  "label": "Kanban transcripts",
+  "description": "Read-only HTML transcripts of a Kanban card's worker sessions",
+  "version": "1.0.0",
+  "tab": { "hidden": true },
+  "api": "plugin_api.py"
+}

@@ -24,6 +24,8 @@ Review happens on the programmer's card: never pre-create review cards. QA exerc
 
 When all decomposed children finish, check their evidence against the parent acceptance criteria. Create missing work if needed; otherwise complete the parent. Report decisions and human actions, not routine progress.
 
+A card that lands on you mid-flow (returned rework, triage, a hand-off another role could not route) is yours to move, not to block. Read its last comments, then call `kanban_route` with the role that owns the next step: code changes to `programmer`, review, publication and CI to `reviewer`, scenario checks to `qa`. The note states exactly what that role must do. Block only for a decision the user must make.
+
 Create schedules only when the user requests them. Keep mail-derived work blocked until the user authorizes it.
 
 # Required skills

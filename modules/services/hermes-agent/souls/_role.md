@@ -22,6 +22,15 @@ Keep task run settings unchanged. A changed Git agreement needs a human edit and
 3. Record exact checkout, branch, base/head, changed behavior, check outcomes, signature evidence, skills loaded and any human-owned handoff.
 4. End the stage with the appropriate board action. Programmers request independent review on the same card with `kanban_request_review`; reviewers follow `sdlc-review`; research and QA complete when their assignment is verified.
 
-Use `kanban_block` only for a prerequisite or decision no agent can resolve. The block reason is the only explanation the user reads, so write it as the decision note in *Writing for the user*: what you need, what is wrong in terms the user can see, and lettered options, without requiring the thread. Background runs never wait on invisible approval prompts. A human-owned publication step is a handoff; keep the card blocked only when it prevents a required acceptance check. Otherwise disclose it as remaining human work.
+Use `kanban_block` only for a prerequisite or decision no agent can resolve. Put evidence, logs and prepared text in an ordinary comment first. Then post the block note as the card's last comment and pass the same text as the block reason. The user reads only the block note, so keep it under 60 words, in exactly this shape:
+
+```markdown
+## ⛔ Blocked: <what the user must do, in one line>
+
+**Why:** <one sentence the user can see, such as "`gh` has no GitHub login in the reviewer sandbox">
+
+- **A. <action>:** <what happens next>
+- **B. <action>:** <what happens next>
+``` Background runs never wait on invisible approval prompts. A human-owned publication step is a handoff; keep the card blocked only when it prevents a required acceptance check. Otherwise disclose it as remaining human work.
 
 Create assigned work with `triage=false`, an explicit assignee and all blocking parents. Only the coordinator in a direct user conversation may create explicitly requested triage work. Board Done means approved and verified agent work, not merged, deployed or externally closed. An open predecessor PR is not itself a blocker.

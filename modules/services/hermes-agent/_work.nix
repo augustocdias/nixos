@@ -49,6 +49,29 @@
     home = homeDirectory;
     recallOnly = wikiReaders;
   };
+  kanbanTranscripts = import ./_kanban-transcripts.nix {inherit lib;};
+  # The desktop half mounts into Desktop's Kanban task modal, which has no SDK area: fail the build
+  # when the markup it reads moves, instead of the list silently vanishing after a Hermes update.
+  kanbanTranscriptsDesktop = pkgs.runCommand "kanban-transcripts-plugin.js" {} ''
+    src=${inputs.hermes-agent}/apps/desktop/src
+    check() {
+      grep -qF -- "$2" "$src/$1" || {
+        echo "kanban-transcripts: '$2' is gone from apps/desktop/src/$1; re-check desktop/plugin.js against the task modal" >&2
+        exit 1
+      }
+    }
+    check plugins/kanban/board.tsx '<TaskDrawer'
+    check plugins/kanban/drawer.tsx '<header className='
+    check plugins/kanban/drawer.tsx '{shortId(task.id)}'
+    check plugins/kanban/drawer.tsx '<DialogTitle className='
+    check plugins/kanban/drawer.tsx '<aside className='
+    check plugins/kanban/ui.tsx ".replace(/^t_/, ''').slice(0, 6)"
+    check plugins/kanban/ui.tsx "FIELD_LABEL = 'text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-(--ui-text-quaternary)'"
+    check components/ui/dialog.tsx 'data-slot="dialog-content"'
+    check components/ui/dialog.tsx 'data-slot="dialog-title"'
+    check components/ui/dialog.tsx 'bodyClassName?: string'
+    cp ${./kanban-transcripts/desktop/plugin.js} $out
+  '';
   # The default profile is the root Hermes home, not profiles/default.
   homeOf = name:
     if name == "default"
@@ -204,6 +227,20 @@
       'if path not in names:' \
       'if path not in names and os.path.relpath(path, home) not in UNHIDDEN_HOME_PATHS:'
     echo 'UNHIDDEN_HOME_PATHS = (${lib.concatMapStringsSep ", " (p: "\"${p}\"") unhidden},)' >> $out/home.py
+    # Hermes strips GH_TOKEN, GITHUB_TOKEN and BASH_ENV from every terminal command, even when passed through,
+    # so the token travels as AGENT_GH_TOKEN and every sandbox spawn restores it for gh.
+    substituteInPlace $out/sandbox.py --replace-fail \
+      'env=_make_run_env(self.env),' \
+      'env=_with_agent_gh_token(_make_run_env(self.env)),'
+    cat ${agentGhTokenPatch} >> $out/sandbox.py
+  '';
+  agentGhTokenPatch = pkgs.writeText "agent-gh-token.py" ''
+
+
+    def _with_agent_gh_token(env):
+        if env.get("AGENT_GH_TOKEN"):
+            env["GH_TOKEN"] = env["AGENT_GH_TOKEN"]
+        return env
   '';
   # pnpm reads registry auth from this file instead of ~/.npmrc, which the sandbox hides.
   npmrcAuth = pkgs.writeText "npmrc" "//npm.pkg.github.com/:_authToken=\${NELLY_GH_REGISTRY_TOKEN}\n";
@@ -251,7 +288,7 @@
       # Every session starts here, kanban workers included: a card's workspace does not move the
       # bubblewrap cwd. Workers reach their checkout through the ~/dev bind below.
       cwd = "${dev}/.hermes-workspaces/${name}";
-      env_passthrough = ["NIX_REMOTE"] ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) ["GH_TOKEN" "DOCKER_HOST" "CONTAINER_HOST" "PNPM_CONFIG_NPMRC_AUTH_FILE"];
+      env_passthrough = ["NIX_REMOTE"] ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) ["AGENT_GH_TOKEN" "DOCKER_HOST" "CONTAINER_HOST" "PNPM_CONFIG_NPMRC_AUTH_FILE"];
     };
     browser = lib.optionalAttrs (lib.elem "browser" toolsets) {
       executable_path =
@@ -281,7 +318,7 @@
     };
     plugins = {
       enabled =
-        ["rtk-rewrite" "hermes-workflow" "advanced-delegation" "office-3d" "wiki-gate"]
+        ["rtk-rewrite" "hermes-workflow" "advanced-delegation" "office-3d" "wiki-gate" "kanban-transcripts"]
         ++ lib.optional isLinux "bubblewrap"
         ++ lib.optional (isLinux && security) "hermes-security"
         ++ lib.optional (isLinux && rea) "rea"
@@ -375,7 +412,7 @@
             };
           };
         soul = soul "coordinator";
-        secrets.GH_TOKEN = config.sops.secrets.github_token.path;
+        secrets.AGENT_GH_TOKEN = config.sops.secrets.github_token.path;
         plugin = true;
       };
       assistant = {
@@ -463,7 +500,7 @@
         delegate = name == "reviewer";
       };
       soul = soul name;
-      secrets.GH_TOKEN = config.sops.secrets.github_token.path;
+      secrets.AGENT_GH_TOKEN = config.sops.secrets.github_token.path;
       plugin = true;
     });
   manifest = pkgs.writeText "hermes-profiles.json" (builtins.toJSON {
@@ -505,7 +542,7 @@
               dispatch_in_gateway = true;
               dispatch_profiles = roles ++ ["coordinator"];
               max_in_progress = 1;
-              auto_decompose = true;
+              auto_decompose = false;
               orchestrator_profile = "coordinator";
               default_assignee = "coordinator";
             };
@@ -553,7 +590,9 @@ in {
     ++ lib.optionals isLinux [pkgs.bubblewrap pkgs.util-linux pkgs.nodejs]
     ++ [
       # Upstream's desktop runs its own 0.0.0 build, whose plugin version gate skips bubblewrap: no terminal backend, no file tools.
-      (package.hermesDesktop.override {extraEnv.HERMES_DESKTOP_HERMES = lib.getExe hermes;})
+      # The profile path, not the store path: Desktop outlives switches and respawns the gateway, and a
+      # store path would keep launching the previous generation's wrapper and environment.
+      (package.hermesDesktop.override {extraEnv.HERMES_DESKTOP_HERMES = "/etc/profiles/per-user/${config.home.username}/bin/hermes";})
     ];
   herdr.programs.hermes = {
     name = "Hermes";
@@ -577,6 +616,7 @@ in {
       ++ [
         (lib.nameValuePair "${home}/plugins/office-3d" {source = inputs.hermes-plugin-office-3d;})
         (lib.nameValuePair "${home}/plugins/wiki-gate" {source = wikiGate;})
+        (lib.nameValuePair "${home}/plugins/kanban-transcripts" {source = kanbanTranscripts;})
         # Upstream's adapter, version-matched to the binary; see the deny twins in profileConfig.
         (lib.nameValuePair "${home}/plugins/rtk-rewrite" {source = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";})
       ])
@@ -596,6 +636,7 @@ in {
       ".hermes/nix/plugins/hermes-workflow".source = plugin;
       # Desktop cannot stamp its package marker into a copy of a read-only store directory.
       ".hermes/desktop-plugins/office-3d/plugin.js".source = "${inputs.hermes-plugin-office-3d}/desktop/plugin.js";
+      ".hermes/desktop-plugins/kanban-transcripts/plugin.js".source = kanbanTranscriptsDesktop;
     };
   # A local vault has no clone to start from; the sync timer adds the baseline and commits.
   home.activation.wiki-vaults = lib.hm.dag.entryAfter ["writeBoundary"] (lib.concatMapStrings (wiki:
@@ -613,7 +654,8 @@ in {
       ${desktopSettings} ${lib.escapeShellArg "${root}/ui-preferences.json"}
   '';
   systemd.user.services = lib.optionalAttrs isLinux {
-    hermes-agent = {
+    # Hermes clients look for exactly this unit name and start it instead of spawning their own gateway.
+    hermes-gateway = {
       Unit = {
         Description = "Hermes Agent gateway";
         X-RestartIfChanged = false;

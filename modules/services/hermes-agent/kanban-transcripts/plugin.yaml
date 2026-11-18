@@ -1,0 +1,3 @@
+name: kanban-transcripts
+version: 1.0.0
+description: Read-only HTML transcripts of a Kanban card's worker sessions, for Hermes Desktop.

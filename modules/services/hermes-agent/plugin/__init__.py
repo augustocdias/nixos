@@ -231,6 +231,43 @@ def kanban_delete(args, **_):
         return _error(str(e))
 
 
+def kanban_route(args, **_):
+    """Hand a card that landed on the coordinator to the role owning its next step, and release it to run.
+
+    Kanban's own tools only move a worker's own card; rework returned to the coordinator otherwise sits blocked.
+    """
+    try:
+        card = str(args.get("card") or "").strip()
+        assignee = str(args.get("assignee") or "").strip()
+        note = str(args.get("note") or "").strip()
+        if not card or not note:
+            return _error("card and note are required")
+        if assignee not in SETTINGS["roles"]:
+            return _error(f"assignee must be one of {SETTINGS['roles']}")
+        kb, connect = _kb()
+        with connect() as conn:
+            task = kb.get_task(conn, card)
+            if task is None:
+                return _error(f"no card {card}")
+            if task.status == "running":
+                return _error(f"{card} is running; route it after the run ends")
+            if task.status in ("done", "archived"):
+                return _error(f"{card} is {task.status}")
+            if task.status == "triage":
+                kb.specify_triage_task(conn, card, assignee=assignee, author="coordinator")
+            else:
+                kb.assign_task(conn, card, assignee)
+            kb.add_comment(conn, card, "coordinator", f"### Routed to {assignee}\n\n{note}")
+            status = kb.get_task(conn, card).status
+            if status in ("todo", "blocked"):
+                ok, reason = kb.promote_task(conn, card, actor="coordinator", reason=note[:200])
+                if not ok:
+                    return _json({"routed": card, "assignee": assignee, "status": status, "waiting": reason})
+            return _json({"routed": card, "assignee": assignee, "status": kb.get_task(conn, card).status})
+    except Exception as e:
+        return _error(str(e))
+
+
 # --- Google, read-only (assistant) ------------------------------------------
 
 GOOGLE_SCOPES = [
@@ -380,7 +417,7 @@ def google_login(args):
         sys.exit("Pipe the Desktop app client JSON in: hermes -p assistant google-login < client_secret.json")
     token = Path(SETTINGS["google_token"])
     if not token.parent.is_dir():
-        sys.exit(f"{token.parent} does not exist: start the hermes-agent service once first")
+        sys.exit(f"{token.parent} does not exist: start the Hermes gateway once first")
     flow = InstalledAppFlow.from_client_config(config, GOOGLE_SCOPES)
     # Desktop clients accept any loopback port; approve in a browser on this machine.
     creds = flow.run_local_server(
@@ -609,8 +646,8 @@ def register(ctx):
             "parameters": {"type": "object", "properties": {"task": {"type": "string"}, "args": {"type": "array", "items": {"type": "string"}}}, "required": ["task", "args"]}}, handler=git)
     ctx.register_cli_command("git-policy", "Accept a human-edited task Git policy", _git_policy_parser, git_policy)
     if profile == "coordinator":
-        for handler, fields in [(kanban_archive, ["card"]), (kanban_delete, ["card"])]:
-            description = handler.__name__.replace("_", " ")
+        for handler, fields in [(kanban_archive, ["card"]), (kanban_delete, ["card"]), (kanban_route, ["card", "assignee", "note"])]:
+            description = (handler.__doc__ or handler.__name__.replace("_", " ")).strip().splitlines()[0]
             ctx.register_tool(name=handler.__name__, toolset="workflow", description=description, schema={
                 "name": handler.__name__, "description": description,
                 "parameters": {"type": "object", "properties": {key: {"type": "string"} for key in fields}, "required": fields}}, handler=handler)
