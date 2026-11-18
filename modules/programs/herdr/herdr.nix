@@ -180,16 +180,7 @@
           "herdr-app/mods/tmux-prefix/main.js".source = "${tmuxPrefix}/main.js";
           "herdr-app/mods/tmux-prefix/mod.json".source = "${tmuxPrefix}/mod.json";
           "herdr-app/programs.json".text = builtins.toJSON {
-            programs =
-              {
-                omp = {
-                  name = "OMP";
-                  icon = "icons/pi.svg";
-                  tint = true;
-                  run = ["omp"];
-                };
-              }
-              // config.herdr.programs;
+            programs = config.herdr.programs;
           };
           "herdr-app/themes/catppuccin.json".text = builtins.toJSON {
             background = "#1e1e2e";

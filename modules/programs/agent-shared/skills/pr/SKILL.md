@@ -1,6 +1,6 @@
 ---
 name: pr
-description: "Use when writing a PR body."
+description: "Use when writing or updating a PR body."
 ---
 
 [Shared workflow](WORKFLOW.md)

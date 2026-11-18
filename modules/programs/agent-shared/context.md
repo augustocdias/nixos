@@ -9,16 +9,8 @@
 
 ## Commands
 
-Commands already start in the workspace. Use relative paths and the tool's cwd/directory option for another directory; never re-enter the current directory with `cd`.
+Commands already start in the workspace. Never `cd` into the current directory; use the tool's cwd or directory option for another directory.
 
-## Instruction ownership
+## Git
 
-The chat-style section owns how replies read; the engineering section owns minimal-but-complete changes. Both appear below and stay active until the user turns them off. Follow their safety, exact-output, and persisted-document exceptions. Neither changes approvals or sandbox boundaries. Linux sandbox operations are governed by the separately loaded sandbox contract.
-
-## Development skills
-
-Use `code-review` for configured diff review, `pr` for PR bodies, and explicitly invoked `to-spec` / `to-tickets` for specification and ticket workflows. Native harness review remains available.
-
-Read each skill's packaged `WORKFLOW.md` for the workspace contract. Shared setup and new supporting artifacts live in locally excluded `.dev-skills/`; keep existing authoritative tracked documents intact. Local exclusion is neither encryption nor backup; sharing requires an explicit action.
-
-Git mutations follow the upfront five-category ownership agreement in `git-conventions`; read-only work needs none. Delegates inherit that run's scope, while the parent owns approval-dependent actions. A delegated checkout may use only its parent's explicitly supplied absolute `.dev-skills/` workspace outside its Git root. Existing approvals, signed-commit routes, and project rules retain precedence.
+Before any Git mutation, load `git-conventions` and agree ownership; read-only work needs none.

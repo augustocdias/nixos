@@ -1,6 +1,6 @@
 ---
 name: wait-what
-description: "Stop. That last message did not land: re-pitch it."
+description: "Re-pitch your last message when it did not land."
 disable-model-invocation: true
 ---
 

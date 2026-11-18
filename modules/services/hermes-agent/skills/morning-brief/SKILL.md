@@ -1,6 +1,6 @@
 ---
 name: morning-brief
-description: Prepare the user's morning brief from today's calendar, unread mail and the kanban board. Use when a cron job or the user asks for the daily brief.
+description: "Use when a cron job or the user asks for the daily morning brief."
 ---
 
 # Morning brief

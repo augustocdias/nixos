@@ -11,7 +11,7 @@ Resolve and retain the absolute `.dev-skills/` workspace path according to the s
 
 This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user; just synthesize what you already know.
 
-Read the resolved workspace’s `issue-tracker.md`, `triage-labels.md`, and `domain.md`. If required configuration is absent, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills`; do not automatically invoke manual setup.
+Read the resolved workspace’s `issue-tracker.md`, `triage-labels.md`, and `domain.md`. If required configuration is absent, suggest the user invoke `setup-dev-skills`; do not automatically invoke manual setup.
 
 ## Process
 

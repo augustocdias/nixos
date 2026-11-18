@@ -46,7 +46,7 @@ The SSH agent socket is not mounted in the jail, and `SSH_AUTH_SOCK` is unset. B
 
 SSH credentials are the user's credentials. Obtain approval for consequential actions such as pushing shared branches, force-pushing, or deleting remote refs. Authorized SSH and remote deployment are not technically blocked by the jail.
 
-The GPG signing/decryption socket is absent. When the user launched this session with the signing grant, `SSH_AUTH_SOCK` is `/tmp/agent-ssh.sock` and git's environment config selects SSH signing: commits are signed with the agent key, and SSH pushes use the same key, without `host_ssh_agent`. The key stays in a host ssh-agent, so it can be used here but not read. Without the grant, request signed `git commit -S` through approved `host_exec`, or leave the commit to the user. The `git-conventions` skill owns the signing route and the pre-push signature check. Keep Git signing configuration unchanged and all host approvals intact. SSH authentication does not grant Git authoring access.
+The GPG signing/decryption socket is absent. A session launched with the signing grant has `SSH_AUTH_SOCK=/tmp/agent-ssh.sock`: it signs and pushes with the agent key and needs no `host_ssh_agent`. `git-conventions` owns the signing route and the pre-push signature check. Keep Git signing configuration unchanged and all host approvals intact. SSH authentication does not grant Git authoring access.
 
 ## Deletion and recovery
 

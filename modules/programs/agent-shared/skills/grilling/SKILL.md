@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.
+description: "Use when the user wants a plan, decision or idea stress-tested, or says \"grill\"."
 ---
 
 Read [Shared workflow](WORKFLOW.md) before following this skill.

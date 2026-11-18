@@ -56,7 +56,7 @@ def _root():
 
 @contextlib.contextmanager
 def _state():
-    """Task policy snapshots and blocker bookkeeping, protected from terminal tools."""
+    """Task policy snapshots, protected from terminal tools."""
     path = _root() / "hermes-workflow.json"
     with open(path.with_suffix(".lock"), "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -216,89 +216,19 @@ def kanban_archive(args, **_):
         return _error(str(e))
 
 
-# --- Blocker checks (coordinator) --------------------------------------------
-
-
-def _blocked_card(kb, conn, card):
-    task = kb.get_task(conn, card)
-    if task is None:
-        raise ValueError(f"no card {card}")
-    if task.status != "blocked":
-        raise ValueError(f"card {card} is {task.status}, not blocked")
-    return task
-
-
-def blocker_resolve(args, **_):
-    """Kanban's own tools only let a worker change its own card; this one acts on the blocked card."""
+def kanban_delete(args, **_):
+    """Permanent removal for the user's explicit delete requests; the sandbox hides the board from the CLI."""
     try:
-        card, guidance = str(args.get("card") or ""), str(args.get("guidance") or "").strip()
-        if not guidance:
-            return _error("guidance is required")
+        card = str(args.get("card") or "").strip()
+        if not card:
+            return _error("card is required")
         kb, connect = _kb()
         with connect() as conn:
-            _blocked_card(kb, conn, card)
-            kb.add_comment(conn, card, "coordinator", "### Unblocked by the coordinator\n\n" + guidance)
-            if not kb.unblock_task(conn, card):
-                return _error(f"could not unblock {card}")
-            return _json({"unblocked": card, "status": kb.get_task(conn, card).status})
+            if not kb.delete_task(conn, card):
+                return _error(f"no card {card}")
+            return _json({"deleted": card})
     except Exception as e:
         return _error(str(e))
-
-
-def blocker_note(args, **_):
-    try:
-        card, note = str(args.get("card") or ""), str(args.get("note") or "").strip()
-        if not note:
-            return _error("note is required")
-        kb, connect = _kb()
-        with connect() as conn:
-            _blocked_card(kb, conn, card)
-            kb.add_comment(conn, card, "coordinator", "### Checked by the coordinator: needs you\n\n" + note)
-            return _json({"noted": card, "status": "blocked"})
-    except Exception as e:
-        return _error(str(e))
-
-
-CHECK_TITLE = "Check blocker: "
-
-
-def _check_blocks(kb, conn):
-    """File one coordinator check card per new block, and delete the ones the coordinator finished.
-
-    Mail cards, which wait for the user, are skipped. A finished check card is deleted, not
-    archived, so it leaves no history: the decision lives as a comment on the blocked card.
-    """
-    for task in kb.list_tasks(conn, status="done"):
-        if task.created_by == AUTHOR and task.title.startswith(CHECK_TITLE):
-            kb.delete_task(conn, task.id)
-    with _state() as data:
-        checked = dict(data.get("_checked") or {})
-    for task in kb.list_tasks(conn, status="blocked"):
-        if task.created_by in (AUTHOR, "assistant"):
-            continue  # check cards themselves, and mail cards
-        block = next((e for e in reversed(kb.list_events(conn, task.id)) if e.kind == "blocked"), None)
-        if block is None or checked.get(task.id) == block.id:
-            continue
-        reason = str((block.payload or {}).get("reason") or "No reason given.")
-        kb.create_task(
-            conn,
-            title=f"{CHECK_TITLE}{task.title}"[:120],
-            body=(
-                "## Blocked card\n\n| Field | Value |\n|---|---|\n"
-                f"| Card | `{task.id}` |\n| Title | {task.title} |\n| Role | {task.assignee or 'none'} |\n\n"
-                f"## Reason given\n\n{reason}\n\n"
-                "## What to do\n\nRead the blocked card and its thread. If it can be resolved without the user, "
-                "`blocker_resolve` it with guidance. Otherwise `blocker_note` it and leave it blocked. "
-                "Then `kanban_complete` this card with what you decided."
-            ),
-            assignee="coordinator",
-            created_by=AUTHOR,
-            tenant=task.tenant,
-            idempotency_key=f"blocker-{task.id}-{block.id}",
-        )
-        checked[task.id] = block.id
-    with _state() as data:
-        data["_checked"] = checked
 
 
 # --- Google, read-only (assistant) ------------------------------------------
@@ -599,16 +529,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 
-def watch(stop):
-    while not stop.wait(SETTINGS["poll_seconds"]):
-        try:
-            kb, connect = _kb()
-            with connect() as conn:
-                _check_blocks(kb, conn)
-        except Exception:
-            logger.exception("Hermes blocker check failed")
-
-
 def _serve(ctx):
     """Start the endpoint once per gateway: the first profile to bind the port wins."""
     if os.environ.get("_HERMES_GATEWAY") != "1":
@@ -617,12 +537,9 @@ def _serve(ctx):
         server = ThreadingHTTPServer(("127.0.0.1", SETTINGS["port"]), Handler)
     except OSError:
         return  # already served by this gateway, or a kanban worker of it
-    stop = threading.Event()
     threading.Thread(target=server.serve_forever, name="hermes-workflow-http", daemon=True).start()
-    threading.Thread(target=watch, args=(stop,), name="hermes-workflow-watch", daemon=True).start()
 
     def close():
-        stop.set()
         server.shutdown()
         server.server_close()
 
@@ -692,7 +609,7 @@ def register(ctx):
             "parameters": {"type": "object", "properties": {"task": {"type": "string"}, "args": {"type": "array", "items": {"type": "string"}}}, "required": ["task", "args"]}}, handler=git)
     ctx.register_cli_command("git-policy", "Accept a human-edited task Git policy", _git_policy_parser, git_policy)
     if profile == "coordinator":
-        for handler, fields in [(blocker_resolve, ["card", "guidance"]), (blocker_note, ["card", "note"]), (kanban_archive, ["card"])]:
+        for handler, fields in [(kanban_archive, ["card"]), (kanban_delete, ["card"])]:
             description = handler.__name__.replace("_", " ")
             ctx.register_tool(name=handler.__name__, toolset="workflow", description=description, schema={
                 "name": handler.__name__, "description": description,

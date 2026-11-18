@@ -45,3 +45,4 @@ Topic docs are a snapshot of the current system. Source files win when they disa
 - Jail and permission changes affect both omp and Claude Code; keep approvals and sandbox boundaries intact. After changing `agent-shared/_bash.nix` or a harness `_permissions.nix`, inspect the rendered rules, not only the source.
 - Preserve human ownership of branches and checkouts and existing approval routes. Development-skill routing and `.dev-skills/` workspace boundaries follow [Coding agents](docs/coding-agents.md#development-skills).
 - Exercise changed behavior with the focused checks its topic names, and report which checks ran and what they did not cover.
+- Keep test code and probe scripts outside the repository, in `/tmp` or `.dev-skills/`. These are daily-driven machines: Augusto verifies a change by using it and rolls back the generation or fixes it right away, and rebuilds must stay fast. Add tests to the repository only when he asks for them.

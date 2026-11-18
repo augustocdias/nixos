@@ -8,9 +8,9 @@ disable-model-invocation: true
 Read [Shared workflow](WORKFLOW.md) before following this skill.
 
 
-Write a handoff document summarising the current conversation so a fresh agent can continue the work. Resolve the absolute `.dev-skills/` workspace using the shared workflow, then save to `<workspace>/handoffs/<slug>.md`. If setup is missing, suggest `/setup-dev-skills` in Claude Code or `/skill:setup-dev-skills` in omp before writing the document.
+Write a handoff document summarising the current conversation so a fresh agent can continue the work. Resolve the absolute `.dev-skills/` workspace using the shared workflow, then save to `<workspace>/handoffs/<slug>.md`. If setup is missing, suggest the user invoke `setup-dev-skills` before writing the document.
 
-Include a "suggested skills" section in the document. For contextual skills, describe loading through Claude Code's native Skill mechanism or omp's `read skill://name`. For manual skills, suggest the user invoke `/name` in Claude Code or `/skill:name` in omp rather than automatically launching them. Include the absolute workspace path so the next agent does not resolve a different artifact location.
+Include a "suggested skills" section in the document. Name each skill and mark it contextual or manual; the next agent loads contextual skills itself and leaves manual ones to the user. Include the absolute workspace path so the next agent does not resolve a different artifact location.
 
 Do not duplicate content already captured in other artifacts (specs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
 

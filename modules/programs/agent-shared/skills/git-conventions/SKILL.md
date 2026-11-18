@@ -1,6 +1,6 @@
 ---
 name: git-conventions
-description: Augusto's git commit, branch, and PR conventions. Use when writing commit messages, drafting PRs, or creating branches, to match a consistent style across repos.
+description: "Use before any Git mutation (branch, worktree, commit, push or PR) and when writing commit messages or PR titles."
 ---
 
 # Git conventions

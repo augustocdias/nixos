@@ -13,7 +13,7 @@ Resolve and retain the absolute `.dev-skills/` workspace path according to the s
 
 Break a plan, spec, or conversation into a set of **tickets**: tracer-bullet vertical slices, each declaring the tickets that **block** it.
 
-Read `issue-tracker.md`, `triage-labels.md`, and `domain.md` in the resolved workspace. If required configuration is absent, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills`; do not automatically invoke manual setup.
+Read `issue-tracker.md`, `triage-labels.md`, and `domain.md` in the resolved workspace. If required configuration is absent, suggest the user invoke `setup-dev-skills`; do not automatically invoke manual setup.
 
 ## Process
 

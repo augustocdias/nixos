@@ -27,9 +27,8 @@ in {
         '';
 
         installPhase = ''
-          mkdir -p $out/lib/jgrep $out/share/jgrep
+          mkdir -p $out/lib/jgrep
           cp dist/jgrep.js $out/lib/jgrep/jgrep.js
-          cp -r skills/jgrep/SKILL.md $out/share/jgrep/SKILL.md
 
           makeWrapper ${lib.getExe pkgs.nodejs} $out/bin/jgrep \
             --add-flags "$out/lib/jgrep/jgrep.js"
@@ -48,8 +47,8 @@ in {
       home.packages = [jgrep];
 
       # Work-only, so the skill goes to the work-capable harnesses only.
-      programs.claude-code.skills.jgrep = "${jgrep}/share/jgrep/SKILL.md";
-      home.file.".omp/agent/skills/jgrep/SKILL.md".source = "${jgrep}/share/jgrep/SKILL.md";
+      programs.claude-code.skills.jgrep = ./skills/jgrep;
+      home.file.".omp/agent/skills/jgrep".source = ./skills/jgrep;
 
       # Ensure the cache dir exists so the claude jail's try-rw-bind picks it up.
       home.activation.jgrep-cache = lib.hm.dag.entryAfter ["writeBoundary"] ''

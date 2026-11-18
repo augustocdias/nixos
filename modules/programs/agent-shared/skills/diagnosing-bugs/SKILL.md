@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: "Use when something is broken, throwing, failing or slow and the cause is unknown, including hard bugs, performance regressions and \"diagnose\" or \"debug this\" requests."
 ---
 
 [Shared workflow](WORKFLOW.md)
@@ -18,7 +18,7 @@ Accept the user’s reported failure and supplied output as ground truth. Do not
 
 Place generated scripts, minimized fixtures, redacted traces, profiles, and retained evidence under `<absolute-workspace>/debug/<slug>/`. Run diagnostic subprocesses with explicit absolute input/output paths so changing cwd does not relocate evidence. Permanent regression tests belong at the agreed project seam.
 
-Before branch switching, bisection, or worktree use, load `git-conventions` through Claude's native Skill mechanism or omp's `read skill://git-conventions` and establish the upfront ownership agreement. Use an authorized diagnostic checkout; preserve user changes and unrelated worktrees. Headless workers return approval-dependent Git and remote actions to the parent rather than attempting host prompts. Keep supporting evidence local and outside production commits.
+Before branch switching, bisection, or worktree use, load `git-conventions` and establish the upfront ownership agreement. Use an authorized diagnostic checkout; preserve user changes and unrelated worktrees. Headless workers return approval-dependent Git and remote actions to the parent rather than attempting host prompts. Keep supporting evidence local and outside production commits.
 
 ## Redact
 

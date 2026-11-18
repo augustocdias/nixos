@@ -1,13 +1,13 @@
 ---
 name: unslop
-description: Cut AI tells from writing that gets saved. Use when writing or editing prose that outlives the chat, such as docs, PR bodies, commit bodies, code comments, issues, tickets, or messages to third parties.
+description: "Use when writing or editing prose that outlives the chat: docs, PR and commit bodies, code comments, issues, tickets, or messages to third parties."
 ---
 
 # Unslop
 
 Edit text to remove AI patterns. Scan for the patterns below, then rewrite. Preserve meaning and match the intended tone.
 
-These rules cover saved prose. Chat replies follow the Caveman chat style instead, and rule 33 does not apply to them.
+These rules cover saved prose. Chat replies follow the active chat style instead, and rule 33 does not apply to them.
 
 ## Patterns to detect and fix
 

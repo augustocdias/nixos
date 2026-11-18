@@ -12,7 +12,7 @@ The user has asked you to teach them something. This is a stateful request - the
 
 ## Teaching Workspace
 
-Resolve and retain the absolute `.dev-skills/` workspace using the shared workflow. Choose a topic slug and retain an absolute teaching root at `<workspace>/teach/<topic>/`. All teaching outputs and state stay under this one tree, regardless of subprocess cwd. Pass both absolute paths explicitly to any subagent. If setup is missing, suggest `/setup-dev-skills` in Claude Code or `/skill:setup-dev-skills` in omp before creating files.
+Resolve and retain the absolute `.dev-skills/` workspace using the shared workflow. Choose a topic slug and retain an absolute teaching root at `<workspace>/teach/<topic>/`. All teaching outputs and state stay under this one tree, regardless of subprocess cwd. Pass both absolute paths explicitly to any subagent. If setup is missing, suggest the user invoke `setup-dev-skills` before creating files.
 
 Paths such as `./lessons/`, `MISSION.md`, and the rest below resolve from this teaching root, never from the invocation directory or the shared workspace root. Only the installed `*-FORMAT.md` links resolve from this skill's folder. Create meaningful documents lazily as the teaching task needs them. The state of their learning is captured in this directory in several files:
 

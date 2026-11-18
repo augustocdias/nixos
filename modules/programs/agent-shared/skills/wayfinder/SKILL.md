@@ -13,7 +13,7 @@ A loose idea has arrived, too big for one agent session, and wrapped in fog: the
 
 The destination varies per effort, and naming it is the first act of charting: it shapes every ticket. It might be a spec to hand off and iterate on, a decision to lock before planning starts, or a change made in place like a data-structure migration. The map is domain-agnostic: engineering work, course content, whatever fits the shape.
 
-Load contextual skills through Claude’s native Skill mechanism or omp’s `read skill://<name>`. Invoke this manual skill with Claude `/wayfinder` or omp `/skill:wayfinder`. All remote map/ticket creation, claims, assignment, labels, relationship changes, comments, and closure require the existing approval route. Do not treat a proposed transition as applied. Never store secret values or sensitive payloads in tickets or research.
+All remote map/ticket creation, claims, assignment, labels, relationship changes, comments, and closure require the existing approval route. Do not treat a proposed transition as applied. Never store secret values or sensitive payloads in tickets or research.
 
 ## Plan, don't do
 
@@ -29,7 +29,7 @@ The map is the canonical artifact: a single issue labelled `wayfinder:map` on a 
 
 The map is an **index**, not a store. It lists the decisions made and points at the tickets that hold their detail; a decision lives in exactly one place, its ticket, so the map never restates it, only gists it and links.
 
-**Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** Read the resolved workspace’s `issue-tracker.md` and its "Wayfinding operations" section. If required setup is missing, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills` manually before creating artifacts; do not invent a tracker configuration. Local Markdown is supported without remote mutations.
+**Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** Read the resolved workspace’s `issue-tracker.md` and its "Wayfinding operations" section. If required setup is missing, suggest the user invoke `setup-dev-skills` before creating artifacts; do not invent a tracker configuration. Local Markdown is supported without remote mutations.
 
 ### The map body
 

@@ -1,6 +1,6 @@
 ---
 name: writing-for-agents
-description: Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md.
+description: "Use when creating or editing a skill, AGENTS.md, CLAUDE.md, or another document an agent reads, such as a system prompt or Hermes SOUL."
 ---
 
 Read [Shared workflow](WORKFLOW.md) before following this skill.

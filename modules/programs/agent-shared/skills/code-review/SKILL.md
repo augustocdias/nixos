@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
+description: "Use when reviewing changes since a fixed point (commit, branch, tag or merge-base): a branch, a PR, work-in-progress changes, a \"review since X\" request, or the review step of another skill."
 ---
 
 [Shared workflow](WORKFLOW.md)
@@ -15,7 +15,7 @@ Two-axis review of the actual requested diff (committed changes, work in progres
 
 Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Start every reviewer with fresh context.
 
-Read the resolved workspace’s `issue-tracker.md` when tracker access is needed. Stateless review may proceed without setup if no configuration or supporting artifact is needed. If setup is required, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills` manually; do not invoke manual setup automatically.
+Read the resolved workspace’s `issue-tracker.md` when tracker access is needed. Stateless review may proceed without setup if no configuration or supporting artifact is needed. If setup is required, suggest the user invoke `setup-dev-skills`; do not invoke manual setup automatically.
 
 ## Process
 

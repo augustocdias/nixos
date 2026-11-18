@@ -5,6 +5,9 @@
 }: let
   models = import ./_models.nix;
   fallbacks = import ./_fallbacks.nix;
+  # Bundled duplicates of house skills, and CLIs that would take over work the profile does itself.
+  # Bootstrap replaces this list, so a Desktop toggle lasts until the next restart.
+  disabledSkills = ["test-driven-development" "systematic-debugging" "requesting-code-review" "simplify-code" "spike" "grounded-citations" "humanizer" "claude-code" "codex"];
 in {
   # Keep Hermes on a current uv2nix builder; flake.lock owns the exact revision.
   flake-file.inputs.uv2nix = {
@@ -29,6 +32,6 @@ in {
     url = "github:oslook/hermes-desktop-plugin-office-3d";
     flake = false;
   };
-  den.aspects.hermes-agent.darwin = import ./_darwin.nix {inherit inputs lib models fallbacks;};
-  den.aspects.hermes-work.homeManager = import ./_work.nix {inherit inputs models fallbacks;};
+  den.aspects.hermes-agent.darwin = import ./_darwin.nix {inherit inputs lib models fallbacks disabledSkills;};
+  den.aspects.hermes-work.homeManager = import ./_work.nix {inherit inputs models fallbacks disabledSkills;};
 }

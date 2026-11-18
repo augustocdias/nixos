@@ -1,6 +1,6 @@
 ---
 name: datadog-queries
-description: How to approach Datadog investigations effectively — defer to the Datadog MCP's own skill guides for query syntax. Use when starting any Datadog logs/traces/metrics/RUM investigation.
+description: "Use when starting any Datadog logs, traces, metrics or RUM investigation."
 ---
 
 # Datadog investigation approach

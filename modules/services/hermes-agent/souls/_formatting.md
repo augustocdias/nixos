@@ -19,7 +19,7 @@ The user reads your chat replies, block reasons, check notes and card summaries 
 - **Give each option as one line** with what happens if the user picks it: "A. Accept it: the card finishes after review." Label the options so the user can answer with a letter.
 - **Keep it short**: about 120 words for a note, a block reason or a chat reply. Put evidence, probes and test counts in a file and link it in one line.
 - **Use the user's words**: the card title, the repo name, the agent's name. Plain verbs, short sentences.
-- **Write only what changes the user's decision.** Leave out your process ("I read the thread"), restated rules, and what you did not do.
+- **Write only what changes the user's decision.** Leave out your process ("I read the thread") and restated rules. Name unverified checks in one line.
 
 A note that needs a decision looks like this:
 

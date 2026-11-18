@@ -1,7 +1,7 @@
 
 # Working directly in Hermes
 
-Use your configured model and native tools to perform the assignment yourself. Read the card, its full thread, the ticket and repository instructions before editing. Load the relevant development skill and apply its steps in this session.
+Use your configured model and native tools to perform the assignment yourself. Read the ticket and repository instructions before editing.
 
 A delegated helper does not own the parent's board task or Git grant. Review supplied evidence and files; leave Git operations and board transitions to the owning worker. When requesting such a check, supply the diff, exact base/head and acceptance criteria rather than asking the helper to borrow your task ID.
 
@@ -9,7 +9,7 @@ The card's Run settings contain Repo, Tracker and Git ownership. Repo names the 
 
 # Git ownership
 
-Use the `git` tool for every Git operation, including reads. Pass the current task ID and an array of arguments without the `git` executable. For example, `{"task":"<card-id>","args":["status","--short"]}`. Terminal Git is blocked. Credentials remain inside the proxy; never request a key or signing socket.
+Use the `git` tool for every Git operation, including reads. Pass the current task ID and an array of arguments without the `git` executable. For example, `{"task":"<card-id>","args":["status","--short"]}`. Terminal Git is blocked. Credentials remain inside the proxy; never request a key or signing socket. The proxy replaces the credential, signing and worker-proposal sections of `git-conventions`; take only its ownership scope and commit style.
 
 Ownership is independently `agent` or `human` for branches, worktrees, commits, pushes and PRs. Missing values and legacy `ask` mean human. The proxy enforces branch, worktree, commit and push ownership. Honor PR ownership before using publication tools. A human-owned operation means prepare the exact handoff and leave it to the user, not ask for approval in a background terminal. Existing grants are not permission to merge, force-push or delete unrelated work. All created commits must be signed, and every outgoing commit must pass signature verification.
 
@@ -19,9 +19,9 @@ Keep task run settings unchanged. A changed Git agreement needs a human edit and
 
 1. Record the intended scope and the acceptance checks with `kanban_comment`.
 2. Perform the work, observe the changed behavior, and collect all delegated results before handing off. Tests alone do not establish a UI or service works.
-3. Record exact checkout, branch, base/head, changed behavior, check outcomes and any human-owned handoff. Use `owner/repo#123` for PR references, including quoted evidence.
-4. End the stage with the appropriate board action. Programmers request independent review; reviewers follow `sdlc-review`; research and QA complete when their assignment is verified.
+3. Record exact checkout, branch, base/head, changed behavior, check outcomes, signature evidence, skills loaded and any human-owned handoff.
+4. End the stage with the appropriate board action. Programmers request independent review on the same card with `kanban_request_review`; reviewers follow `sdlc-review`; research and QA complete when their assignment is verified.
 
-Use `kanban_block` only for a prerequisite or decision no agent can resolve. State Needs you, What happened and Options. Background runs never wait on invisible approval prompts. A human-owned publication step is a handoff; keep the card blocked only when it prevents a required acceptance check. Otherwise disclose it as remaining human work.
+Use `kanban_block` only for a prerequisite or decision no agent can resolve. The block reason is the only explanation the user reads, so write it as the decision note in *Writing for the user*: what you need, what is wrong in terms the user can see, and lettered options, without requiring the thread. Background runs never wait on invisible approval prompts. A human-owned publication step is a handoff; keep the card blocked only when it prevents a required acceptance check. Otherwise disclose it as remaining human work.
 
 Create assigned work with `triage=false`, an explicit assignee and all blocking parents. Only the coordinator in a direct user conversation may create explicitly requested triage work. Board Done means approved and verified agent work, not merged, deployed or externally closed. An open predecessor PR is not itself a blocker.

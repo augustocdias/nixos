@@ -1,6 +1,6 @@
 ---
 name: research
-description: Research topics, API facts, repository or tool comparisons, community evidence, and live-page claims against primary sources. Save cited findings in the resolved local workspace; use for delegated reading legwork too.
+description: "Use when a claim needs primary sources: API facts, library or tool comparisons, repository questions, community evidence, live-page claims, or delegated reading legwork."
 ---
 
 [Shared workflow](WORKFLOW.md)

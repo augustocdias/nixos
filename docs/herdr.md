@@ -26,7 +26,7 @@ The `herdr-tmux-prefix` input contains the upstream examples repository, but onl
 
 The prefix input follows the upstream default branch. `nix flake update herdr-tmux-prefix` refreshes its locked revision; rebuild afterward to apply it. Source adaptations fail on changed upstream anchors rather than silently dropping behavior.
 
-OMP's launcher entry and agent shortcuts resolve installed command names, including the Linux jail wrappers. Remote spaces require those commands on their target machine; a launcher entry does not install them remotely.
+The App's built-in OMP entry and the agent shortcuts resolve installed command names, including the Linux jail wrappers. Remote spaces require those commands on their target machine; a launcher entry does not install them remotely.
 
 Other modules add launcher entries and global keys through the `herdr.programs` and `herdr.keys` options, because `programs.json` and `keys.json` are single files. An entry with an App built-in name, such as `hermes`, replaces that built-in entry, so restate its icon and colours. The work Hermes uses this for Super+S, which opens the coordinator.
 

@@ -10,6 +10,7 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
 - **Lauren Tan**: [pstack](https://github.com/cursor/plugins/tree/main/pstack). The `unslop` skill in `modules/programs/agent-shared/skills/`. MIT, see `pstack/LICENSE`.
 - **Julius Brussee**: [Caveman](https://github.com/JuliusBrussee/caveman). The chat-style rules (`agent-shared/style/caveman.md`), the one-line finding format in `skills/code-review`, and the commit rules in `skills/git-conventions`. Apache-2.0, see `caveman/`.
 - **Dietrich Gebert**: [Ponytail](https://github.com/DietrichGebert/ponytail). The engineering rules (`agent-shared/style/ponytail.md`) and the quality checklist in `skills/code-review`. MIT, see `ponytail/LICENSE`.
+- **MINT**: [jgrep](https://github.com/kyu1204/jgrep). The work-only skill in `modules/services/work/skills/jgrep/`. MIT, see `jgrep/LICENSE`.
 
 ## Caveman
 
@@ -44,4 +45,13 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
   - Removed the frontmatter, the levels table and level switching.
   - Folded the `ponytail-review` checklist into `skills/code-review`.
 
-Hermes still uses the upstream Caveman and Ponytail integrations through their flake inputs. Updating any copy here is a deliberate copy-and-review operation.
+All managed harnesses use the local Caveman and Ponytail rules. Updating these copies is a manual copy-and-review operation, independent of system package updates.
+
+## jgrep
+
+- Source: [`jevgrep` 0.6.0 npm archive](https://registry.npmjs.org/jevgrep/-/jevgrep-0.6.0.tgz), repository revision `fedcb464f3be7aafc96c53d2d15e24e68cd22e8b`.
+- Archive SHA-256: `sha256-CXhFmil3Zpip/6eWyKY6Bxng3W/Hqwh5l1fD1iJ7M6M=`.
+- Copyright (c) 2026 MINT.
+- License: MIT (`jgrep/LICENSE`).
+- Copied verbatim from `package/skills/jgrep/SKILL.md` into `modules/services/work/skills/jgrep/SKILL.md`.
+- The package and skill have separate update lifecycles. Update the skill manually after review.

@@ -1,6 +1,6 @@
 ---
 name: terminal-browser
-description: "Browser automation and web UI checks: open pages in a terminal, inspect and interact with them, and capture screenshots using terminal-browser."
+description: "Use when a task needs a browser: automating or checking a web UI, interacting with a page, or capturing screenshots."
 ---
 
 # Browser automation
@@ -9,7 +9,7 @@ Use `terminal-browser` for interactive pages and web UI checks. Use the harness'
 
 ## 1. Open an owned browser
 
-Load `herdr-core` through the harness's skill mechanism before starting a terminal. Use Claude's Skill tool or OMP's `read skill://herdr-core`. Keep its execution boundary and approval rules. Record existing browsers with `terminal-browser ls --all --json` before launching yours.
+Load `herdr-core` before starting a terminal. Keep its execution boundary and approval rules. Record existing browsers with `terminal-browser ls --all --json` before launching yours.
 
 Launch the browser in its own Core terminal, with a unique name and the project's working directory:
 

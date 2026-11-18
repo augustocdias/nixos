@@ -3,11 +3,6 @@
   lib,
   ...
 }: {
-  flake-file.inputs.ponytail = {
-    url = lib.mkDefault "github:DietrichGebert/ponytail";
-    flake = false;
-  };
-
   den.aspects.claude-code = {
     includes = [den.aspects.agent-shared];
     homeManager = {pkgs, ...}: let

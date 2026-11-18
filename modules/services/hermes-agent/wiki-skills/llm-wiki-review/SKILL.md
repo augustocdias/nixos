@@ -1,6 +1,6 @@
 ---
 name: llm-wiki-review
-description: Librarian review loop for the LLM wiki. Turn raw sources into proposals, send a numbered digest, record chat verdicts, and apply approved proposals to gold. Use for wiki ingest, verdicts, apply, lint and memory maintenance.
+description: "Use for every wiki task: ingest, verdicts, apply, lint and memory maintenance."
 version: 1.0.0
 metadata:
   hermes:

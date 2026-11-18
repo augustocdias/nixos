@@ -1,6 +1,6 @@
 ---
 name: prototype
-description: Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like.
+description: "Use when a design question needs a throwaway build to answer it: whether a state model or logic feels right, or what a UI should look like."
 ---
 
 [Shared workflow](WORKFLOW.md)
@@ -19,7 +19,7 @@ Identify which question is being answered, using the user's prompt, the surround
 
 The two branches produce very different artifacts, so getting this wrong wastes the whole prototype. If the question is genuinely ambiguous and the user isn't reachable, default to whichever branch better matches the surrounding code (a backend module → logic; a page or component → UI) and state the assumption at the top of the prototype.
 
-Before checkout/worktree changes or Git publication, load `git-conventions` through Claude's native Skill mechanism or omp's `read skill://git-conventions` and establish ownership. Headless workers request privileged or remote actions from the parent. Prototype selection can be promoted within the user's requested implementation scope; if the request is exploration-only, capture the decision and hand off the production change.
+Before checkout/worktree changes or Git publication, load `git-conventions` and establish ownership. Headless workers request privileged or remote actions from the parent. Prototype selection can be promoted within the user's requested implementation scope; if the request is exploration-only, capture the decision and hand off the production change.
 
 ## Rules that apply to both
 

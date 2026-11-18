@@ -90,12 +90,17 @@ def enable_plugins(path, names):
     plugins = plugins if isinstance(plugins, dict) else {}
     enabled = plugins.get("enabled")
     enabled = enabled if isinstance(enabled, list) else []
-    missing = [name for name in names if name not in enabled]
-    if missing:
+    # Ponytail now comes from the local SOUL; retire its old prompt-injecting plugin.
+    wanted = [name for name in enabled if name != "ponytail"]
+    wanted += [name for name in names if name not in wanted]
+    disabled = plugins.get("disabled")
+    disabled = disabled if isinstance(disabled, list) else []
+    retired = disabled if "ponytail" in disabled else disabled + ["ponytail"]
+    if wanted != enabled or retired != disabled:
         atomic_write(
             path,
             json.dumps(
-                {**config, "plugins": {**plugins, "enabled": enabled + missing}}
+                {**config, "plugins": {**plugins, "enabled": wanted, "disabled": retired}}
             ),
         )
 
@@ -161,6 +166,8 @@ def bootstrap(manifest):
         # The Caveman skill bundle is no longer linked; drop the old managed link.
         if (home / "skills" / "caveman-bundle").is_symlink():
             (home / "skills" / "caveman-bundle").unlink()
+        if (home / "plugins" / "ponytail").is_symlink():
+            (home / "plugins" / "ponytail").unlink()
         for directory in ("plugins", "memories", "sessions", "skills", "cron"):
             (home / directory).mkdir(exist_ok=True)
         for name in ("MEMORY.md", "USER.md"):

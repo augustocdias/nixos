@@ -4,11 +4,11 @@ Read this contract before the owning skill's workflow. Project instructions, the
 
 ## Invocation and style
 
-Claude Code loads skills through its native Skill mechanism and `/name`. omp loads a skill with `read skill://name`; explicit invocation uses `/skill:name`. Use the installed companion paths within the skill root. Never traverse above that root through `skill://`.
+Use the installed companion paths within the skill root, never a path above it.
 
-Manual-only skills are `grill-me`, `grill-with-docs`, `setup-dev-skills`, `orchestrator`, `implement-spec`, `improve-codebase-architecture`, `retro`, `to-spec`, `to-tickets`, `triage`, `wayfinder`, `handoff`, `teach`, `to-questionnaire`, and `wait-what`. Their `disable-model-invocation: true` flag controls discovery and invocation, not permission. Suggest the user's manual command instead of automatically invoking them. Explicit invocation of `orchestrator` also authorizes loading and following `implement-spec` for that supplied spec, with Herdr as its worker transport. This exception does not authorize other manual workflows. Contextual skills also remain manually invocable. In particular, `implement` supports Claude `/implement`, omp `/skill:implement`, contextual user-requested implementation and explicit orchestrator assignments.
+A skill whose frontmatter sets `disable-model-invocation: true` is manual-only, even where a harness lists it: suggest the user invoke it instead of loading it yourself. The flag controls invocation, not permission. Explicit invocation of `orchestrator` also authorizes loading and following `implement-spec` for that supplied spec, with Herdr as its worker transport. This exception does not authorize other manual workflows.
 
-The chat style compresses chat, not meaning, files, comments, specifications, or lessons. The engineering rules require the smallest complete change, not shortened workflows or skipped verification. Keep their skipped-work/risk note outside any requested exact document format. Reuse agreed test seams and project conventions; do not manufacture abstractions, tests of implementation wording, or speculative scope.
+When the chat style and engineering rules are loaded: the chat style compresses chat, not meaning, files, comments, specifications, or lessons. The engineering rules require the smallest complete change, not shortened workflows or skipped verification. Keep their skipped-work/risk note outside any requested exact document format. Reuse agreed test seams and project conventions; do not manufacture abstractions, tests of implementation wording, or speculative scope.
 
 ## Workspace resolution
 
@@ -16,7 +16,7 @@ The chat style compresses chat, not meaning, files, comments, specifications, or
 
 A delegated worker uses the parent's explicitly supplied absolute workspace even when it lies outside the assigned checkout's Git root. This narrow exception permits shared supporting artifacts, not unrelated filesystem traversal. Do not rediscover or initialize a second workspace. Use separate worker evidence files; only the parent writes shared progress.
 
-An initialized workspace contains `README.md` and `issue-tracker.md`. If required configuration or output storage is absent, offer `/setup-dev-skills` (Claude) or `/skill:setup-dev-skills` (omp) before generating artifacts. Stateless review or explanation may proceed without setup. Native session stores, native plan-mode files, and installed read-only templates stay where their owners require them.
+An initialized workspace contains `README.md` and `issue-tracker.md`. If required configuration or output storage is absent, suggest the user invoke `setup-dev-skills` before generating artifacts. Stateless review or explanation may proceed without setup. Native session stores, native plan-mode files, and installed read-only templates stay where their owners require them.
 
 Do not follow a workspace or target symlink outside its intended directory. Preserve existing user documents and decisions. Existing tracked glossary, ADR, or standards documents may remain authoritative read-only inputs; record their locations in `domain.md`. Only a separately requested production-documentation change edits those sources.
 
@@ -52,12 +52,10 @@ Load `git-conventions` when the workflow needs Git mutations. Agree branch, work
 
 Existing permissions remain unchanged. Remote mutations, label creation, publication, pushes, and signed commits use normal approval routes. Headless adapters return exact proposed tool calls for the parent to approve; they do not bypass permissions. A declined commit is not a completed commit. Native `/review` and native helpers remain available; `code-review` is the canonical configured diff-review workflow. `pr` owns PR-body structure, subject to a real repository template and `git-conventions` title/issue/safety rules.
 
-The parent owns approval-dependent actions and credentials. When Git-over-SSH is needed, obtain `host_ssh_agent` approval before any worker starts; pass the approved socket path to applicable workers. Rejection does not permit another credential route. Workers return evidence, intended production paths and pending actions; the parent stages explicit production paths and handles signed commits/pushes through the required host route. Preserve Darwin's existing signing route outside the Linux jail.
-
-`git-conventions` also owns the signing route. A session the user launched with the signing grant signs and pushes with the agent key, and passes that grant only to host workers whose tickets ask for it. Without the grant, signed commits and pushes keep their normal approval routes, and workers return proposals.
+The parent owns approval-dependent actions and credentials; `git-conventions` owns the credential and signing routes.
 
 Before commits or publication, inspect tracked and staged supporting artifacts. If any `.dev-skills/` artifacts are tracked or staged, stop publication and explain the conflict without discarding or untracking user work. Never force-add supporting artifacts, temporary preview wiring, or artifact archive branches. Authorized PR bodies and tracker summaries may contain concise necessary evidence, not uploaded supporting files or inaccessible local links. Sharing generated artifacts needs a separate explicit request.
 
-Wizard scripts are for humans to run on the host. Give the exact host command. Do not run credential, provisioning, deployment, or privileged stages from the agent. Anchor scratch state beside the wizard, not its caller's cwd; explicitly distinguish an intended external target from supporting state. Use SOPS for this repository's secrets and never print their values.
+Wizard scripts are for humans to run on the host. Give the exact host command. Do not run credential, provisioning, deployment, or privileged stages from the agent. Anchor scratch state beside the wizard, not its caller's cwd; explicitly distinguish an intended external target from supporting state. Never print secret values.
 
 Accept user-reported failures as evidence; do not rerun merely to confirm the report. Seek reproducible causal evidence through safe, one-variable probes. Verify actual changed behavior, rendered reports/previews, and generated scripts. Never invent before/after evidence, recipient facts, deadlines, terminology, or remote label existence.

@@ -11,7 +11,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 ## Steps
 
-1. load the `writing-for-agents` skill (Claude: native Skill mechanism; omp: `read skill://writing-for-agents`) for the writing style guide.
+1. load the `writing-for-agents` skill for the writing style guide.
 
 2. Read the primary sources for the session the user specifies. This may mean searching through session logs on this machine. If the user doesn't specify a session, default to the current one.
 

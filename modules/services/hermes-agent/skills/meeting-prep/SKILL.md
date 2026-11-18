@@ -1,6 +1,6 @@
 ---
 name: meeting-prep
-description: Prepare the user for an upcoming calendar event by gathering related cards, issues, pull requests and notes. Use when a cron job or the user asks to prep a meeting.
+description: "Use when a cron job or the user asks to prep for an upcoming calendar event."
 ---
 
 # Meeting prep

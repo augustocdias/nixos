@@ -45,13 +45,13 @@ For a PR, the same states read against the attached code: `ready-for-agent` mean
 
 Every triaged issue should carry exactly one category role and one state role. If state roles conflict, flag it and ask the maintainer before doing anything else.
 
-These are canonical role names. The actual label strings used in the issue tracker may differ. Read the actual mapping in the resolved workspace’s `triage-labels.md` and operations in `issue-tracker.md`. If required configuration is absent, suggest Claude `/setup-dev-skills` or omp `/skill:setup-dev-skills`; never auto-invoke manual setup. Do not claim a proposed label exists.
+These are canonical role names. The actual label strings used in the issue tracker may differ. Read the actual mapping in the resolved workspace’s `triage-labels.md` and operations in `issue-tracker.md`. If required configuration is absent, suggest the user invoke `setup-dev-skills`; never auto-invoke manual setup. Do not claim a proposed label exists.
 
 State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. The maintainer can override at any time; flag transitions that look unusual and ask before proceeding.
 
 ## Invocation
 
-The maintainer invokes Claude `/triage` or omp `/skill:triage` and describes what they want in natural language. Interpret the request and act. Examples:
+The maintainer invokes `triage` and describes what they want in natural language. Interpret the request and act. Examples:
 
 - "Show me anything that needs my attention"
 - "Let's look at #42" (issue or PR)
@@ -78,7 +78,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 3. **Verify the claim.** Before grilling, verify the issue or PR with the relevant tests or commands. Accept user-reported failures and supplied output as ground truth; use new runs for causal evidence, not merely reconfirmation. For a PR, check out its actual head in the checkout/worktree authorized by the upfront `git-conventions` agreement, confirm its identity, and run the relevant checks against that diff. Preserve user work and unrelated worktrees. Headless workers return approval-dependent checkout, credential, or remote actions to the parent; the parent obtains required SSH approval before dispatch. Report confirmed evidence (with code path), failed probes, or insufficient detail separately; unavailable checkout/testing is not successful verification. Save durable diagnostic harnesses/evidence under `.dev-skills/debug/<slug>/`. Supported verification makes a stronger agent brief.
 
-4. **Grill (if needed).** If the request needs fleshing out, load contextual `grilling` and `domain-modeling` through Claude’s native Skill mechanism or omp’s `read skill://<name>`, and grill it into shape a round of questions at a time, sharpening domain terms and updating the workspace `GLOSSARY.md` and `adr/` (or configured bounded-context documents) inline as decisions land.
+4. **Grill (if needed).** If the request needs fleshing out, load contextual `grilling` and `domain-modeling`, and grill it into shape a round of questions at a time, sharpening domain terms and updating the workspace `GLOSSARY.md` and `adr/` (or configured bounded-context documents) inline as decisions land.
 
 5. **Apply the outcome after approval:** Use configured tracker operations for labels/statuses, comments, and closure. Recommendation is not permission to mutate. For local Markdown, update the applicable ticket under `.dev-skills/features/<slug>/issues/`; retain the same category/state meaning and AI disclosure.
 

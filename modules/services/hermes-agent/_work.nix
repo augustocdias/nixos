@@ -3,6 +3,7 @@
   inputs,
   models,
   fallbacks,
+  disabledSkills,
   ...
 }: {
   config,
@@ -131,19 +132,10 @@
       human_signer = config.programs.git.signing.key;
       known_hosts = "${homeDirectory}/.ssh/known_hosts";
       google_token = "${root}/profiles/assistant/google_token.json";
-      poll_seconds = 15;
     })} $out/settings.json
   '';
-  globalContext = let
-    sections = lib.splitString "\n## " (builtins.readFile ../../programs/agent-shared/context.md);
-  in
-    lib.concatMapStrings (section: "\n## " + section + "\n") (builtins.filter (section:
-      lib.hasPrefix "Evidence and decisions" section || lib.hasPrefix "Development skills" section)
-    sections);
-  style = lib.concatMapStrings builtins.readFile [
-    ../../programs/agent-shared/style/caveman.md
-    ../../programs/agent-shared/style/ponytail.md
-  ];
+  # Hermes souls skip the harness context and Caveman: both contradict _formatting.md or name
+  # Claude/omp mechanics. Ponytail's change discipline applies to the programmer only.
   soul = name:
     pkgs.writeText "${name}-SOUL.md" ((
         if librarians ? ${name}
@@ -151,6 +143,7 @@
         else builtins.readFile ./souls/${name}.md
       )
       + lib.optionalString (lib.elem name (roles ++ ["coordinator"])) (builtins.readFile ./souls/_role.md)
+      + lib.optionalString (lib.elem name (roles ++ ["coordinator"])) (builtins.readFile ./souls/_skills.md)
       + lib.optionalString (lib.elem name (roles ++ ["coordinator" "default"])) (builtins.readFile (
         if isLinux
         then ./souls/_linux.md
@@ -158,10 +151,8 @@
       ))
       + lib.optionalString (isLinux && name == "coordinator") (wikis.soul ./souls/_wiki.md wikiOf.coordinator)
       + builtins.readFile ./souls/_formatting.md
-      + "\n# Global rules\n"
-      + globalContext
-      + "\n"
-      + style);
+      + builtins.readFile ./souls/_evidence.md
+      + lib.optionalString (name == "programmer") ("\n" + builtins.readFile ../../programs/agent-shared/style/ponytail.md));
   # Catppuccin Mocha for the CLI; missing keys inherit the built-in default skin.
   skin = (pkgs.formats.yaml {}).generate "catppuccin-mocha.yaml" {
     name = "catppuccin-mocha";
@@ -192,6 +183,30 @@
     };
   };
 
+  # Development caches and gh state the work repos need, bound read-write like the Claude/omp jail does.
+  # shortcut: assumes uid 1000 for the Podman socket; derive it if the user's uid ever changes.
+  runtimeDir = "/run/user/1000";
+  devBinds =
+    map (path: {
+      src = "${homeDirectory}/${path}";
+      readonly = false;
+    }) [".cache/nix" ".cache/pnpm" ".cache/gh" ".npm" ".cargo/registry" ".cargo/git" ".local/share/pnpm" ".local/state/pnpm" ".local/share/gh" ".local/state/gh" ".local/share/direnv"]
+    ++ [
+      {src = "${homeDirectory}/.config/direnv";}
+      {src = "${runtimeDir}/podman";}
+    ];
+  # Upstream bubblewrap refuses any bind under these credential-list entries; the binds above need them.
+  unhidden = [".cache" ".cargo" ".npm"];
+  bubblewrapPlugin = pkgs.runCommand "hermes-bubblewrap" {} ''
+    cp -r ${inputs.hermes-official-plugins}/bubblewrap $out
+    chmod -R u+w $out
+    substituteInPlace $out/home.py --replace-fail \
+      'if path not in names:' \
+      'if path not in names and os.path.relpath(path, home) not in UNHIDDEN_HOME_PATHS:'
+    echo 'UNHIDDEN_HOME_PATHS = (${lib.concatMapStringsSep ", " (p: "\"${p}\"") unhidden},)' >> $out/home.py
+  '';
+  # pnpm reads registry auth from this file instead of ~/.npmrc, which the sandbox hides.
+  npmrcAuth = pkgs.writeText "npmrc" "//npm.pkg.github.com/:_authToken=\${NELLY_GH_REGISTRY_TOKEN}\n";
   officialPlugins =
     ["advanced-delegation"]
     ++ (
@@ -224,7 +239,8 @@
     toolsets = lib.optional (lib.elem "kanban" toolsets) "kanban";
     approvals = {
       mode = "off";
-      deny = ["*nixos-rebuild*" "*darwin-rebuild*" "git" "git *" "*/git" "*/git *"];
+      # rtk-rewrite turns `git status` into `rtk git status` before this check; the `rtk git` twins catch it.
+      deny = ["*nixos-rebuild*" "*darwin-rebuild*" "git" "git *" "*/git" "*/git *" "rtk git" "rtk git *"];
     };
     terminal = {
       backend =
@@ -232,9 +248,10 @@
         then "bubblewrap"
         else "local";
       degraded_mode = "fail";
-      # Native kanban workers override cwd with their card's explicit workspace.
+      # Every session starts here, kanban workers included: a card's workspace does not move the
+      # bubblewrap cwd. Workers reach their checkout through the ~/dev bind below.
       cwd = "${dev}/.hermes-workspaces/${name}";
-      env_passthrough = ["NIX_REMOTE"] ++ lib.optional (name == "reviewer") "GH_TOKEN";
+      env_passthrough = ["NIX_REMOTE"] ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) ["GH_TOKEN" "DOCKER_HOST" "CONTAINER_HOST" "PNPM_CONFIG_NPMRC_AUTH_FILE"];
     };
     browser = lib.optionalAttrs (lib.elem "browser" toolsets) {
       executable_path =
@@ -258,10 +275,13 @@
       streaming = true;
       bell_on_prompt = true;
     };
-    skills.external_dirs = ["${sharedSkills.package}" "${./skills}"];
+    skills = {
+      external_dirs = ["${sharedSkills.package}" "${./skills}"];
+      disabled = disabledSkills;
+    };
     plugins = {
       enabled =
-        ["hermes-workflow" "advanced-delegation" "office-3d" "wiki-gate"]
+        ["rtk-rewrite" "hermes-workflow" "advanced-delegation" "office-3d" "wiki-gate"]
         ++ lib.optional isLinux "bubblewrap"
         ++ lib.optional (isLinux && security) "hermes-security"
         ++ lib.optional (isLinux && rea) "rea"
@@ -271,15 +291,23 @@
           profile = "network";
           home_default_deny = "all";
           hide = ["/run/secrets" "${homeDirectory}/.config/sops" "${config.sops.secrets.agent_ssh_key.path}"];
-          # File tools run in this sandbox too. Only the folders a profile writes are bound,
+          # File tools run in this sandbox too. Only the vault folders a profile writes are bound,
           # so no sandbox can plant Git hooks or config that the sync timer would run.
-          binds = lib.optional (lib.elem name wikiWriters) {
-            src =
-              if name == "librarian"
-              then "${librarians.librarian.path}/${librarians.librarian.tree}"
-              else "${librarians.librarian.path}/${librarians.librarian.tree}/raw";
-            readonly = false;
-          };
+          binds =
+            lib.optional (lib.elem name wikiWriters) {
+              src =
+                if name == "librarian"
+                then "${librarians.librarian.path}/${librarians.librarian.tree}"
+                else "${librarians.librarian.path}/${librarians.librarian.tree}/raw";
+              readonly = false;
+            }
+            # Card checkouts live under ~/dev, outside terminal.cwd, the only path the backend binds itself.
+            # Tradeoff: these profiles can read and write every repository under ~/dev, its .git included.
+            ++ lib.optional (lib.elem name (["coordinator"] ++ roles)) {
+              src = dev;
+              readonly = false;
+            }
+            ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) devBinds;
           memory_mb = 4096;
           cpu_seconds = 600;
           max_procs = 256;
@@ -333,7 +361,7 @@
   profiles =
     {
       coordinator = {
-        description = "Plans work with the user, routes native Hermes roles and resolves board blockers.";
+        description = "Plans work with the user, routes native Hermes roles.";
         config =
           lib.recursiveUpdate (profileConfig {
             name = "coordinator";
@@ -347,6 +375,7 @@
             };
           };
         soul = soul "coordinator";
+        secrets.GH_TOKEN = config.sops.secrets.github_token.path;
         plugin = true;
       };
       assistant = {
@@ -427,13 +456,14 @@
           work
           ++ lib.optionals (name == "qa") ["browser" "vision"]
           ++ lib.optional (isLinux && name == "reviewer") "security"
-          ++ lib.optional (name == "reviewer") "delegation";
+          # Every role may spawn plain subagents; only the reviewer routes to other profiles, whose credentials a route lends.
+          ++ ["delegation"];
         rea = isLinux && lib.elem name ["programmer" "reviewer" "qa" "research"];
         security = isLinux && name == "reviewer";
         delegate = name == "reviewer";
       };
       soul = soul name;
-      secrets = lib.optionalAttrs (name == "reviewer") {GH_TOKEN = config.sops.secrets.github_token.path;};
+      secrets.GH_TOKEN = config.sops.secrets.github_token.path;
       plugin = true;
     });
   manifest = pkgs.writeText "hermes-profiles.json" (builtins.toJSON {
@@ -506,6 +536,10 @@
       export CLAUDE_SUBSCRIPTION_DIRECTSDK_COMMAND=${lib.getExe pkgs.claude-code}
       export HERMES_SECURITY_OSV_SCANNER=${lib.getExe pkgs.osv-scanner}
       export NIX_REMOTE=daemon
+      export DOCKER_HOST=unix://${runtimeDir}/podman/podman.sock CONTAINER_HOST=unix://${runtimeDir}/podman/podman.sock
+      export PNPM_CONFIG_NPMRC_AUTH_FILE=${npmrcAuth}
+      # The sandbox refuses a missing bind source; the socket appears only once Podman starts.
+      mkdir -p ${runtimeDir}/podman
     ''}
     unset AGENT_JAIL_SIGNING SSH_AUTH_SOCK GPG_AGENT_INFO
     ${bootstrap}
@@ -533,11 +567,18 @@ in {
   home.file =
     lib.listToAttrs (lib.concatMap (home:
       (map (name:
-        lib.nameValuePair "${home}/plugins/${name}" {source = "${inputs.hermes-official-plugins}/${name}";})
+        lib.nameValuePair "${home}/plugins/${name}" {
+          source =
+            if name == "bubblewrap"
+            then bubblewrapPlugin
+            else "${inputs.hermes-official-plugins}/${name}";
+        })
       officialPlugins)
       ++ [
         (lib.nameValuePair "${home}/plugins/office-3d" {source = inputs.hermes-plugin-office-3d;})
         (lib.nameValuePair "${home}/plugins/wiki-gate" {source = wikiGate;})
+        # Upstream's adapter, version-matched to the binary; see the deny twins in profileConfig.
+        (lib.nameValuePair "${home}/plugins/rtk-rewrite" {source = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";})
       ])
     ([".hermes"] ++ map (name: ".hermes/profiles/${name}") (builtins.attrNames profiles)))
     // lib.listToAttrs (map (name: lib.nameValuePair "${homeOf name}/plugins/hwiki" {source = inputs.hermes-plugin-hwiki;}) wikiProfiles)
