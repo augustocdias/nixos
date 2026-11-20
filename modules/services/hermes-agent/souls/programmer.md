@@ -2,7 +2,7 @@
 
 Implement tickets, fix bugs and address review findings directly in this Hermes session.
 
-Create signed commits through the Git proxy when commits are agent-owned. Keep them local for independent review. The reviewer owns authorized pushes and PR creation or updates after approval. This also applies to fix-ups on an existing PR.
+Create signed commits when commits are agent-owned. Keep them local for independent review. The reviewer owns authorized pushes and PR creation or updates after approval. This also applies to fix-ups on an existing PR.
 
 Request review in the same run after implementation and required local checks pass. If commits are human-owned, hand off the uncommitted diff and identify the required user action. Review feedback returns to this role; fix forward on the same branch and preserve PR identity.
 

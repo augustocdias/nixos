@@ -83,7 +83,7 @@ Run on the daily cron or when asked.
 3. Draft proposals as above instead of writing gold pages. Do not update `index.md` during ingest. Append one `ingest` entry to `log.md` that lists the proposals.
 4. Stop at 10 proposals per run. Leave the remaining sources for the next run.
 5. Mark each fully proposed source `unprocessed: false`. Change only that field in raw files.
-6. Send the digest.
+6. Send the digest. List every proposal still at `status: needs-review` in `review/`, whichever run drafted it, so a digest the person missed comes back each day until they answer it. When this run drafted nothing, head the digest `Wiki reminder YYYY-MM-DD: N proposals awaiting review` and log the item numbering as a `reminder` entry in `log.md`. Reply `[SILENT]` only when nothing is new and nothing awaits review.
 
 ## Digest
 

@@ -20,7 +20,7 @@ environments:
 # Publication after approval
 
 1. Verify that the checkout and reviewed head still match. Load `git-conventions` and `pr`, retaining the card's agent/human agreement. Publish only reviewed work.
-2. Push through the Git proxy only when pushes are agent-owned. The proxy verifies every outgoing signature. If pushes or commits belong to the user, prepare a precise handoff instead of attempting them elsewhere.
+2. Push only when pushes are agent-owned. Before pushing, confirm `git log --format='%H %G?' <remote-head>..<head>` prints `G` for every outgoing commit. If pushes or commits belong to the user, prepare a precise handoff instead of attempting them elsewhere.
 3. When PRs are agent-owned and the head is published, find the PR by repository and branch before creating one. Update the existing PR in place. Preserve its base, identity and stack. Merges and published rewrites need separate authorization.
 4. Observe required checks on the exact published head. Diagnose failures and return code fixes to programmer on the same branch. Pending checks remain work; user-owned manual checks remain explicitly unrun unless the user made them an acceptance gate.
 5. Report `owner/repo#123`, exact base/head, review findings, required CI outcomes and any human handoff.

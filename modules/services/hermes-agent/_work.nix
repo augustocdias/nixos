@@ -134,6 +134,55 @@
   allowedSigners = pkgs.writeText "hermes-git-signers" ''
     ${config.programs.git.settings.user.email} ${agentPublicKey}
   '';
+  # Terminal Git for work roles. One ssh-agent holds only the agent key. Bubblewrap unsets SSH_AUTH_SOCK,
+  # so Git reaches the socket through core.sshCommand and a signing wrapper instead.
+  gitAgentDir = "${runtimeDir}/hermes-git";
+  gitAgentSocket = "${gitAgentDir}/agent.sock";
+  gitAgent = pkgs.writeShellScript "hermes-git-agent" ''
+    ${pkgs.coreutils}/bin/mkdir -p ${gitAgentDir}
+    ${pkgs.coreutils}/bin/rm -f ${gitAgentSocket}
+    ${lib.getExe' pkgs.openssh "ssh-agent"} -D -a ${gitAgentSocket} &
+    agent=$!
+    for _ in $(${pkgs.coreutils}/bin/seq 100); do
+      [ -S ${gitAgentSocket} ] && break
+      ${pkgs.coreutils}/bin/sleep 0.05
+    done
+    SSH_AUTH_SOCK=${gitAgentSocket} ${lib.getExe' pkgs.openssh "ssh-add"} -q ${config.sops.secrets.agent_ssh_key.path} || {
+      kill "$agent"
+      exit 1
+    }
+    wait "$agent"
+  '';
+  gitSign = pkgs.writeShellScript "hermes-git-sign" ''
+    SSH_AUTH_SOCK=${gitAgentSocket} exec ${lib.getExe' pkgs.openssh "ssh-keygen"} "$@"
+  '';
+  agentPublicKeyFile = pkgs.writeText "agent-ssh-key.pub" "${agentPublicKey}\n";
+  # From `gh api meta`; pinned so a sandbox never trusts a key on first use.
+  githubKnownHosts = pkgs.writeText "github-known-hosts" ''
+    github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+    github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+    github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+  '';
+  agentGitConfig = pkgs.writeText "hermes-gitconfig" (lib.generators.toGitINI {
+    user = {
+      inherit (config.programs.git.settings.user) name email;
+      signingKey = "key::${agentPublicKey}";
+    };
+    gpg = {
+      format = "ssh";
+      ssh = {
+        program = "${gitSign}";
+        allowedSignersFile = "${allowedSigners}";
+      };
+    };
+    commit.gpgSign = true;
+    tag.gpgSign = true;
+    core.sshCommand = lib.concatStringsSep " " [
+      (lib.getExe pkgs.openssh)
+      "-F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+      "-o IdentityAgent=${gitAgentSocket} -i ${agentPublicKeyFile} -o UserKnownHostsFile=${githubKnownHosts}"
+    ];
+  });
   plugin = pkgs.runCommand "hermes-workflow" {} ''
     mkdir -p $out
     cp ${./plugin}/*.py $out/
@@ -141,19 +190,6 @@
     cp ${pkgs.writeText "settings.json" (builtins.toJSON {
       inherit port dev roles;
       extra_repos = ["${homeDirectory}/nixos"];
-      git = lib.getExe pkgs.git;
-      ssh = lib.getExe pkgs.openssh;
-      ssh_agent = lib.getExe' pkgs.openssh "ssh-agent";
-      ssh_add = lib.getExe' pkgs.openssh "ssh-add";
-      ssh_keygen = lib.getExe' pkgs.openssh "ssh-keygen";
-      gpg = lib.getExe pkgs.gnupg;
-      agent_key = config.sops.secrets.agent_ssh_key.path;
-      agent_public_key = agentPublicKey;
-      allowed_signers = "${allowedSigners}";
-      user_name = config.programs.git.settings.user.name;
-      user_email = config.programs.git.settings.user.email;
-      human_signer = config.programs.git.signing.key;
-      known_hosts = "${homeDirectory}/.ssh/known_hosts";
       google_token = "${root}/profiles/assistant/google_token.json";
     })} $out/settings.json
   '';
@@ -218,6 +254,7 @@
     ++ [
       {src = "${homeDirectory}/.config/direnv";}
       {src = "${runtimeDir}/podman";}
+      {src = gitAgentDir;}
     ];
   # Upstream bubblewrap refuses any bind under these credential-list entries; the binds above need them.
   unhidden = [".cache" ".cargo" ".npm"];
@@ -229,7 +266,8 @@
       'if path not in names and os.path.relpath(path, home) not in UNHIDDEN_HOME_PATHS:'
     echo 'UNHIDDEN_HOME_PATHS = (${lib.concatMapStringsSep ", " (p: "\"${p}\"") unhidden},)' >> $out/home.py
     # Hermes strips GH_TOKEN, GITHUB_TOKEN and BASH_ENV from every terminal command, even when passed through,
-    # so the token travels as AGENT_GH_TOKEN and every sandbox spawn restores it for gh.
+    # so the token travels as AGENT_GH_TOKEN and every sandbox spawn restores it for gh. The agent Git config
+    # travels as AGENT_GIT_CONFIG so host-side Git in the gateway (wiki-gate) keeps the user's config.
     substituteInPlace $out/sandbox.py --replace-fail \
       'env=_make_run_env(self.env),' \
       'env=_with_agent_gh_token(_make_run_env(self.env)),'
@@ -241,6 +279,8 @@
     def _with_agent_gh_token(env):
         if env.get("AGENT_GH_TOKEN"):
             env["GH_TOKEN"] = env["AGENT_GH_TOKEN"]
+        if env.get("AGENT_GIT_CONFIG"):
+            env["GIT_CONFIG_GLOBAL"] = env["AGENT_GIT_CONFIG"]
         return env
   '';
   # pnpm reads registry auth from this file instead of ~/.npmrc, which the sandbox hides.
@@ -252,9 +292,9 @@
       then ["bubblewrap" "hermes-security" "rea"]
       else ["homeassistant"]
     );
-  allToolsets = ["web" "browser" "terminal" "file" "code_execution" "vision" "video" "image_gen" "video_gen" "x_search" "tts" "skills" "todo" "kanban" "memory" "context_engine" "session_search" "connections" "clarify" "delegation" "cronjob" "discord" "discord_admin" "yuanbao" "computer_use" "git" "workflow" "google" "security" "homeassistant" "office-3d" "a2a"];
+  allToolsets = ["web" "browser" "terminal" "file" "code_execution" "vision" "video" "image_gen" "video_gen" "x_search" "tts" "skills" "todo" "kanban" "memory" "context_engine" "session_search" "connections" "clarify" "delegation" "cronjob" "discord" "discord_admin" "yuanbao" "computer_use" "workflow" "google" "security" "homeassistant" "office-3d" "a2a"];
   base = ["skills" "memory" "session_search" "office-3d"];
-  work = base ++ ["kanban" "terminal" "file" "code_execution" "web" "git" "todo"];
+  work = base ++ ["kanban" "terminal" "file" "code_execution" "web" "todo"];
   profileConfig = {
     name,
     toolsets,
@@ -277,8 +317,7 @@
     toolsets = lib.optional (lib.elem "kanban" toolsets) "kanban";
     approvals = {
       mode = "off";
-      # rtk-rewrite turns `git status` into `rtk git status` before this check; the `rtk git` twins catch it.
-      deny = ["*nixos-rebuild*" "*darwin-rebuild*" "git" "git *" "*/git" "*/git *" "rtk git" "rtk git *"];
+      deny = ["*nixos-rebuild*" "*darwin-rebuild*"];
     };
     terminal = {
       backend =
@@ -289,7 +328,7 @@
       # Every session starts here, kanban workers included: a card's workspace does not move the
       # bubblewrap cwd. Workers reach their checkout through the ~/dev bind below.
       cwd = "${dev}/.hermes-workspaces/${name}";
-      env_passthrough = ["NIX_REMOTE"] ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) ["AGENT_GH_TOKEN" "DOCKER_HOST" "CONTAINER_HOST" "PNPM_CONFIG_NPMRC_AUTH_FILE"];
+      env_passthrough = ["NIX_REMOTE"] ++ lib.optionals (lib.elem name (["coordinator"] ++ roles)) ["AGENT_GH_TOKEN" "AGENT_GIT_CONFIG" "DOCKER_HOST" "CONTAINER_HOST" "PNPM_CONFIG_NPMRC_AUTH_FILE"];
     };
     browser = lib.optionalAttrs (lib.elem "browser" toolsets) {
       executable_path =
@@ -576,8 +615,9 @@
       export NIX_REMOTE=daemon
       export DOCKER_HOST=unix://${runtimeDir}/podman/podman.sock CONTAINER_HOST=unix://${runtimeDir}/podman/podman.sock
       export PNPM_CONFIG_NPMRC_AUTH_FILE=${npmrcAuth}
-      # The sandbox refuses a missing bind source; the socket appears only once Podman starts.
-      mkdir -p ${runtimeDir}/podman
+      export AGENT_GIT_CONFIG=${agentGitConfig}
+      # The sandbox refuses a missing bind source; the sockets appear only once their services start.
+      mkdir -p ${runtimeDir}/podman ${gitAgentDir}
     ''}
     unset AGENT_JAIL_SIGNING SSH_AUTH_SOCK GPG_AGENT_INFO
     ${bootstrap}
@@ -660,6 +700,8 @@ in {
       Unit = {
         Description = "Hermes Agent gateway";
         X-RestartIfChanged = false;
+        Wants = ["hermes-git-agent.service"];
+        After = ["hermes-git-agent.service"];
       };
       Service = {
         Environment = ["HERMES_HOME=${root}" "PATH=${profileDirectory}/bin:/run/current-system/sw/bin"];
@@ -667,6 +709,15 @@ in {
         ExecStart = "${lib.getExe hermes} -p default gateway run";
         Restart = "on-failure";
         RestartSec = 10;
+      };
+      Install.WantedBy = ["default.target"];
+    };
+    hermes-git-agent = {
+      Unit.Description = "SSH agent holding only the Hermes agent key";
+      Service = {
+        ExecStart = "${gitAgent}";
+        Restart = "on-failure";
+        RestartSec = 5;
       };
       Install.WantedBy = ["default.target"];
     };

@@ -9,18 +9,18 @@ The card's Run settings contain Repo, Tracker and Git ownership. Repo names the 
 
 # Git ownership
 
-Use the `git` tool for every Git operation, including reads. Pass the current task ID and an array of arguments without the `git` executable. For example, `{"task":"<card-id>","args":["status","--short"]}`. Terminal Git is blocked. Credentials remain inside the proxy; never request a key or signing socket. The proxy replaces the credential, signing and worker-proposal sections of `git-conventions`; take only its ownership scope and commit style.
+Run Git in the terminal against the card's checkout. The sandbox's Git config signs every commit and tag with the agent key and pushes over SSH with the same key; keep that config and add no other key, signing program or credential helper. Take only ownership scope and commit style from `git-conventions`; its credential, signing and worker-proposal sections do not apply here.
 
-Ownership is independently `agent` or `human` for branches, worktrees, commits, pushes and PRs. Missing values and legacy `ask` mean human. The proxy enforces branch, worktree, commit and push ownership. Honor PR ownership before using publication tools. A human-owned operation means prepare the exact handoff and leave it to the user, not ask for approval in a background terminal. Existing grants are not permission to merge, force-push or delete unrelated work. All created commits must be signed, and every outgoing commit must pass signature verification.
+Ownership is independently `agent` or `human` for branches, worktrees, commits, pushes and PRs. Missing values and legacy `ask` mean human. Nothing enforces ownership mechanically; honor each category yourself. Honor PR ownership before using publication tools. A human-owned operation means prepare the exact handoff and leave it to the user, not ask for approval in a background terminal. Existing grants are not permission to merge, force-push or delete unrelated work. All created commits must be signed, and every outgoing commit must pass signature verification.
 
-Keep task run settings unchanged. A changed Git agreement needs a human edit and, after first Git use, the user's `hermes git-policy <card-id>` command. A child card cannot broaden your repository or Git grant. Bring cross-repository work to the coordinator as a separately scoped assignment.
+Keep task run settings unchanged. A changed Git agreement needs a human edit. A child card cannot broaden your repository or Git grant. Bring cross-repository work to the coordinator as a separately scoped assignment.
 
 # Board lifecycle
 
 1. Record the intended scope and the acceptance checks with `kanban_comment`.
 2. Perform the work, observe the changed behavior, and collect all delegated results before handing off. Tests alone do not establish a UI or service works.
 3. Record exact checkout, branch, base/head, changed behavior, check outcomes, signature evidence, skills loaded and any human-owned handoff.
-4. End the stage with the appropriate board action. Programmers request independent review on the same card with `kanban_request_review`; reviewers follow `sdlc-review`; research and QA complete when their assignment is verified.
+4. End the stage with the appropriate board action. Programmers end their stage by calling `kanban_request_review` on the same card with `reviewer="reviewer"`, after the handoff comment; reviewers follow `sdlc-review`; research and QA complete when their assignment is verified.
 
 Use `kanban_block` only for a prerequisite or decision no agent can resolve. Put evidence, logs and prepared text in an ordinary comment first. Then post the block note as the card's last comment and pass the same text as the block reason. The user reads only the block note, so keep it under 60 words, in exactly this shape:
 

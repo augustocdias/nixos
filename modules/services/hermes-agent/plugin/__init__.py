@@ -1,6 +1,4 @@
 """Native Hermes board workflow, task-scoped Git, and read-only Google tools."""
-import contextlib
-import fcntl
 import json
 import logging
 import os
@@ -12,7 +10,6 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .git_proxy import GitProxy
 
 logger = logging.getLogger(__name__)
 SETTINGS = json.loads((Path(__file__).parent / "settings.json").read_text())
@@ -52,20 +49,6 @@ def _root():
     from hermes_constants import get_default_hermes_root
 
     return Path(get_default_hermes_root())
-
-
-@contextlib.contextmanager
-def _state():
-    """Task policy snapshots, protected from terminal tools."""
-    path = _root() / "hermes-workflow.json"
-    with open(path.with_suffix(".lock"), "a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        # A corrupt policy file must fail closed.
-        data = json.loads(path.read_text()) if path.exists() else {}
-        yield data
-        tmp = path.with_name(f".{path.name}.{os.getpid()}")
-        tmp.write_text(json.dumps(data))
-        tmp.replace(path)
 
 
 def _inside_dev(path):
@@ -157,49 +140,6 @@ def _policy(kb, conn, task):
     if repo is None:
         raise ValueError("The card must name one existing repository or worktree under an allowed root")
     return {"repo": str(repo), "git": {key: "agent" if fields["git"].get(key) == "agent" else "human" for key in GIT_CATEGORIES}}
-
-
-def git(args, **_):
-    try:
-        task_id = str(args.get("task") or "")
-        own = _owned_task()
-        if not own or task_id != own:
-            raise ValueError("Git requires the current dispatcher-owned task ID; delegated or unrelated tasks cannot borrow its grant")
-        kb, connect = _kb()
-        with connect() as conn:
-            task = kb.get_task(conn, task_id)
-            if task is None:
-                raise ValueError("Task no longer exists")
-            proposed = _policy(kb, conn, task)
-            workspace = Path(task.workspace_path or proposed["repo"]).resolve()
-            if workspace != Path(proposed["repo"]):
-                raise ValueError("Task workspace and Repo disagree; the user must select the intended checkout")
-        with _state() as data:
-            policies = data.setdefault("git_policies", {})
-            policy = policies.setdefault(task_id, proposed)
-            if policy != proposed:
-                raise ValueError("Task Git policy changed after first use; the user must update it with hermes git-policy")
-        result = GitProxy(SETTINGS).run(policy["repo"], policy["git"], args.get("args"))
-        return _json(result)
-    except Exception as error:
-        return _error(str(error))
-
-
-def git_policy(args):
-    """Human CLI action, never exposed as an agent tool."""
-    kb, connect = _kb()
-    with connect() as conn:
-        task = kb.get_task(conn, args.task)
-        if task is None:
-            raise ValueError("Unknown task")
-        policy = _policy(kb, conn, task)
-    with _state() as data:
-        data.setdefault("git_policies", {})[args.task] = policy
-    print(_json({"task": args.task, **policy}))
-
-
-def _git_policy_parser(parser):
-    parser.add_argument("task", help="Task whose human-edited Git ownership should replace the stored policy")
 
 
 def kanban_archive(args, **_):
@@ -640,11 +580,6 @@ def _herdr_hooks(ctx):
 
 def register(ctx):
     profile = ctx.profile_name
-    if profile in SETTINGS["roles"] + ["coordinator"]:
-        ctx.register_tool(name="git", toolset="git", description="Execute Git for this task under its agent/human ownership policy.", schema={
-            "name": "git", "description": "Task-scoped Git proxy. Pass arguments without the git executable. Human-owned operations return a handoff.",
-            "parameters": {"type": "object", "properties": {"task": {"type": "string"}, "args": {"type": "array", "items": {"type": "string"}}}, "required": ["task", "args"]}}, handler=git)
-    ctx.register_cli_command("git-policy", "Accept a human-edited task Git policy", _git_policy_parser, git_policy)
     if profile == "coordinator":
         for handler, fields in [(kanban_archive, ["card"]), (kanban_delete, ["card"]), (kanban_route, ["card", "assignee", "note"])]:
             description = (handler.__doc__ or handler.__name__.replace("_", " ")).strip().splitlines()[0]

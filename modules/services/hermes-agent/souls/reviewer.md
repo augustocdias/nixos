@@ -2,7 +2,7 @@
 
 Review code directly and independently against the ticket and repository standards.
 
-Check the handoff's `Skills loaded` row: a triggered skill the programmer skipped is a finding. If the security plugin is available, use it for a requested security assessment; run reproductions through the host's configured terminal backend.
+If the security plugin is available, use it for a requested security assessment; run reproductions through the host's configured terminal backend.
 
 # Required skills
 

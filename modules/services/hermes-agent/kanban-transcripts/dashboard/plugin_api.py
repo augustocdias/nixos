@@ -5,7 +5,8 @@ admits the run (gateway/session_kanban.py). The session lives in the run profile
 the profile Desktop shows. Every read is read-only: the board DBs open with ``mode=ro`` and the
 session store through ``SessionDB(read_only=True)``, so a transcript never resumes or writes a
 session. The HTML is the same pipeline as
-``hermes -p <profile> sessions export <file> --format html --session-id <id> --redact``.
+``hermes -p <profile> sessions export <file> --format html --session-id <id> --redact``,
+except that user and assistant text renders as Markdown.
 """
 
 from __future__ import annotations
@@ -13,13 +14,23 @@ from __future__ import annotations
 import base64
 import json
 import re
+import secrets
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from markdown_it import MarkdownIt
 
 router = APIRouter()
+
+# html=False escapes raw HTML; validateLink drops javascript:, vbscript:, file: and non-image data: URLs.
+_MD = MarkdownIt("default", {"html": False})
+_MD_STYLE = (
+    "<style>.md{white-space:normal}.md>:first-child{margin-top:0}.md>:last-child{margin-bottom:0}"
+    ".md table{display:block;overflow-x:auto;border-collapse:collapse}"
+    ".md th,.md td{border:1px solid var(--border-color);padding:.25rem .5rem}</style>"
+)
 
 
 def _boards():
@@ -59,6 +70,27 @@ def _runs(task_id: str) -> list[dict]:
     return []
 
 
+def _markdown_page(session: dict) -> str:
+    """The export page with user and assistant text rendered as Markdown.
+
+    generate_html_export escapes every message, so each such message goes in as a random token
+    that is swapped for its rendered Markdown afterwards. Tool calls, tool output and reasoning
+    keep the export's own escaped rendering.
+    """
+    from hermes_cli.session_export_html import _content_text, generate_html_export
+
+    nonce, rendered, messages = secrets.token_hex(8), {}, []
+    for i, msg in enumerate(session.get("messages") or ()):
+        text = _content_text(msg.get("content") or "")
+        if msg.get("role") in ("user", "assistant") and text and isinstance(text, str):
+            token = f"md{nonce}x{i}"
+            rendered[token] = f'<div class="md">{_MD.render(text)}</div>'
+            msg = {**msg, "content": token}
+        messages.append(msg)
+    page = generate_html_export({**session, "messages": messages}).replace("</head>", _MD_STYLE + "</head>", 1)
+    return re.sub(rf"md{nonce}x\d+", lambda m: rendered.get(m[0], m[0]), page)
+
+
 @router.get("/lookup")
 def lookup(short: str, title: str = ""):
     """The card the open task modal shows, with its runs.
@@ -90,7 +122,6 @@ def html(task_id: str, run_id: int):
 
     from hermes_cli.profiles import resolve_profile_env
     from hermes_cli.session_export import export_projection
-    from hermes_cli.session_export_html import generate_html_export
     from hermes_cli.session_export_md import redact_session_data
     from hermes_state import SessionDB
 
@@ -104,6 +135,6 @@ def html(task_id: str, run_id: int):
         db.close()
     if not data:
         raise HTTPException(status_code=404, detail=f"session {run['session_id']} not found")
-    page = generate_html_export(redact_session_data(data)).encode("utf-8")
+    page = _markdown_page(redact_session_data(data)).encode("utf-8")
     # limit: Chromium caps URLs at 2 MB, so a very long transcript may not render; serve an http URL if that bites.
     return {"src": "data:text/html;charset=utf-8;base64," + base64.b64encode(page).decode("ascii")}
