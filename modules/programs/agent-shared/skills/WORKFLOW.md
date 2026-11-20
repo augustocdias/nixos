@@ -12,7 +12,7 @@ When the chat style and engineering rules are loaded: the chat style compresses 
 
 ## Code comments
 
-A comment in new or changed code earns its place only when it records what the code cannot show: a license header, a constraint imposed by a dependency, platform or protocol that this project cannot change, a public API contract, a link to the issue or RFC behind a constraint, or a `shortcut:` note naming its limit. When a comment would explain this project's own surprising code, change the code instead: rename, extract or restructure until the behavior is obvious. Narration of what the next lines do is noise that later agents load as context. A lint suppression stays only when its rule is wrong for that case, with the reason on the same line. The rule covers comments the change adds or edits; existing comments outside the change stay as they are.
+A comment in new or changed code earns its place only when it records what the code cannot show: a license header, a constraint imposed by a dependency, platform or protocol that this project cannot change, a public API contract, a link to the issue or RFC behind a constraint, or a `limit:` note naming a deliberate shortcut and when to revisit it. When a comment would explain this project's own surprising code, change the code instead: rename, extract or restructure until the behavior is obvious. Narration of what the next lines do is noise that later agents load as context. A lint suppression stays only when its rule is wrong for that case, with the reason on the same line. The rule covers comments the change adds or edits; existing comments outside the change stay as they are.
 
 ## Workspace resolution
 

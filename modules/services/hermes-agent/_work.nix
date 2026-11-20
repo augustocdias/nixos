@@ -208,7 +208,7 @@
   };
 
   # Development caches and gh state the work repos need, bound read-write like the Claude/omp jail does.
-  # shortcut: assumes uid 1000 for the Podman socket; derive it if the user's uid ever changes.
+  # limit: assumes uid 1000 for the Podman socket; derive it if the user's uid ever changes.
   runtimeDir = "/run/user/1000";
   devBinds =
     map (path: {

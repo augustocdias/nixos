@@ -72,7 +72,7 @@ The Standards axis also carries the **quality checklist** below, in order of imp
 5. **Speed**: big slowdowns are findings; small wins are suggestions.
 6. **Lean**: delete (dead code, unused options, speculative features), reuse (name the existing helper's path), stdlib/native, yagni, merge near-copies, split a function doing unrelated jobs (by job, never by line count).
 
-Every checklist finding needs a concrete case: "this input or situation leads to this wrong result". No case, no finding. Re-read the lines before reporting. A `shortcut:` comment that names its limit is a decision, not a finding, unless the expected load already crosses it. Propose the smallest fix; prefer fixes that delete code.
+Every checklist finding needs a concrete case: "this input or situation leads to this wrong result". No case, no finding. Re-read the lines before reporting. A `limit:` comment that names its limit is a decision, not a finding, unless the expected load already crosses it. Propose the smallest fix; prefer fixes that delete code.
 
 ### 4. Spawn the sub-agents in parallel
 

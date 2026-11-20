@@ -105,5 +105,5 @@ def html(task_id: str, run_id: int):
     if not data:
         raise HTTPException(status_code=404, detail=f"session {run['session_id']} not found")
     page = generate_html_export(redact_session_data(data)).encode("utf-8")
-    # shortcut: Chromium caps URLs at 2 MB, so a very long transcript may not render; serve an http URL if that bites.
+    # limit: Chromium caps URLs at 2 MB, so a very long transcript may not render; serve an http URL if that bites.
     return {"src": "data:text/html;charset=utf-8;base64," + base64.b64encode(page).decode("ascii")}

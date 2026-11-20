@@ -27,7 +27,7 @@ class GitProxy:
                 "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
                 "-c", "credential.helper=", "-c", "core.askPass=", "-c", "diff.external=",
                 "-c", "protocol.allow=never", "-c", "protocol.ssh.allow=always",
-                "-c", "protocol.https.allow=always", "-c", "submodule.recurse=false",
+                "-c", "protocol.https.allow=always", "-c", "submodule.recurse=false", "-c", "fetch.recurseSubmodules=false",
                 # Recorded resolutions are local, unreviewed state; never replay them into agent commits.
                 "-c", "rerere.enabled=false", "-c", "rerere.autoUpdate=false",
                 "-c", "user.name=" + self.settings["user_name"],
@@ -43,74 +43,34 @@ class GitProxy:
             raise ValueError(result.stderr.strip() or result.stdout.strip() or "Git operation failed")
         return result
 
-    # Local config is writable by project code. Only data-only keys are accepted, each with the values
-    # Git documents for it (None: any value). Anything that can run a command, load other config, redirect
-    # a URL, supply credentials or change hooks stays off this list; see git-config(1).
+    # Local config is writable by project code. Keys that can run a command, load other config or files,
+    # redirect a URL, supply credentials, move refs or the work tree, or loosen protections are refused;
+    # everything else passes. Keys the -c options in _command override (core.hooksPath, rerere.*, user.*,
+    # commit.gpgSign) pass because the override wins. See git-config(1).
+    DENY = re.compile("|".join([
+        # Generic command-valued suffixes cover drivers, tools and helpers of any section.
+        r".+\.(?:program|command|cmd|textconv|driver|clean|smudge|process|helper|editor|pager)",
+        r"core\.(?:fsmonitor|sshcommand|gitproxy|askpass|alternaterefscommand|worktree|sharedrepository"
+        r"|attributesfile|excludesfile)",
+        r"(?:alias|pager|hook|trailer|credential|credentialcache|credentialstore|url|http|https|protocol"
+        r"|include|includeif|gpg|author|committer|safe|bundle|uploadpack|receive|uploadarchive|mergetool|difftool"
+        r"|browser|guitool|man|sendemail)\..+",
+        r"diff\.(?:external|tool|orderfile)", r"merge\.tool", r"sequence\.editor", r"web\.browser",
+        r"init\.templatedir", r"commit\.template", r"blame\.ignorerevsfile",
+        r"remote\.[^.]+\.(?:vcs|uploadpack|receivepack|proxy|proxyauthmethod|serveroption|push|mirror)",
+        r"branch\.[^.]+\.mergeoptions", r"pull\.(?:twohead|octopus)", r"push\.pushoption", r"fetch\.bundleuri",
+        r"submodule\..+\.gitdir", r"submodule\.alternatelocation", r"extensions\.submodulepathconfig",
+        r"gc\.(?:pruneexpire|reflogexpire.*|worktreepruneexpire|rerere.*)",
+    ]), re.I)
     BOOL = r"|true|false|yes|no|on|off|1|0"
-    CONFIG = [(re.compile(key, re.I), value and re.compile(value, re.I)) for key, value in [
-        (r"core\.repositoryformatversion", r"[01]"),
-        (r"core\.(?:filemode|bare|ignorecase|precomposeunicode|symlinks|sparsecheckout|sparsecheckoutcone|commitgraph"
-         r"|multipackindex|splitindex|preloadindex|trustctime|quotepath|longpaths)", BOOL),
-        (r"core\.logallrefupdates", BOOL + "|always"),
-        (r"core\.untrackedcache", BOOL + "|keep"),
-        (r"core\.autocrlf", BOOL + "|input"),
-        (r"core\.safecrlf", BOOL + "|warn"),
-        (r"core\.eol", r"lf|crlf|native"),
+    # Keys allowed only with these values.
+    VALUES = [(re.compile(key, re.I), re.compile(value, re.I)) for key, value in [
         (r"core\.(?:protecthfs|protectntfs)", r"true|yes|on|1"),
-        (r"core\.(?:abbrev|checkstat|whitespace|compression)", None),
-        (r"extensions\.(?:objectformat|compatobjectformat)", r"sha1|sha256"),
         # A refstorage URI carries a payload path that moves the refs elsewhere.
         (r"extensions\.refstorage", r"files|reftable"),
-        (r"extensions\.(?:worktreeconfig|relativeworktrees|preciousobjects|noop|noop-v1)", BOOL),
-        (r"extensions\.partialclone", r"[A-Za-z0-9_-]+"),
-        (r"remote\.[^.]+\.(?:url|pushurl|fetch)", None),
-        (r"remote\.[^.]+\.(?:prune|prunetags|promisor|skipfetchall|skipdefaultupdate)", BOOL),
-        (r"remote\.[^.]+\.tagopt", r"--no-tags|--tags"),
-        (r"remote\.[^.]+\.partialclonefilter", r"blob:none|blob:limit=\d+[kmg]?|tree:\d+"),
-        (r"remote\.[^.]+\.followremotehead", r"never|create|always|warn(?:-if-not-[A-Za-z0-9_./-]+)?"),
-        (r"branch\..+\.(?:remote|merge|rebase|pushremote|description)", None),
-        (r"submodule\..+\.url", None),
         # git-submodule(1): "!command" runs a shell command; gitmodules(5) already refuses it.
         (r"submodule\..+\.update", r"none|checkout|rebase|merge"),
-        (r"submodule\..+\.active", BOOL),
-        (r"submodule\..+\.fetchrecursesubmodules", BOOL + "|on-demand"),
-        (r"submodule\..+\.ignore", r"none|untracked|dirty|all"),
-        (r"submodule\..+\.branch", r"[A-Za-z0-9_./-]+"),
-        (r"submodule\.active", None),
-        (r"submodule\.fetchjobs", r"\d+"),
-        # Allowed so the proxy accepts the repository; _command forces both off.
-        (r"rerere\.(?:enabled|autoupdate)", BOOL),
-        (r"pull\.rebase", BOOL + "|merges|interactive"),
-        (r"(?:pull|merge)\.ff", BOOL + "|only"),
-        (r"push\.default", r"nothing|current|upstream|tracking|simple|matching"),
-        (r"push\.(?:autosetupremote|followtags|useforceifincludes|negotiate|usebitmaps)", BOOL),
-        (r"push\.gpgsign", BOOL + "|if-asked"),
         (r"push\.recursesubmodules", r"check|no|false|off|0"),
-        (r"fetch\.(?:prune|prunetags|writecommitgraph|showforcedupdates|fsckobjects|all)", BOOL),
-        (r"fetch\.(?:parallel|unpacklimit)", r"\d+"),
-        (r"fetch\.output", r"full|compact"),
-        (r"fetch\.negotiationalgorithm", r"consecutive|skipping|noop|default"),
-        (r"merge\.conflictstyle", r"merge|diff3|zdiff3"),
-        (r"merge\.(?:autostash|renormalize|verifysignatures|renames)", BOOL),
-        (r"rebase\.(?:autostash|autosquash|updaterefs|stat)", BOOL),
-        (r"rebase\.missingcommitscheck", r"ignore|warn|error"),
-        (r"diff\.(?:algorithm|renames|renamelimit|colormoved|colormovedws|indentheuristic|mnemonicprefix|noprefix"
-         r"|context|interhunkcontext|submodule|ignoresubmodules|wserrorhighlight)", None),
-        (r"(?:color|advice|status|log)\..+", None),
-        # The proxy's -c values override these identity and signing keys.
-        (r"user\.(?:name|email)", None),
-        (r"(?:commit|tag)\.gpgsign", BOOL),
-        (r"lfs\.repositoryformatversion", r"\d+"),
-        (r"maintenance\.(?:auto|autodetach)", BOOL),
-        (r"maintenance\.strategy", r"none|gc|geometric|incremental"),
-        (r"gc\.(?:auto|autopacklimit)", r"-?\d+"),
-        (r"gc\.(?:autodetach|writecommitgraph)", BOOL),
-        (r"index\.version", r"[234]"),
-        (r"index\.(?:sparse|skiphash|recordendofindexentries|recordoffsettable)", BOOL),
-        (r"index\.threads", BOOL + r"|\d+"),
-        (r"feature\.(?:manyfiles|experimental)", BOOL),
-        (r"init\.defaultbranch", r"[A-Za-z0-9_./-]+"),
-        (r"worktree\.(?:userelativepaths|guessremote)", BOOL),
     ]]
 
     def _validate_repository(self, repo, env):
@@ -125,9 +85,9 @@ class GitProxy:
                 listed = self._exec(repo, ["config", "--file", str(path), "--no-includes", "--null", "--list"], env, check=True).stdout
                 entries += [entry.partition("\n")[::2] for entry in listed.split("\0") if entry]
         for key, value in entries:
-            rule = next((value_rule for key_rule, value_rule in self.CONFIG if key_rule.fullmatch(key)), False)
-            if rule is False:
-                raise ValueError(f"Repository config {key!r} needs human review before proxy execution")
+            if self.DENY.fullmatch(key):
+                raise ValueError(f"Repository config {key!r} can run commands or redirect Git; remove it or run Git yourself")
+            rule = next((value_rule for key_rule, value_rule in self.VALUES if key_rule.fullmatch(key)), None)
             if rule is not None and not rule.fullmatch(value):
                 raise ValueError(f"Repository config {key!r} has a value the proxy does not accept: {value!r}")
             if key.lower().endswith(".fetch"):
