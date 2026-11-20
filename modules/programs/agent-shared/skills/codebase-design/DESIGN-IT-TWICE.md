@@ -13,6 +13,7 @@ Before spawning sub-agents, write a user-facing explanation of the problem space
 - The constraints any new interface would need to satisfy
 - The dependencies it would rely on, and which category they fall into (see [DEEPENING.md](DEEPENING.md))
 - A rough illustrative code sketch to ground the constraints, not a proposal, just a way to make the constraints concrete
+- The 3–6 criteria you will compare the designs on, written now so the comparison does not bend toward whichever design you read first
 
 Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the sub-agents work in parallel.
 
@@ -39,6 +40,8 @@ Each sub-agent outputs:
 
 ### 3. Present and compare
 
-Present designs sequentially so the user can absorb each one, then compare them in prose. Contrast by **depth** (leverage at the interface), **locality** (where change concentrates), and **seam placement**.
+Present designs sequentially so the user can absorb each one, then compare them in prose. Contrast by **depth** (leverage at the interface), **locality** (where change concentrates), and **seam placement**, then score each design against the criteria from Step 1, one criterion at a time.
+
+When the designs diverge so widely that they answer different problems, the Step 1 framing was underspecified: sharpen it and rerun Step 2 instead of picking among them.
 
 After comparing, give your own recommendation: which design you think is strongest and why. If elements from different designs would combine well, propose a hybrid. Be opinionated: the user wants a strong read, not a menu.

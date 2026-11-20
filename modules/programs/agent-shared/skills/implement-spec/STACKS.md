@@ -10,6 +10,8 @@ Agree publication timing upfront: verified-layer incremental drafts (recommended
 
 A chain's final tip contains its complete result. Multiple independent tips may need an agreed local-only integration branch/worktree for cross-ticket verification. It gets no aggregate PR. Apply review fixes to the owning layers, then update descendants under rewrite consent where necessary; never leave fixes only on integration.
 
+A review covers a layer's patch, not its SHA. After a lower-layer fix moves the layers above it, compare each descendant's `git patch-id --stable` at the reviewed commit with the same value at its new head. An identical patch-id means the layer's own change is unchanged: its review stands and only its checks rerun. A different patch-id means the layer needs a fresh ticket-scoped review.
+
 ## Assigned checkouts and shared workspace
 
 Agree persistent accessible paths before creation. Default to `<absolute-workspace>/worktrees/<run>/<ticket>` inside locally excluded `.dev-skills/`; another established location must be accessible and explicitly approved. Never silently use sibling paths in session-private tmpfs or broaden mounts.

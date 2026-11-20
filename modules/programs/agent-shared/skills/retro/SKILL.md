@@ -24,8 +24,11 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 - **Tool economy**: did the agent make expensive tool calls that could be streamlined? Is there any custom tooling (CLI's, MCP's) that is particularly token-inefficient? _Use when_ the agent made an expensive tool call.
 - **No-ops**: look for instructions in steering files that don't modify the agent's behavior. _Use when_ the steering files are large and unwieldy.
 - **Information access**: look for opportunities to increase the agent's access to information. Teeing dev server logs, readonly access to third-party services. _Use when_ a crucial piece of information was not available to the agent.
+- **Skills**: a skill that should have fired and did not gets its description tuned. A finding that belongs in a skill the session used routes there: read that skill first and drop what it already states clearly. _Use when_ the agent missed or repeated a procedure a skill owns.
 
-4. Present these candidates to the user, in order of severity, grounded in actual session evidence. Ask which improvements they want before changing rules, standards, skills, hooks, or automation. A finding is not authorization to make the change. Save a durable retrospective only when requested, at `<absolute-workspace>/retros/<slug>.md`; otherwise keep it in chat.
+4. Filter the candidates. Keep one only when it will still hold in six months and changes what a future agent does. Drop one-offs and details that drift, such as SHAs, versions and counts. A mistake class counts once it has happened twice. When a correction repeats a rule that already exists with nothing enforcing it, propose the enforcer at the highest level that works: architecture, then types, then a lint or check, then a test, with prose last. A proposed check must fail on the real past mistake: run it against the commit or text that contained the mistake and show the failure. Each rule in `CODING_STANDARDS.md` names what enforces it, or says it is a judgement call.
+
+5. Present these candidates to the user, in order of severity, grounded in actual session evidence. Ask which improvements they want before changing rules, standards, skills, hooks, or automation. A finding is not authorization to make the change. Save a durable retrospective only when requested, at `<absolute-workspace>/retros/<slug>.md`; otherwise keep it in chat.
 
 ## Reference
 

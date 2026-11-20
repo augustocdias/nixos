@@ -10,13 +10,15 @@ description: "Use when something is broken, throwing, failing or slow and the ca
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
+This skill diagnoses. It ends with a cited diagnosis and a proposed fix, and it changes no production code. Phase 6 hands the diagnosis to whoever owns the fix.
+
 Read `domain.md` in the resolved absolute workspace for authoritative glossary and ADR locations. New domain notes belong under that workspace, not tracked source directories. When exploring the codebase, read the configured `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
 ## Evidence, permissions, and workspace
 
 Accept the user’s reported failure and supplied output as ground truth. Do not rerun it merely to confirm the report. New probes must seek causal evidence or verify a fix, use one variable at a time, and respect the existing production/read-only permission boundary. If the reported failure already establishes a phase’s evidence, carry it forward rather than repeating it. Record any inaccessible causal check honestly.
 
-Place generated scripts, minimized fixtures, redacted traces, profiles, and retained evidence under `<absolute-workspace>/debug/<slug>/`. Run diagnostic subprocesses with explicit absolute input/output paths so changing cwd does not relocate evidence. Permanent regression tests belong at the agreed project seam.
+Place generated scripts, minimized fixtures, redacted traces, profiles, and retained evidence under `<absolute-workspace>/debug/<slug>/`. Run diagnostic subprocesses with explicit absolute input/output paths so changing cwd does not relocate evidence. The proposed regression test names the agreed project seam where it belongs.
 
 Before branch switching, bisection, or worktree use, load `git-conventions` and establish the upfront ownership agreement. Use an authorized diagnostic checkout; preserve user changes and unrelated worktrees. Headless workers return approval-dependent Git and remote actions to the parent rather than attempting host prompts. Keep supporting evidence local and outside production commits.
 
@@ -90,7 +92,7 @@ Confirm:
 
 Once it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut, and keep only what's load-bearing for the failure.
 
-Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.
+Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the proposed regression test in Phase 5.
 
 Done when **every remaining element is load-bearing**: removing any one of them makes the loop go green.
 
@@ -98,7 +100,7 @@ Do not proceed until you have reproduced **and** minimised.
 
 ## Phase 3: Hypothesise
 
-Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
+Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea. Seed them with the change history of the affected code: the commits and PR discussions that introduced or last changed it, read through the Rationale mode of `research`.
 
 Each hypothesis must be **falsifiable**: state the prediction it makes.
 
@@ -120,30 +122,31 @@ Tool preference:
 
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 
-**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect using the agreed diagnostic checkout and one controlled input at a time. Measure first, fix second.
+**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect using the agreed diagnostic checkout and one controlled input at a time. Vet every number with `benchmark-checklist` before you trust it.
 
-## Phase 5: Fix + regression test
+**Premise check.** When two refuted hypotheses, or two failed fix attempts reported to you, share one assumption, suspect the assumption. Write it as one sentence and name an observation that would come out differently if it were false. Make that observation when it is within reach: a local run, a log, a read-only query. When it needs another system, access you lack, or a person, record it as an open question in the diagnosis and ask for that evidence. Build no further hypothesis on the assumption until the observation answers it.
 
-Write the regression test **before the fix**, but only if there is a **correct seam** for it.
+## Phase 5: Diagnosis and proposed fix
 
-A correct seam is one where the test exercises the **real bug pattern** as it occurs at the call site. If the only available seam is too shallow (single-caller test when the bug needs multiple callers, unit test that can't replicate the chain that triggered the bug), a regression test there gives false confidence.
+Write the diagnosis to `<absolute-workspace>/debug/<slug>/diagnosis.md`. It contains:
 
-**If no correct seam exists, that itself is the finding.** Note it. The codebase architecture is preventing the bug from being locked down. Flag this for the next phase.
+- **Cause.** The confirmed mechanism, the evidence that confirmed it, and the hypotheses that the evidence ruled out.
+- **Repro.** The minimised Phase 1 command and its redacted output.
+- **Proposed fix.** The smallest change that fixes the root cause, and where it goes. Ask whether the state that triggered the symptom is legitimate. If it is, the fix handles that state where the code broke. If the state should never exist, the fix goes where the state was produced, because a guard at the symptom hides the bug. Name every other place with the same fault.
+- **Regression test.** The **correct seam** for a test that goes red on this bug: one where the test exercises the real bug pattern as it occurs at the call site. If the only available seam is too shallow (a single-caller test when the bug needs several callers, a unit test that cannot replicate the triggering chain), say so. A missing seam is itself a finding: the architecture prevents locking the bug down.
+- **Signal.** When finding the cause took a deep dig, propose the cheap always-on signal (a log line, a metric, an assertion) that would have shown it at first look.
+- **Open questions.** Premise checks and evidence that need another system, access or a person.
 
-If a correct seam exists:
+## Phase 6: Hand off
 
-1. Turn the minimised repro into a failing test at that seam.
-2. Watch it fail. If you forced the red by mutating code or a fixture, `diff` against a pristine copy to prove the mutation landed before you trust it.
-3. Apply the fix.
-4. Watch it pass.
-5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
+- **Inside another workflow** (an assigned ticket, card or orchestrated task): return the diagnosis to that workflow. When the fix lies inside the assignment's scope, the assigned workflow owns it and applies it with its own tests and review. When the fix lies outside that scope, the assignment reports a blocker that carries the diagnosis, so the user decides whether a ticket or card follows.
+- **Invoked directly**: turn the diagnosis into a plan the user can act on. Write `<absolute-workspace>/debug/<slug>/plan.md` with the sections of a `to-spec` specification: Problem Statement, Solution, Implementation Decisions, Testing Decisions (the regression seam goes here), Out of Scope and Further Notes (the open questions go here). Then suggest `to-spec` to publish it, or `to-tickets` when the fix needs several tickets.
 
-## Phase 6: Cleanup
+## Phase 7: Cleanup
 
 Required before declaring done:
 
-- [ ] Original repro no longer reproduces (re-run the Phase 1 loop)
-- [ ] Regression test passes (or absence of seam is documented)
+- [ ] The diagnosis and, when invoked directly, the plan exist at their workspace paths
 - [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
 - [ ] Throwaway diagnostic scaffolds deleted; retain only useful redacted evidence under `<absolute-workspace>/debug/<slug>/`
-- [ ] The hypothesis that turned out correct is stated in the commit / PR message, so the next debugger learns
+- [ ] The checkout is back at its agreed ref with no production change left behind

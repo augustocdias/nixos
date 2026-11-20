@@ -8,9 +8,13 @@ Use for broad, consequential or disputed decisions. Define the decision and succ
 
 ## Repository or tool research
 
-For adoption or comparison, inspect the implementation boundary, license, releases, maintenance, issues, installation requirements and relevant tests. Check package metadata and independent usage evidence when adoption matters. Stars, forks and downloads are proxies, not proof of production use. Distinguish documented capabilities from behavior you exercised.
+For adoption or comparison, inspect the implementation boundary, license, releases, maintenance, issues, installation requirements and relevant tests. Check package metadata and independent usage evidence when adoption matters. Stars, forks and downloads are proxies, not proof of production use. Distinguish documented capabilities from behavior you exercised. Vet any benchmark number a comparison relies on with `benchmark-checklist`.
 
 For a bounded API or local-code question, inspect the owning documentation or implementation and relevant callers. Cite the version or revision and local lines where useful. Do not expand one implementation fact into an adoption review or require unrelated public corroboration.
+
+## Rationale
+
+Use when the question is why code, configuration or a decision is the way it is. Answer from the record, not from the current code: the commits and PR or issue discussions that introduced the target and each later change to it, then ADRs, docs or chat threads when that trail is thin. Cite what the authors wrote, mark your own inferences as inferences, and say what the record does not answer.
 
 ## Community evidence
 

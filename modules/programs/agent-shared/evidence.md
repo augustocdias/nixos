@@ -1,0 +1,5 @@
+- Check library and API behavior against current official documentation, through Context7 when it is available, and link the source.
+- Mark each claim as verified, naming its source or command, or as inference. If no source is available, say the claim rests on general knowledge and needs verification.
+- Get the current date from a tool.
+- Resolve repository facts with tools. Ask the user only about materially different scope or behavior choices.
+- Before you recommend a change to an existing file, skill or configuration, read its current text and cite the lines your recommendation rests on. A recommendation about material you have not read is a guess: read the material first, or label the recommendation unverified. Failure example: proposing a new rule for a skill without opening it, when the skill already states that rule.

@@ -55,6 +55,17 @@ Default to workspace `GLOSSARY.md` and `adr/`. Offer `GLOSSARY-MAP.md` plus `dom
 
 Ask whether work in this repo is tracked on the Hermes kanban board, unless `issue-tracker.md` already says. The board is the user's own tracking copy: cards point at this repo's tickets, and Hermes roles launch agents from them. Recommend yes when the repo is under `~/dev` and the Hermes board MCP (`hermes-board`) is connected. Record the answer and the repo's absolute path in `issue-tracker.md` under `## Hermes board`; `to-tickets` and the Hermes coordinator read it there.
 
+### E. Project skills
+
+Project-specific skills, such as generated verification skills, live in `<workspace>/skills/<name>/SKILL.md`, never in a tracked skill folder. No harness reads that folder on its own, so link it from the folders each harness discovers at the Git root:
+
+| Link at the Git root | Read by |
+| --- | --- |
+| `.claude/skills` | Claude Code |
+| `.agents/skills` | omp, and Hermes once the root is trusted |
+
+Create `<workspace>/skills/` and, for each link, a relative symlink to it (`.claude/skills -> ../.dev-skills/skills`), creating the parent folder if needed. Append each link path to the resolved exclusion file, anchored to the root with a leading `/` (`/.claude/skills`), using the same append rules as `.dev-skills/`. When the target already exists as a real or tracked folder, leave it untouched: link each project skill individually inside it (`.claude/skills/<name> -> ../../.dev-skills/skills/<name>`) and exclude each link path the same way. Hermes loads `.agents/skills` only from trusted roots: give the user `hermes -p <profile> skills trust <git-root>` for each Hermes profile that works in this repo, because the agent cannot change Hermes configuration. A linked worktree has its own root without these links; skills there load only after the same links are created in that worktree.
+
 ## 3. Confirm material changes
 
 Present discovered tracker/project selection, label mapping, domain layout, and any conflicts with prior choices. Resolve only unresolved material tradeoffs. Preserve existing user-edited documents and tracker decisions. Create missing documents; propose conflicting updates instead of replacing the directory. Do not add an Agent skills block to tracked context files.
@@ -69,11 +80,12 @@ Create these documents at the absolute workspace path, retaining existing conten
 - `domain.md`: domain layout, consumer rules, and links to authoritative existing documents.
 - `GLOSSARY.md`: discovered/agreed terms, or an honest empty glossary header pending real domain work.
 - `CODING_STANDARDS.md`: relevant verified rules and references, not new invented standards.
+- `skills/`: the project skills folder and its harness links from section E.
 
 README indexes the lazy artifact locations from WORKFLOW.md. Do not create empty specs, ADRs, research reports, teaching missions, questionnaires, or tickets without task content.
 
 ## 5. Verify and report
 
-In Git, run `git check-ignore` on all new supporting files and confirm exclusion came from the intended local rule. Check that tracked ignore/context files remain untouched. On rerun, preserve a user-added note, existing exclusion rules, and tracker decisions; avoid duplicate exclusion entries and create only missing prerequisites. Outside Git, report the exclusion limit rather than claiming files are ignored.
+In Git, run `git check-ignore` on all new supporting files and project skill links, and confirm exclusion came from the intended local rule. Confirm each link resolves to `<workspace>/skills/`. Check that tracked ignore/context files remain untouched. On rerun, preserve a user-added note, existing exclusion rules, and tracker decisions; avoid duplicate exclusion entries and create only missing prerequisites. Outside Git, report the exclusion limit rather than claiming files are ignored.
 
 Report workspace's absolute path, tracker, existing authoritative sources, created/preserved documents, and unapplied remote proposals. Explain that users can edit the workspace documents; reruns fill gaps without resetting their choices. Other skills reuse the nearest initialized workspace within this checkout.

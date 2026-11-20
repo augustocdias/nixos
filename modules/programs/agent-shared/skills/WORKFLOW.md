@@ -10,6 +10,10 @@ A skill whose frontmatter sets `disable-model-invocation: true` is manual-only, 
 
 When the chat style and engineering rules are loaded: the chat style compresses chat, not meaning, files, comments, specifications, or lessons. The engineering rules require the smallest complete change, not shortened workflows or skipped verification. Keep their skipped-work/risk note outside any requested exact document format. Reuse agreed test seams and project conventions; do not manufacture abstractions, tests of implementation wording, or speculative scope.
 
+## Code comments
+
+A comment in new or changed code earns its place only when it records what the code cannot show: a license header, a constraint imposed by a dependency, platform or protocol that this project cannot change, a public API contract, a link to the issue or RFC behind a constraint, or a `shortcut:` note naming its limit. When a comment would explain this project's own surprising code, change the code instead: rename, extract or restructure until the behavior is obvious. Narration of what the next lines do is noise that later agents load as context. A lint suppression stays only when its rule is wrong for that case, with the reason on the same line. The rule covers comments the change adds or edits; existing comments outside the change stay as they are.
+
 ## Workspace resolution
 
 `setup-dev-skills` initializes `.dev-skills/` in its invocation directory. For every other skill, find the nearest existing initialized `.dev-skills/` walking from the invocation directory up to and including the current Git working-tree root. Never cross that root, enter a different checkout, or search unrelated home directories. Outside Git, check only the invocation directory. Resolve and retain an absolute workspace path for the turn. Pass that path explicitly to delegates and anchor all output there, regardless of subprocess cwd.
@@ -39,7 +43,9 @@ All paths below are relative to the retained absolute workspace, not the reposit
 | Architecture reports | `reports/architecture-<timestamp>.html` |
 | Rejected enhancements | `out-of-scope/<concept>.md` |
 | Handoffs / questionnaires | `handoffs/<slug>.md`, `questionnaires/<slug>.md` |
-| Diagnostics and evidence | `debug/<slug>/` |
+| Diagnostics, diagnoses and fix plans | `debug/<slug>/`, including `diagnosis.md` and `plan.md` |
+| Project skills (verification and other per-project skills) | `skills/<name>/SKILL.md` |
+| Review proof repros | `reviews/<slug>/proof-<n>/` |
 | Teaching mission, resources, notes, learning glossary, lessons, references, learning records, assets | `teach/<topic>/` |
 | Human-run wizard and state | `wizards/<slug>.sh` and supporting files beside it |
 | Saved reviews / retrospectives, only when requested | `reviews/<slug>.md`, `retros/<slug>.md` |

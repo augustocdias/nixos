@@ -174,7 +174,8 @@
       ))
       + lib.optionalString (isLinux && name == "coordinator") (wikis.soul ./souls/_wiki.md wikiOf.coordinator)
       + builtins.readFile ./souls/_formatting.md
-      + builtins.readFile ./souls/_evidence.md
+      + "\n# Evidence\n\n"
+      + builtins.readFile ../../programs/agent-shared/evidence.md
       + lib.optionalString (name == "programmer") ("\n" + builtins.readFile ../../programs/agent-shared/style/ponytail.md));
   # Catppuccin Mocha for the CLI; missing keys inherit the built-in default skin.
   skin = (pkgs.formats.yaml {}).generate "catppuccin-mocha.yaml" {

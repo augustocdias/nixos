@@ -19,10 +19,12 @@
   agents = ./agents;
   commands = ./commands;
   context = ./context.md;
-  # Global context plus the adapted style rules.
-  contextText = lib.concatMapStringsSep "\n" builtins.readFile [
-    ./context.md
-    ./style/caveman.md
-    ./style/ponytail.md
+  # Global context plus the adapted style rules. evidence.md is headerless because
+  # Hermes souls read it under their own heading level.
+  contextText = lib.concatStringsSep "\n" [
+    (builtins.readFile ./context.md)
+    ("## Evidence and decisions\n\n" + builtins.readFile ./evidence.md)
+    (builtins.readFile ./style/caveman.md)
+    (builtins.readFile ./style/ponytail.md)
   ];
 }

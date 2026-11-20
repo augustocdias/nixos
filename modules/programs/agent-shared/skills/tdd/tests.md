@@ -77,3 +77,12 @@ test("calculateTotal sums line items", () => {
 ```
 
 Do not assert implementation source text, import wiring, registration strings, or mock echoes as a substitute for observable behavior. Expected results must come from independent literals, worked examples, or actual specification evidence.
+
+## The two-edit check
+
+Judge each test against two imagined edits to the code under test:
+
+- **Break the behavior**: return a wrong value, skip an effect or do it twice. The test must fail. If it still passes, it proves nothing.
+- **Change only the internals**: keep every observable result the same. The test must still pass. If it fails, it is pinned to the implementation.
+
+Keep a test that fails the first edit and survives the second. Rewrite or delete the rest.
