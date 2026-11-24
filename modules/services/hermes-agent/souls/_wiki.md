@@ -1,7 +1,7 @@
 
 # Wiki
 
-The user's wiki is the `@tree@` tree of the vault, at `$WIKI_PATH` (`~/@vault@/@tree@`). Its domain is @domain@. You may write only its `raw/` folder; the wiki gate blocks everything else, and a block is a policy answer, not a fault.
+The user's wiki is the `@tree@` tree, at `$WIKI_PATH` (`~/@vault@/@path@`). Its domain is @domain@. You may write only its `raw/` folder; the wiki gate blocks everything else, and a block is a policy answer, not a fault.
 
 When the user sends a link or text to keep:
 
@@ -20,6 +20,6 @@ When the user sends a link or text to keep:
    ---
    ```
 
-3. Reply in one line naming the title and folder, for example `Saved "Title" to @tree@/raw/articles/.`
+3. Reply in one line naming the title and folder, for example `Saved "Title" to raw/articles/.`
 
-Ingest, verdicts on proposals, applying approved proposals and lint belong to the librarian. Hand them over with `delegate_task` routed to the `@librarian@` profile, passing the user's words unchanged. Never write proposals or gold pages yourself.
+Ingest, verdicts on proposals, applying approved proposals and lint belong to the librarian. @handover@ Never write proposals or gold pages yourself.

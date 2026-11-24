@@ -1,15 +1,11 @@
-"""Create native profiles without cloning, then render runtime-only credentials."""
+"""Helpers the profile bootstrap (_bootstrap_work.py) uses to write Hermes homes."""
 
-import json
 import os
-import sys
 import tempfile
 import time
 from pathlib import Path
 
 from dotenv import dotenv_values, set_key, unset_key
-from hermes_cli.config import require_readable_config_before_write
-from hermes_cli.profiles import create_profile, profile_exists
 
 
 def read_secret(path):
@@ -47,16 +43,6 @@ def merge_config(existing, managed):
     return result
 
 
-def write_config(path, managed):
-    existing = require_readable_config_before_write(path)
-    config = merge_config(existing, managed)
-    if "model" in managed:
-        config["model"] = managed["model"]
-    if "fallback_providers" in managed:
-        config.pop("fallback_model", None)
-    atomic_write(path, json.dumps(config))
-
-
 def write_env(path, managed):
     with tempfile.TemporaryDirectory(dir=path.parent) as directory:
         temporary = Path(directory) / ".env"
@@ -81,104 +67,3 @@ def link_plugin(plugin, target):
         )
     else:
         plugin.symlink_to(target)
-
-
-def enable_plugins(path, names):
-    # Union, not replace: plugins enabled locally with `hermes plugins` stay on.
-    config = require_readable_config_before_write(path)
-    plugins = config.get("plugins")
-    plugins = plugins if isinstance(plugins, dict) else {}
-    enabled = plugins.get("enabled")
-    enabled = enabled if isinstance(enabled, list) else []
-    # Ponytail now comes from the local SOUL; retire its old prompt-injecting plugin.
-    wanted = [name for name in enabled if name != "ponytail"]
-    wanted += [name for name in names if name not in wanted]
-    disabled = plugins.get("disabled")
-    disabled = disabled if isinstance(disabled, list) else []
-    retired = disabled if "ponytail" in disabled else disabled + ["ponytail"]
-    if wanted != enabled or retired != disabled:
-        atomic_write(
-            path,
-            json.dumps(
-                {**config, "plugins": {**plugins, "enabled": wanted, "disabled": retired}}
-            ),
-        )
-
-
-def bootstrap(manifest):
-    root = Path(os.environ["HERMES_HOME"])
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    host_key = read_secret(manifest["host_key"])
-    if len(host_key) < 16:
-        raise ValueError("Host API key must contain at least 16 characters")
-    keys = {
-        person: read_secret(path) for person, path in manifest["profile_keys"].items()
-    }
-    if len({host_key, *keys.values()}) != 3 or any(
-        len(key) < 16 for key in keys.values()
-    ):
-        raise ValueError(
-            "Host and personal API keys must be distinct and at least 16 characters"
-        )
-    mcp_env = {
-        name: read_secret(path) for name, path in manifest["mcp_secrets"].items()
-    }
-    write_config(root / "config.yaml", manifest["host_config"])
-    write_env(
-        root / ".env",
-        {
-            "API_SERVER_ENABLED": "true",
-            "API_SERVER_HOST": "127.0.0.1",
-            "API_SERVER_PORT": "8650",
-            "API_SERVER_MODEL_NAME": "hermes-agent",
-            "API_SERVER_KEY": host_key,
-            "OPENAI_API_KEY": "ollama",
-        },
-    )
-    for person in ("augusto", "livia"):
-        if not profile_exists(person):
-            create_profile(person, no_alias=True)
-        home = root / "profiles" / person
-        if home.is_symlink():
-            raise RuntimeError(
-                "Personal profile home must not be shared through a symlink"
-            )
-        key = keys[person]
-        write_config(home / "config.yaml", manifest["profile_configs"][person])
-        write_env(
-            home / ".env",
-            {
-                "API_SERVER_KEY": key,
-                "API_SERVER_MODEL_NAME": "hermes-agent",
-                "OPENAI_API_KEY": "ollama",
-                **manifest["profile_env"][person],
-                **mcp_env,
-            },
-        )
-        atomic_write(home / "SOUL.md", Path(manifest["souls"][person]).read_text())
-        hwiki = home / "hwiki.json"
-        local = json.loads(hwiki.read_text()) if hwiki.exists() else {}
-        atomic_write(hwiki, json.dumps({**local, **manifest["hwiki"][person]}))
-        # Honcho is gone; drop its key file and plugin link from older deployments.
-        (home / "honcho.json").unlink(missing_ok=True)
-        if (home / "plugins" / "honcho").is_symlink():
-            (home / "plugins" / "honcho").unlink()
-        # The Caveman skill bundle is no longer linked; drop the old managed link.
-        if (home / "skills" / "caveman-bundle").is_symlink():
-            (home / "skills" / "caveman-bundle").unlink()
-        if (home / "plugins" / "ponytail").is_symlink():
-            (home / "plugins" / "ponytail").unlink()
-        for directory in ("plugins", "memories", "sessions", "skills", "cron"):
-            (home / directory).mkdir(exist_ok=True)
-        for name in ("MEMORY.md", "USER.md"):
-            path = home / "memories" / name
-            if not path.exists():
-                path.touch(mode=0o600)
-        for name, target in manifest["plugins"].items():
-            link_plugin(home / "plugins" / name, Path(target))
-        enable_plugins(home / "config.yaml", manifest["enabled_plugins"])
-
-
-if __name__ == "__main__":
-    os.umask(0o077)
-    bootstrap(json.loads(Path(sys.argv[1]).read_text()))

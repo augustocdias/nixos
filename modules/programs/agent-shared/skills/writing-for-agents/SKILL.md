@@ -85,4 +85,4 @@ You win twice: fewer tokens, and a sharper hook for the agent to hang its thinki
 
 ## Local integration boundaries
 
-Apply this guidance to the requested writing task, not as permission to rewrite unrelated prompts automatically. Preserve safety and authorization requirements even when pruning or preferring positive phrasing would make the text shorter. Existing project rules and the user's requested document format take precedence. Caveman compresses chat, not persisted documents; use normal prose in skills, specifications, teaching materials, comments, and other saved content. Ponytail's closing risk note belongs in chat and must not alter an exact requested document format.
+Apply this guidance to the requested writing task, not as permission to rewrite unrelated prompts automatically. Preserve safety and authorization requirements even when pruning or preferring positive phrasing would make the text shorter. Existing project rules and the user's requested document format take precedence. Ponytail's closing risk note belongs in chat and must not alter an exact requested document format.

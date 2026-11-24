@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Commit, rebase and push agent writes to a wiki vault, after the wiki gate audit passes.
-# Usage: vault-sync <vault> <tree>
+# Usage: vault-sync <vault> <tree> [<dir>]   (dir: the tree's folder in the vault; omitted for the vault root)
 # Environment:
 #   WIKI_GATE         gate.py of the wiki-gate plugin
 #   WIKI_PYTHON       Python that runs it
-#   WIKI_INBOX_BASE   template for <tree>/review/inbox.base
+#   WIKI_INBOX_BASE   template for <dir>/review/inbox.base
 #   WIKI_TOKEN_FILE   optional GitHub token; fetch and push then use HTTPS even for an SSH remote
 set -euo pipefail
 
 vault=$1
 tree=$2
+wiki=$vault${3:+/$3}
 
 report() {
   printf '%s\n' "$1" >&2
@@ -41,10 +42,10 @@ fi
 for line in .obsidian/ .trash/; do
   grep -qxF "$line" "$vault/.gitignore" 2>/dev/null || printf '%s\n' "$line" >>"$vault/.gitignore"
 done
-mkdir -p "$vault/$tree/raw" "$vault/$tree/review/applied" "$vault/$tree/memory"
-if [ ! -e "$vault/$tree/review/inbox.base" ]; then
+mkdir -p "$wiki/raw" "$wiki/review/applied" "$wiki/memory"
+if [ ! -e "$wiki/review/inbox.base" ]; then
   # The template comes from the read-only Nix store; Obsidian saves view changes into the copy.
-  install -m 0644 "$WIKI_INBOX_BASE" "$vault/$tree/review/inbox.base"
+  install -m 0644 "$WIKI_INBOX_BASE" "$wiki/review/inbox.base"
 fi
 
 # Audit exactly what gets committed: a write landing after this add waits for the next run.

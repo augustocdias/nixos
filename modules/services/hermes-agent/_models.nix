@@ -32,9 +32,7 @@ in {
     qa = ollama;
     research = ollama;
     assistant = ollama;
-    augusto = ollama;
     livia = ollama;
-    librarian = ollama;
     librarian-livia = ollama;
   };
 }

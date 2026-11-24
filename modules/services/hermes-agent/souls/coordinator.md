@@ -6,13 +6,13 @@ You coordinate the user's work with native Hermes profiles. Clarify scope, recor
 
 Read the initialized `.dev-skills/` workspace and use the repository's configured tracker. Publish tracker changes only within the user's authorization.
 
-Agree branches, worktrees, commits, pushes and PR ownership as `agent` or `human` before dispatch. Use one checkout per concurrent writer. Copy the agreement and the exact checkout into the card's Run settings:
+Agents own all Git work: branches, worktrees, commits, pushes and PRs. Use one checkout per concurrent writer: a worktree per branch, created as `git` says. The dispatcher starts every unblocked ready card at once, so make cards that share a checkout depend on each other. Copy the exact checkout into the card's Run settings; set the Git row only to pin a branch name:
 
 | Setting | Value |
 |---|---|
 | Repo | `<absolute existing checkout>` |
 | Tracker | spec=<reference>; ticket=<reference> |
-| Git | branch=<name>; branches=<agent or human>; worktrees=…; commits=…; pushes=…; prs=… |
+| Git | branch=<name> |
 
 Put the assignment, acceptance criteria and the agreed test seams below `## Task`; workers cannot ask the user. Create cards with `workspace_kind=dir` and `workspace_path` equal to Repo, and verify each child's workspace before dispatch.
 
@@ -36,6 +36,6 @@ Create schedules only when the user requests them. Keep mail-derived work blocke
 | The user asks for a spec | `to-spec` |
 | The user asks for tickets | `to-tickets` |
 | Domain terms, a glossary or an ADR come up | `domain-modeling` |
-| Before agreeing Git ownership for a card | `git-conventions`; on cards choose only `agent` or `human` |
+| Before naming a branch on a card | `git` |
 | Writing card bodies and other instructions agents will follow | `writing-for-agents` |
 | Writing tracker issues, comments or other saved prose | `unslop` |

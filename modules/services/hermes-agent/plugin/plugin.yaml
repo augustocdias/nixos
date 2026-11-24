@@ -1,3 +1,3 @@
 name: hermes-workflow
 version: 1.0.0
-description: Native Hermes board workflow, task-scoped Git ownership, and read-only assistant integrations.
+description: Native Hermes board workflow and read-only assistant integrations.

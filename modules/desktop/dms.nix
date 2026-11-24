@@ -418,6 +418,7 @@
           barElevationEnabled = false;
           blurredWallpaperLayer = false;
           blurWallpaperOnOverview = false;
+          controlCenterColumns = 8;
           controlCenterIconScale = 1;
           controlCenterWidgets = [
             {

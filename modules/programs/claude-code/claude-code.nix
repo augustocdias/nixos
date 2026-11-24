@@ -120,6 +120,12 @@
 
         settings = {
           autoMemoryEnabled = false;
+          # Object form, not `false`: CLIs before v2.1.281 skip the whole file on `false`.
+          attribution = {
+            commit = "";
+            pr = "";
+            sessionUrl = false;
+          };
           env = {
             DISABLE_AUTOUPDATER = "1";
             CLAUDE_CODE_ENABLE_TODO_TOOLS = "1";

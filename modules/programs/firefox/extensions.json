@@ -8,13 +8,13 @@
   "ublock-origin": {
     "slug": "ublock-origin",
     "name": "uBlock Origin",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5290541/ublock_origin-1.77.0.xpi",
     "addonId": "uBlock0@raymondhill.net"
   },
   "onepassword-password-manager": {
     "slug": "1password-x-password-manager",
     "name": "1Password",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/5203941/1password_x_password_manager-8.12.44.33.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5266358/1password_x_password_manager-8.12.46.29.xpi",
     "addonId": "{d634138d-c276-4fc8-924b-40a0ea21d284}"
   },
   "translate-web-pages": {
@@ -56,7 +56,7 @@
   "obsidian-web-clipper": {
     "slug": "web-clipper-obsidian",
     "name": "Obsidian Web Clipper",
-    "url": "https://addons.mozilla.org/firefox/downloads/file/4913872/web_clipper_obsidian-1.7.1.xpi",
+    "url": "https://addons.mozilla.org/firefox/downloads/file/5287417/web_clipper_obsidian-1.8.5.xpi",
     "addonId": "clipper@obsidian.md"
   }
 }

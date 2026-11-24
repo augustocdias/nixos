@@ -100,7 +100,8 @@
 
           ENABLE_OLLAMA_API = "False";
           ENABLE_OPENAI_API = "True";
-          OPENAI_API_BASE_URLS = "http://127.0.0.1:8650/p/augusto/v1;http://127.0.0.1:8650/p/livia/v1";
+          # Augusto is the root Hermes profile, served at /v1; Livia is a named profile.
+          OPENAI_API_BASE_URLS = "http://127.0.0.1:8650/v1;http://127.0.0.1:8650/p/livia/v1";
           OPENAI_API_CONFIGS = builtins.toJSON {
             "0" = {
               enable = true;

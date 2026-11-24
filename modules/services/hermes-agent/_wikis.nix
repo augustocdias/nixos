@@ -1,37 +1,46 @@
-# Wiki trees per host: the vault (home-relative), the librarian that curates the tree, the chat
-# profile that files sources into its raw/ folder, and the domain the librarian writes into SCHEMA.md.
+# Wiki trees: the vault (home-relative), the folder inside it ("" for the vault root), the hosts that
+# mount it, the host whose librarian curates it, the profiles that file sources into its raw/ folder,
+# and the domain the librarian writes into SCHEMA.md. Other hosts only file sources and recall.
 let
   trees = {
-    laptop.work = {
+    augusto = {
       vault = "obsidian-vault";
+      dir = "";
+      hosts = ["laptop" "macmini"];
+      curator = "laptop";
       librarian = "librarian";
-      writer = "coordinator";
-      domain = "software engineering and AI research: systems, architecture, tools, practices, agents, models, techniques and papers. Nothing company-specific";
+      writers = ["default" "coordinator"];
+      domain = "software engineering and AI research (systems, architecture, tools, practices, agents, models, techniques and papers), plus personal and household knowledge (home, devices, health, finance, travel, hobbies, people), home automation, self-hosting, NixOS and personal tech projects. Nothing company-specific";
     };
-    macmini = {
-      home = {
-        vault = "obsidian-vault";
-        librarian = "librarian";
-        writer = "augusto";
-        domain = "personal and household knowledge (home, devices, health, finance, travel, hobbies, people), plus home automation, self-hosting, NixOS and personal tech projects";
-      };
-      # Livia's vault never leaves the macmini: local Git history, no remote and no token.
-      livia = {
-        vault = "livia-vault";
-        librarian = "librarian-livia";
-        writer = "livia";
-        domain = "broad personal knowledge";
-        local = true;
-      };
+    # Livia's vault never leaves the macmini: local Git history, no remote and no token.
+    livia = {
+      vault = "livia-vault";
+      dir = "livia";
+      hosts = ["macmini"];
+      curator = "macmini";
+      librarian = "librarian-livia";
+      writers = ["livia"];
+      domain = "broad personal knowledge";
+      local = true;
     };
   };
-  named = builtins.mapAttrs (_: builtins.mapAttrs (tree: wiki: wiki // {inherit tree;})) trees;
-  all = builtins.foldl' (a: b: a // b) {} (builtins.attrValues named);
+  named = builtins.mapAttrs (tree: wiki: wiki // {inherit tree;}) trees;
+  # A path inside the tree, relative to its vault.
+  sub = wiki: path:
+    if wiki.dir == ""
+    then path
+    else "${wiki.dir}/${path}";
 in {
   trees = named;
-  # Every tree in a vault, on any host: each host reads the others' trees.
-  treesIn = vault: builtins.filter (tree: all.${tree}.vault == vault) (builtins.attrNames all);
+  inherit sub;
+  on = host: builtins.filter (wiki: builtins.elem host wiki.hosts) (builtins.attrValues named);
   soul = file: wiki:
-    builtins.replaceStrings ["@tree@" "@vault@" "@domain@" "@librarian@"] [wiki.tree wiki.vault wiki.domain wiki.librarian]
+    builtins.replaceStrings ["@tree@" "@vault@" "@path@" "@domain@" "@librarian@"] [
+      wiki.tree
+      wiki.vault
+      (sub wiki "")
+      wiki.domain
+      wiki.librarian
+    ]
     (builtins.readFile file);
 }

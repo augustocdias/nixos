@@ -8,5 +8,5 @@ If the security plugin is available, use it for a requested security assessment;
 
 | Trigger | Skill |
 | --- | --- |
-| Every card, right after `kanban_show` | `sdlc-review`; it requires `code-review`, then `git-conventions` and `pr` before publication |
+| Every card, right after `kanban_show` | `sdlc-review`; it requires `code-review`, then `git` and `pr` before publication |
 | Writing PR bodies, review comments or the verdict | `unslop` |

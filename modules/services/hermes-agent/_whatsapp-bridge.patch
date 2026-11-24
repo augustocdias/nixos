@@ -1,6 +1,15 @@
 --- a/gateway/platforms/whatsapp_common.py
 +++ b/gateway/platforms/whatsapp_common.py
-@@ -304,6 +304,9 @@ def resolve_whatsapp_bridge_dir() -> Path:
+@@ -309,12 +309,18 @@
+         try:
+             shutil.copytree(install_bridge, hermes_home_bridge, dirs_exist_ok=True,
+                             ignore=shutil.ignore_patterns("node_modules"))
++            # copytree copies the Nix store's read-only modes; npm must write here. Only the copied entries.
++            for path in [hermes_home_bridge, *(hermes_home_bridge / p.relative_to(install_bridge) for p in install_bridge.rglob("*"))]:
++                path.chmod(path.stat().st_mode | 0o200)
+         except (OSError, shutil.Error):
+             pass  # unreadable install tree: the mirror as it stands is still the best runnable copy
+         return hermes_home_bridge
      try:
          hermes_home_bridge.parent.mkdir(parents=True, exist_ok=True)
          shutil.copytree(install_bridge, hermes_home_bridge, dirs_exist_ok=False)

@@ -1,6 +1,6 @@
-"""Create the work profiles and merge the Nix-owned settings into them.
+"""Create every Hermes profile on this host and merge the Nix-owned settings into them.
 
-Shares helpers with the macmini household bootstrap (_bootstrap.py). Runtime setup
+Helpers live in _bootstrap.py. Runtime setup
 (model login, chat platforms, routes, Google) keeps every key Nix does not own,
 and a malformed config.yaml stops startup instead of being overwritten.
 """
@@ -15,6 +15,7 @@ from pathlib import Path
 
 from _bootstrap import atomic_write, link_plugin, merge_config, read_secret, write_env
 from hermes_cli.config import require_readable_config_before_write
+from hermes_cli.config_defaults import DEFAULT_CONFIG
 from hermes_cli.profiles import create_profile, profile_exists, write_profile_meta
 from hermes_cli.plugins_cmd_git import _update_install_record
 from hermes_constants import reset_hermes_home_override, set_hermes_home_override
@@ -31,12 +32,20 @@ def seed(home, managed, plugin, skins, provider):
         server = config.get("mcp_servers", {}).get(name, {})
         for key in ("tool_costs", "spend_limit", "cost_unit"):
             server.pop(key, None)
+    # The household profiles once pinned context7 untrusted; it now runs with full trust, like the laptop's.
+    context7 = config.get("mcp_servers", {}).get("context7", {})
+    if context7.get("trust") == "untrusted":
+        context7.pop("trust")
     entries = config.get("plugins", {}).get("entries", {})
     entries.pop("herdr-agents", None)
     legacy = home / "plugins" / "herdr-agents"
     if legacy.is_symlink():
         legacy.unlink()
     config.pop("fallback_model", None)
+    # An explicit defer list replaces Hermes's curated one, so extend the current default.
+    defaults = DEFAULT_CONFIG["tools"]["tool_search"]["defer"]
+    defer = [*defaults, *(name for name in managed.get("defer", []) if name not in defaults)]
+    config.setdefault("tools", {}).setdefault("tool_search", {})["defer"] = defer
     Path(managed["config"]["terminal"]["cwd"]).mkdir(parents=True, exist_ok=True)
     atomic_write(path, json.dumps(config))
     environment = {**managed.get("env", {}), **{
@@ -91,6 +100,14 @@ def schedule(home, jobs):
 def bootstrap(manifest):
     root = Path(os.environ["HERMES_HOME"])
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Each API listener key admits one profile, so a shared or short key would cross profiles.
+    api_keys = [
+        read_secret(managed["secrets"]["API_SERVER_KEY"])
+        for managed in (manifest["root"], *manifest["profiles"].values())
+        if "API_SERVER_KEY" in managed.get("secrets", {})
+    ]
+    if len(set(api_keys)) != len(api_keys) or any(len(key) < 16 for key in api_keys):
+        raise ValueError("API server keys must be distinct and at least 16 characters")
     provider = None
     if manifest.get("provider"):
         source = Path(manifest["provider"])

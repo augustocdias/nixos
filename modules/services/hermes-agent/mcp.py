@@ -29,7 +29,7 @@ BOARD_TOOLS = [
                 "body": {"type": "string", "description": "What to do, or a pointer to the ticket that says it"},
                 "repo": {"type": "string", "description": "Absolute path of the one repository this card changes, under ~/dev. Cross-repo work is one card per repository."},
                 "tracker": {"type": "string", "description": "Spec and ticket references in the repo's tracker"},
-                "git": {"type": "string", "description": "branch and agent|human ownership of branches, worktrees, commits, pushes and PRs; omitted or legacy ask means human"},
+                "git": {"type": "string", "description": "Optional branch=<name> to pin the branch; agents own all Git work"},
                 "assignee": {"type": "string", "description": "programmer, reviewer, qa or research"},
                 "tenant": {"type": "string", "description": "Groups a spec's cards, e.g. the spec slug"},
                 "parents": {"type": "array", "items": {"type": "string"}, "description": "Cards that must finish first"},

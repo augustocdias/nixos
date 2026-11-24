@@ -1,4 +1,5 @@
-# Wiki gate plugin with this host's vault policy. Each host writes only its own tree.
+# Wiki gate plugin with this host's vault policy. A tree's librarian writes only on its curator host;
+# every host that mounts a tree lets the tree's writers file sources into raw/.
 {
   pkgs,
   lib,
@@ -7,16 +8,20 @@
   recallOnly ? [],
 }: let
   wikis = import ./_wikis.nix;
-  mine = wikis.trees.${host};
-  # Policy for this host's trees; the other host's trees in the same vault stay read-only.
-  vaults = map (vault: {
-    root = "${home}/${vault}";
-    trees = lib.genAttrs (wikis.treesIn vault) (tree:
-      lib.optionalAttrs (mine ? ${tree}) {
-        inherit (mine.${tree}) librarian;
-        writers = [mine.${tree}.writer];
-      });
-  }) (lib.unique (lib.mapAttrsToList (_: wiki: wiki.vault) mine));
+  mine = wikis.on host;
+  vaults =
+    map (vault: {
+      root = "${home}/${vault}";
+      trees = lib.listToAttrs (map (wiki:
+        lib.nameValuePair wiki.tree {
+          inherit (wiki) dir writers;
+          librarian =
+            if wiki.curator == host
+            then wiki.librarian
+            else null;
+        }) (lib.filter (wiki: wiki.vault == vault) mine));
+    })
+    (lib.unique (map (wiki: wiki.vault) mine));
 in
   pkgs.runCommand "wiki-gate" {} ''
     mkdir -p $out

@@ -6,12 +6,6 @@
       lib,
       ...
     }: let
-      # The laptop writes the work tree and the macmini the home tree.
-      tree =
-        if pkgs.stdenv.hostPlatform.isDarwin
-        then "home"
-        else "work";
-
       # Release assets of a community plugin or theme. manifestId spares the
       # Home Manager module from reading manifest.json at evaluation time.
       mkRelease = manifestId: repo: version: hashes:
@@ -61,12 +55,13 @@
       # Web Clipper templates live only in browser sync storage, so this renders the clipper's
       # "Import all settings" file (obsidian-clipper 1.7.1, src/utils/import-export.ts):
       # the raw storage keys, with templates as plain objects that the import compresses.
-      clipperTemplate = treeName: kind: triggers: {
-        id = "${treeName}-${kind}";
-        name = "${lib.toUpper (lib.substring 0 1 treeName)}${lib.substring 1 (-1) treeName} ${kind}";
+      # The wiki is the whole vault (hermes-agent/_wikis.nix), so sources land in its top-level raw/.
+      clipperTemplate = kind: triggers: {
+        id = "wiki-${kind}";
+        name = "Wiki ${kind}";
         behavior = "create";
         inherit vault;
-        path = "${treeName}/raw/${kind}s";
+        path = "raw/${kind}s";
         noteNameFormat = ''{{date|date:"YYYY-MM-DD"}}-{{title|safe_name|kebab}}'';
         noteContentFormat = "{{content}}";
         context = "";
@@ -106,15 +101,8 @@
           ];
       };
       youtube = ["https://www.youtube.com/watch" "https://m.youtube.com/watch" "https://youtu.be/"];
-      # The host's own tree comes first: the first template is the default and wins shared triggers.
-      clipperTemplates = lib.concatMap (t: [(clipperTemplate t "article" []) (clipperTemplate t "video" youtube)]) [
-        tree
-        (
-          if tree == "work"
-          then "home"
-          else "work"
-        )
-      ];
+      # The first template is the default.
+      clipperTemplates = [(clipperTemplate "article" []) (clipperTemplate "video" youtube)];
     in {
       xdg.configFile."obsidian-clipper/settings.json".text = builtins.toJSON ({
           vaults = [vault];
@@ -238,7 +226,7 @@
                 version = 5;
                 separateMobile = false;
                 homepages."Main Homepage" = {
-                  value = "${tree}/review/inbox.base";
+                  value = "review/inbox.base";
                   kind = "File";
                   openOnStartup = true;
                   openMode = "Replace all open notes";

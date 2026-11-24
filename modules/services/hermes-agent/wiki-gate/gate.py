@@ -1,10 +1,12 @@
 """Wiki vault policy shared by the pre_tool_call hook and the sync audit.
 
-Each tree holds raw/ (bronze), review/ (silver, with review/applied/) and gold pages. Raw takes
+Each tree holds raw/ (bronze), review/ (silver, with review/applied/) and gold pages. A tree is the
+folder named by its policy's `dir`, or the whole vault when `dir` is empty. Raw takes
 writes from the tree's writers and librarian; review and the SCHEMA/index/log files only from
 the librarian; gold only from the librarian, with an approved proposal targeting the page.
 memory/ takes hwiki's own tool, which recall_only profiles may not call, and file-tool writes only from
-the tree's librarian, for its unattended memory maintenance. Everything else in a vault is blocked.
+the tree's librarian, for its unattended memory maintenance. Everything else in a vault is blocked,
+including any dot path at the vault or tree top (.git, .gitignore, .obsidian): Git config there runs as the sync job.
 Terminal and code-execution writes bypass the hook; the audit catches their gold changes.
 
 Audit: python gate.py audit <vault> [--base REV] [--held FILE]
@@ -76,7 +78,7 @@ def locate(settings, path):
             continue
         best = None
         for name, policy in vault["trees"].items():
-            base = _key(os.path.join(root, name))
+            base = _key(os.path.join(root, policy.get("dir", name)))
             if _inside(target, base) and (best is None or len(base) > len(best[2])):
                 best = (name, policy, base)
         if best is None:
@@ -88,6 +90,8 @@ def locate(settings, path):
 
 def tier(rel):
     top = rel.split("/", 1)[0]
+    if top.startswith("."):
+        return "hidden"
     if top in ("raw", "review", "memory"):
         return top
     if "/" not in rel and META.fullmatch(rel):
@@ -138,6 +142,8 @@ def decide(settings, profile, path):
     writers = [*policy.get("writers", []), *([librarian] if librarian else [])]
     who = f"profile '{librarian}'" if librarian else "no profile on this host"
     kind = tier(rel)
+    if kind == "hidden":
+        return f"Wiki gate: {path} is vault configuration. Agents never write there."
     if kind == "raw":
         if profile in writers:
             return None

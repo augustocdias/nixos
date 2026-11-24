@@ -1,4 +1,4 @@
-"""Native Hermes board workflow, task-scoped Git, and read-only Google tools."""
+"""Native Hermes board workflow and read-only Google tools."""
 import json
 import logging
 import os
@@ -16,14 +16,13 @@ SETTINGS = json.loads((Path(__file__).parent / "settings.json").read_text())
 AUTHOR = "hermes-workflow"
 HEADER = re.compile(r"^(?:\|\s*\**(Repo|Tracker|Git)\**\s*\|\s*(.*?)\s*\|\s*|(Repo|Tracker|Git):[ \t]*(.*))$", re.M)
 ASSISTANT_KANBAN = {"kanban_create", "kanban_list", "kanban_show"}
-GIT_CATEGORIES = ("branches", "worktrees", "commits", "pushes", "prs")
 CARD_TEMPLATE = """## Run settings
 
 | Setting | Value |
 |---|---|
 | Repo | `<absolute repository or worktree path>` |
 | Tracker | spec=<reference>; ticket=<reference> |
-| Git | branch=<name>; branches=<agent or human>; worktrees=…; commits=…; pushes=…; prs=… |
+| Git | branch=<name> (optional) |
 
 ## Task
 
@@ -79,7 +78,7 @@ def _pairs(value):
 
 
 def card_fields(body):
-    """The card's run settings: repository, tracker and Git ownership."""
+    """The card's run settings: repository, tracker and an optional Git branch."""
     fields = {
         (row_key or line_key).lower(): (row_value or line_value).replace("`", "").replace("\\|", "|").strip()
         for row_key, row_value, line_key, line_value in HEADER.findall(body or "")
@@ -139,7 +138,7 @@ def _policy(kb, conn, task):
     repo = _inside_dev(fields["repo"])
     if repo is None:
         raise ValueError("The card must name one existing repository or worktree under an allowed root")
-    return {"repo": str(repo), "git": {key: "agent" if fields["git"].get(key) == "agent" else "human" for key in GIT_CATEGORIES}}
+    return {"repo": str(repo)}
 
 
 def kanban_archive(args, **_):
@@ -613,8 +612,8 @@ def register(ctx):
                 with connect() as conn:
                     parent = kb.get_task(conn, own)
                     policy = _policy(kb, conn, parent)
-                if str(repo) != policy["repo"] or any(fields["git"].get(key) == "agent" and policy["git"][key] != "agent" for key in GIT_CATEGORIES):
-                    return {"action": "block", "message": "A worker cannot expand its repository or Git grant when creating work"}
+                if str(repo) != policy["repo"]:
+                    return {"action": "block", "message": "A worker cannot change its repository when creating work"}
             return {"action": "modify", "args": {"workspace_kind": "dir", "workspace_path": str(repo), "triage": bool(args.get("triage"))}}
         # Tests from this plugin execute on the host, not through the terminal backend.
         if tool_name == "security_scan_start" and (args.get("allow_tests") or args.get("safety_level", "static") != "static"):

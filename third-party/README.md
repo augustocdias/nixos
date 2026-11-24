@@ -24,6 +24,7 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
   - Folded the caveman-review one-line finding format into `skills/code-review`.
   - Folded the caveman-commit rules into `skills/git-conventions`.
   - Pointed persisted prose to the `unslop` skill.
+  - Applied the rules to saved text too: commits, docs, comments and tickets no longer switch to plain prose.
 
 ## pstack
 
@@ -33,7 +34,8 @@ Licenses and provenance for text copied or adapted into this repository. Nothing
 - Copied from: `pstack/skills/unslop/SKILL.md`, into `agent-shared/skills/unslop/SKILL.md`.
 - Modifications:
   - Removed `disable-model-invocation` and rewrote the description so the skill loads for saved prose.
-  - Added a scope line: chat replies follow Caveman, and rule 33 does not apply to them.
+  - Added a scope line: Caveman sets the voice for chat and saved prose.
+  - Removed upstream rules 20, 22, 23, 24, 28 and 31, which Caveman states, and rule 33, which contradicts it, then numbered the remaining rules 1–21. Upstream rule numbers no longer match.
 
 ## Ponytail
 
