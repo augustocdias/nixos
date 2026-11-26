@@ -1,12 +1,13 @@
 # NixOS + nix-darwin configuration
 
-Declarative Den/aspect configuration for `augusto` across three hosts:
+Declarative Den/aspect configuration for `augusto` across four hosts:
 
 | Host | Platform | Role |
 | --- | --- | --- |
 | `laptop` (`nixos`) | x86_64-linux | NixOS, Hyprland, DankMaterialShell, Home Manager |
 | `macmini` | aarch64-darwin | nix-darwin, Home Manager, OmniWM, voice services |
 | `raspi` (`home`) | aarch64-linux | Headless Home Assistant appliance; no Home Manager user |
+| `vps-hermes` | x86_64-linux | Hetzner Cloud VPS, `server-base`, Hermes; minimal `user-server` Home Manager user |
 
 ## Topic docs
 

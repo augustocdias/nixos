@@ -13,7 +13,7 @@ let
     base_url = "http://127.0.0.1:11434/v1";
     context_length = 65536;
   };
-in {
+in rec {
   laptop = {
     default = codex "gpt-6-luna";
     librarian = codex "gpt-6-astra";
@@ -35,4 +35,5 @@ in {
     livia = ollama;
     librarian-livia = ollama;
   };
+  vps-hermes = laptop;
 }

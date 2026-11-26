@@ -13,7 +13,6 @@
     includes = with den.aspects; [
       ollama
       wyoming
-      hermes-agent
       open-webui
       laya
       libretranslate

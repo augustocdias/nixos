@@ -26,6 +26,7 @@
             a = "add";
             aa = "add .";
             ap = "add -p";
+            amend = "commit --amend --no-edit";
             b = "branch";
             brm = "branch -D";
             s = "status -s";

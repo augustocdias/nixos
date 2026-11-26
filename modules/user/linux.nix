@@ -12,6 +12,7 @@
       xdg
       omp-jail
       work
+      hermes
     ];
   };
 }

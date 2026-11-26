@@ -4,7 +4,7 @@
 
 ## Composition
 
-Each host in `modules/hosts.nix` names a host aspect, plus a user aspect for `augusto` on laptop (`user-linux`) and macmini (`user-macos`). Both user aspects include `user-base`. raspi has a host aspect only.
+Each host in `modules/hosts.nix` names a host aspect, plus a user aspect for `augusto` on laptop (`user-linux`), macmini (`user-macos`) and vps-hermes (`user-server`). `user-linux` and `user-macos` include `user-base`; `user-server` takes only the shell, editor, Git, gpg and fonts. vps-hermes adds a second user, `hermes` (`user-hermes`). raspi has a host aspect only.
 
 `modules/defaults.nix` explicitly lets hosts receive their users' OS content through `den.batteries.user-aspects`. This preserves system settings carried by the user aspects without relying on Den's transition default. Keep `user-shell` in `den.schema.user.includes`, not `den.default.includes`: the default runs in both host and user scopes and duplicates the shell provider.
 
@@ -68,6 +68,22 @@ The `mosquitto` aspect (`modules/services/mosquitto.nix`) runs mosquitto on port
 - `passwordFile` takes the plaintext; `mosquitto_passwd -U` hashes it at activation. The password file and ACL reach the service through systemd `LoadCredential`, read as root before privileges drop, so a default root-owned `0400` secret needs no `owner` or `mode`.
 - Changing the consumer set restarts the broker, because `preStart` regenerates the password and ACL files. `persistence` keeps subscriptions and retained messages across restarts.
 
+<a id="vps-host--vps-hermes"></a>
+
+## VPS host: `vps-hermes`
+
+Hetzner Cloud x86_64 VPS running its own Hermes (see [Work Hermes](coding-agents.md#work-hermes)). `modules/hardware/vps-hermes/vps-hermes.nix` holds the disk, boot and network; `server-base` (`modules/core/server-base.nix`) holds the hardening any server reuses.
+
+- **Users**: `augusto` administers the machine with passwordless sudo, for unattended deploys. Hermes runs unsandboxed, so it runs as `hermes` (uid 1001, lingering), which `vps-hermes.nix` keeps out of `wheel` (den's `primary-user` battery adds it to every user) and out of Nix's trusted users. A compromised worker reaches `hermes`'s files, its two secrets and the agent Git key, but not root or `augusto`. Manage it from `augusto` with `sudo -iu hermes`, `systemctl --user -M hermes@ restart hermes-gateway` and `journalctl --user -M hermes@ -u hermes-gateway`, or log in as `hermes@` directly.
+- **Login**: only the YubiKey key in `server-base` logs in, as `augusto` or `hermes`; `authorizedKeysInHomedir` is off, so a key dropped into `~/.ssh/authorized_keys` is ignored. The agent key signs and pushes Git there but never logs in. Port 22 is the only open port; there is no public Hermes listener.
+- **Clients**: the `security` aspect gives laptop and macmini an `ssh vps-hermes` match block that forwards the local gpg-agent extra socket (the supervised agent's socket-unit path, not `gpg-agent.conf`'s `extra-socket`) to the VPS's `/run/user/1000/gnupg/S.gpg-agent`, where `user-server`'s `gpg` uses it; the VPS runs no gpg-agent. `user-server` creates that directory, and `StreamLocalBindUnlink` replaces a stale socket. Set the block's `hostname` once the VPS has an address. Home Manager owns `~/.ssh/config` on both clients; an unmanaged file found at activation moves to `config.hm-bak`.
+- **Hermes Desktop** reaches the gateway through its native SSH connection as `hermes@`, added in the app on each client; that user gets no gpg forwarding. It connects only while the YubiKey is plugged in.
+- **Boot and disk**: disko lays out EF02 plus an ESP for hybrid BIOS/UEFI GRUB and an ext4 root. Confirm `/dev/sda` in the rescue system first.
+- **Networking**: networkd with DHCP IPv4. Hetzner assigns IPv6 statically: add the server's `/64` address and `fe80::1` gateway in `vps-hermes.nix` after provisioning.
+- **Secrets**: `hermes` decrypts its own file, `modules/hardware/vps-hermes/secrets.yaml`, holding only `github_token` and `agent_ssh_key`, never the shared `env.yaml`. vps-hermes does not build until that file exists, because sops-nix checks declared keys at build time; create it with the YubiKey (`sops modules/hardware/vps-hermes/secrets.yaml`, its `.sops.yaml` rule encrypts to the YubiKey). One age key at `/var/lib/sops-nix/key.txt` serves NixOS and `hermes`'s Home Manager sops, owned by `hermes`. Generate it after provisioning, add its public key to that rule and run `sops updatekeys` on the file. Until then the Hermes Git agent, wiki sync and `gh` token fail.
+- **gpg as augusto** uses the forwarded YubiKey but needs the public key once: `gpg --fetch-keys https://keys.openpgp.org/vks/v1/by-fingerprint/7D8396F74725A208D835CE3730E62A1E4F078650`.
+- **Runtime setup by hand**, as `hermes`: Claude (`claude`) and Codex logins, chat channels (`hermes gateway setup`), and repository checkouts in `~/dev`.
+
 ## Security
 
 - **Disk**: the laptop root is LUKS (`modules/hardware/laptop/laptop.nix`) with TPM2 auto-unlock.
@@ -84,6 +100,12 @@ sudo nixos-rebuild switch --flake .
 
 # Rebuild the macmini
 darwin-rebuild switch --flake .
+
+# Install the VPS from the Hetzner rescue system (confirm the disk first)
+nix run github:nix-community/nixos-anywhere -- --flake .#vps-hermes root@<address>
+
+# Deploy the VPS, built on the laptop
+nixos-rebuild switch --flake .#vps-hermes --target-host augusto@<address> --sudo
 
 # Deploy the Pi: built on the laptop through aarch64 binfmt, closure pushed over SSH
 nixos-rebuild switch --flake .#raspi --target-host augusto@home.local --sudo

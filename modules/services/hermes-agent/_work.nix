@@ -1,4 +1,4 @@
-# Hermes profiles for both hosts. Host differences live in _hosts.nix, _models.nix and _fallbacks.nix.
+# Hermes profiles for every Hermes host. Host differences live in _hosts.nix, _models.nix, _fallbacks.nix and _wikis.nix.
 {
   inputs,
   models,
@@ -9,22 +9,22 @@
   config,
   pkgs,
   lib,
+  options,
   osConfig ? {},
+  host,
   ...
 }: let
   inherit (config.home) homeDirectory profileDirectory;
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
-  host =
-    if isLinux
-    then "laptop"
-    else "macmini";
-  hostModels = models.${host};
+  # The den host name keys every per-host table.
+  hostKey = host.name;
+  hostModels = models.${hostKey};
   hostCfg =
     (import ./_hosts.nix {
       inherit inputs lib pkgs osConfig;
       inherit (config.home) homeDirectory;
     }).${
-      host
+      hostKey
     };
   bubblewrap = hostCfg.terminal == "bubblewrap";
   auxiliaryModel = model: (builtins.removeAttrs model ["default"]) // {model = model.default;};
@@ -51,8 +51,8 @@
   # sources into raw/ on every host that mounts the tree.
   wikis = import ./_wikis.nix;
   withPath = wiki: wiki // {path = "${homeDirectory}/${wiki.vault}";};
-  hostWikis = map withPath (wikis.on host);
-  librarians = lib.listToAttrs (map (wiki: lib.nameValuePair wiki.librarian wiki) (lib.filter (wiki: wiki.curator == host) hostWikis));
+  hostWikis = map withPath (wikis.on hostKey);
+  librarians = lib.listToAttrs (map (wiki: lib.nameValuePair wiki.librarian wiki) (lib.filter (wiki: wiki.curator == hostKey) hostWikis));
   # Programmer, QA and reviewer keep no persistent state, so each run starts from a fresh context.
   wikiReaders = ["research" "assistant"];
   writersOf = lib.listToAttrs (lib.concatMap (wiki: map (name: lib.nameValuePair name wiki) wiki.writers) hostWikis);
@@ -60,7 +60,8 @@
   wikiProfiles = builtins.attrNames wikiOf;
   wikiWriters = builtins.attrNames writersOf ++ builtins.attrNames librarians;
   wikiGate = import ./_wiki-gate.nix {
-    inherit pkgs lib host;
+    inherit pkgs lib;
+    host = hostKey;
     home = homeDirectory;
     recallOnly = wikiReaders;
   };
@@ -217,7 +218,7 @@
   people = ["default"] ++ persons;
   # A writer hands ingest to the librarian on the curator host; elsewhere the librarian's daily ingest picks it up.
   handover = wiki:
-    if wiki.curator == host
+    if wiki.curator == hostKey
     then "Hand them over with `delegate_task` routed to the `${wiki.librarian}` profile, passing the user's words unchanged."
     else "The librarian runs on the ${wiki.curator}; it ingests new sources on its daily run after the vault syncs, so tell the user the source is queued.";
   soul = name:
@@ -230,11 +231,7 @@
       )
       + lib.optionalString (lib.elem name (roles ++ ["coordinator"])) (builtins.readFile ./souls/_role.md)
       + lib.optionalString (lib.elem name (roles ++ ["coordinator"])) (builtins.readFile ./souls/_skills.md)
-      + lib.optionalString (lib.elem name (roles ++ ["coordinator"] ++ people)) (builtins.readFile (
-        if isLinux
-        then ./souls/_linux.md
-        else ./souls/_darwin.md
-      ))
+      + lib.optionalString (lib.elem name (roles ++ ["coordinator"] ++ people)) (builtins.readFile hostCfg.executionSoul)
       + lib.optionalString (writersOf ? ${name}) (builtins.replaceStrings ["@handover@"] [(handover writersOf.${name})] (wikis.soul ./souls/_wiki.md writersOf.${name}))
       + builtins.readFile ./souls/_formatting.md
       + "\n# Evidence\n\n"
@@ -383,7 +380,7 @@
     allowed = toolsets ++ lib.optional (lib.elem name hostCfg.homeassistant) "homeassistant";
   in {
     model = hostModels.${name};
-    fallback_providers = fallbacks.${host}.${name};
+    fallback_providers = fallbacks.${hostKey}.${name};
     agent = {
       disabled_toolsets = lib.subtractLists allowed allToolsets;
       clarify_timeout = 0;
@@ -823,158 +820,180 @@
     ${bootstrap}
     exec ${lib.getExe package} "$@"
   '';
-in {
-  home.packages =
-    [
-      hermes
-    ]
-    ++ lib.optionals isLinux [pkgs.bubblewrap pkgs.util-linux pkgs.nodejs]
-    ++ [
-      # Upstream's desktop runs its own 0.0.0 build, whose plugin version gate skips bubblewrap: no terminal backend, no file tools.
-      # The profile path, not the store path: Desktop outlives switches and respawns the gateway, and a
-      # store path would keep launching the previous generation's wrapper and environment.
-      (package.hermesDesktop.override {extraEnv.HERMES_DESKTOP_HERMES = "/etc/profiles/per-user/${config.home.username}/bin/hermes";})
-    ];
-  herdr.programs.hermes = {
-    name = "Hermes";
-    icon = "icons/hermes.svg";
-    tint = true;
-    tile = "#1c1d21";
-    color = "#ffffff";
-    run = ["hermes" "-p" "coordinator"];
-  };
-  herdr.keys."super-s" = "terminal.open:hermes";
-  home.file =
-    lib.listToAttrs (lib.concatMap (home:
-      (map (name:
-        lib.nameValuePair "${home}/plugins/${name}" {
-          source =
-            if name == "bubblewrap"
-            then bubblewrapPlugin
-            else "${inputs.hermes-official-plugins}/${name}";
-        })
-      officialPlugins)
-      ++ [
-        (lib.nameValuePair "${home}/plugins/office-3d" {source = inputs.hermes-plugin-office-3d;})
-        (lib.nameValuePair "${home}/plugins/wiki-gate" {source = wikiGate;})
-        (lib.nameValuePair "${home}/plugins/kanban-transcripts" {source = kanbanTranscripts;})
-        # Upstream's adapter, version-matched to the binary; see the deny twins in profileConfig.
-        (lib.nameValuePair "${home}/plugins/rtk-rewrite" {source = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";})
-      ])
-    ([".hermes"] ++ map (name: ".hermes/profiles/${name}") (builtins.attrNames profiles)))
-    // lib.listToAttrs (map (name: lib.nameValuePair "${homeOf name}/plugins/hwiki" {source = inputs.hermes-plugin-hwiki;}) wikiProfiles)
-    // lib.mapAttrs' (name: image: lib.nameValuePair "${homeOf name}/assets/avatar.png" {source = ./assets/${image};}) ({
-        default = "hermes.png";
-        coordinator = "hermes-manager.png";
-        assistant = "hermes-assistant.png";
-        programmer = "hermes-programmer.png";
-        reviewer = "hermes-reviewer.png";
-        qa = "hermes-qa.png";
-        research = "hermes-researcher.png";
-      }
-      // lib.mapAttrs (_: _: "hermes-librarian.png") librarians)
-    // {
-      ".hermes/nix/plugins/hermes-workflow".source = plugin;
-      # Desktop cannot stamp its package marker into a copy of a read-only store directory.
-      ".hermes/desktop-plugins/office-3d/plugin.js".source = "${inputs.hermes-plugin-office-3d}/desktop/plugin.js";
-      ".hermes/desktop-plugins/kanban-transcripts/plugin.js".source = kanbanTranscriptsDesktop;
-    };
-  # A local vault has no clone to start from; the sync timer adds the baseline and commits.
-  home.activation.wiki-vaults = lib.hm.dag.entryAfter ["writeBoundary"] (lib.concatMapStrings (wiki:
-    lib.optionalString (wiki.local or false) ''
-      if [ ! -e ${lib.escapeShellArg "${wiki.path}/.git"} ]; then
-        run install -d -m 0700 ${lib.escapeShellArg wiki.path}
-        run ${lib.getExe pkgs.git} init -q -b main ${lib.escapeShellArg wiki.path}
-      fi
-    '')
-  hostWikis);
-  home.activation.hermes-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
-    run mkdir -p ${lib.escapeShellArg root} ${lib.escapeShellArg dev}
-    run chmod 0700 ${lib.escapeShellArg root}
-    run ${package.hermesVenv}/bin/python -c \
-      'import json, sys; from pathlib import Path; from hermes_cli.ui_preferences import write_preferences; write_preferences(json.loads(Path(sys.argv[1]).read_text()), path=Path(sys.argv[2]))' \
-      ${desktopSettings} ${lib.escapeShellArg "${root}/ui-preferences.json"}
-  '';
-  systemd.user.services = lib.optionalAttrs isLinux {
-    # Hermes clients look for exactly this unit name and start it instead of spawning their own gateway.
-    hermes-gateway = {
-      Unit = {
-        Description = "Hermes Agent gateway";
-        X-RestartIfChanged = false;
-        Wants = ["hermes-git-agent.service"];
-        After = ["hermes-git-agent.service"];
-      };
-      Service = {
-        Environment = ["HERMES_HOME=${root}" "PATH=${profileDirectory}/bin:/run/current-system/sw/bin"];
-        WorkingDirectory = dev;
-        ExecStart = "${lib.getExe hermes} -p default gateway run";
-        Restart = "on-failure";
-        RestartSec = 10;
-      };
-      Install.WantedBy = ["default.target"];
-    };
-    hermes-git-agent = {
-      Unit.Description = "SSH agent holding only the Hermes agent key";
-      Service = {
-        ExecStart = "${gitAgent}";
-        Restart = "on-failure";
-        RestartSec = 5;
-      };
-      Install.WantedBy = ["default.target"];
-    };
-    wiki-sync = {
-      Unit.Description = "Audit, commit and sync the wiki vault";
-      Service = {
-        Type = "oneshot";
-        Environment = lib.mapAttrsToList (name: value: "${name}=${value}") (syncEnv augustoWiki);
-        ExecStart = "${lib.getExe vaultSync} ${augustoWiki.path} ${augustoWiki.tree} ${augustoWiki.dir}";
-      };
-    };
-  };
-  systemd.user.timers = lib.optionalAttrs isLinux {
-    wiki-sync = {
-      Unit.Description = "Sync the wiki vault every 15 minutes";
-      Timer = {
-        OnCalendar = "*:0/15";
-        Persistent = true;
-      };
-      Install.WantedBy = ["timers.target"];
-    };
-  };
-  launchd.agents = lib.optionalAttrs (!isLinux) (lib.listToAttrs (map (wiki:
-      lib.nameValuePair "wiki-sync-${wiki.tree}" {
-        enable = true;
-        config = {
-          ProgramArguments = [(lib.getExe vaultSync) wiki.path wiki.tree wiki.dir];
-          EnvironmentVariables = syncEnv wiki;
-          StartInterval = 900;
-          RunAtLoad = true;
-          StandardOutPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
-          StandardErrorPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
+in
+  lib.mkMerge [
+    {
+      home.packages =
+        [
+          hermes
+        ]
+        ++ lib.optionals isLinux (lib.optional bubblewrap pkgs.bubblewrap ++ [pkgs.util-linux pkgs.nodejs])
+        ++ lib.optionals hostCfg.desktop [
+          # Upstream's desktop runs its own 0.0.0 build, whose plugin version gate skips bubblewrap: no terminal backend, no file tools.
+          # The profile path, not the store path: Desktop outlives switches and respawns the gateway, and a
+          # store path would keep launching the previous generation's wrapper and environment.
+          (package.hermesDesktop.override {extraEnv.HERMES_DESKTOP_HERMES = "/etc/profiles/per-user/${config.home.username}/bin/hermes";})
+        ];
+      home.file =
+        lib.listToAttrs (lib.concatMap (home:
+          (map (name:
+            lib.nameValuePair "${home}/plugins/${name}" {
+              source =
+                if name == "bubblewrap"
+                then bubblewrapPlugin
+                else "${inputs.hermes-official-plugins}/${name}";
+            })
+          officialPlugins)
+          ++ [
+            (lib.nameValuePair "${home}/plugins/office-3d" {source = inputs.hermes-plugin-office-3d;})
+            (lib.nameValuePair "${home}/plugins/wiki-gate" {source = wikiGate;})
+            (lib.nameValuePair "${home}/plugins/kanban-transcripts" {source = kanbanTranscripts;})
+            # Upstream's adapter, version-matched to the binary; see the deny twins in profileConfig.
+            (lib.nameValuePair "${home}/plugins/rtk-rewrite" {source = "${pkgs.rtk.src}/hooks/hermes/rtk-rewrite";})
+          ])
+        ([".hermes"] ++ map (name: ".hermes/profiles/${name}") (builtins.attrNames profiles)))
+        // lib.listToAttrs (map (name: lib.nameValuePair "${homeOf name}/plugins/hwiki" {source = inputs.hermes-plugin-hwiki;}) wikiProfiles)
+        // lib.mapAttrs' (name: image: lib.nameValuePair "${homeOf name}/assets/avatar.png" {source = ./assets/${image};}) ({
+            default = "hermes.png";
+            coordinator = "hermes-manager.png";
+            assistant = "hermes-assistant.png";
+            programmer = "hermes-programmer.png";
+            reviewer = "hermes-reviewer.png";
+            qa = "hermes-qa.png";
+            research = "hermes-researcher.png";
+          }
+          // lib.mapAttrs (_: _: "hermes-librarian.png") librarians)
+        // {
+          ".hermes/nix/plugins/hermes-workflow".source = plugin;
+          # Desktop cannot stamp its package marker into a copy of a read-only store directory.
+          ".hermes/desktop-plugins/office-3d/plugin.js".source = "${inputs.hermes-plugin-office-3d}/desktop/plugin.js";
+          ".hermes/desktop-plugins/kanban-transcripts/plugin.js".source = kanbanTranscriptsDesktop;
         };
-      })
-    hostWikis)
-    // {
-      # Linux runs this as the hermes-git-agent user service. A LaunchAgent starts at login, so until the
-      # user logs in on the macmini, Git there has no agent key.
-      hermes-git-agent = {
-        enable = true;
-        config = {
-          ProgramArguments = ["${gitAgent}"];
-          KeepAlive = true;
-          RunAtLoad = true;
-          StandardOutPath = "${homeDirectory}/Library/Logs/hermes-git-agent.log";
-          StandardErrorPath = "${homeDirectory}/Library/Logs/hermes-git-agent.log";
+      # A local vault has no clone to start from; the sync timer adds the baseline and commits.
+      home.activation.wiki-vaults = lib.hm.dag.entryAfter ["writeBoundary"] (lib.concatMapStrings (wiki:
+        lib.optionalString (wiki.local or false) ''
+          if [ ! -e ${lib.escapeShellArg "${wiki.path}/.git"} ]; then
+            run install -d -m 0700 ${lib.escapeShellArg wiki.path}
+            run ${lib.getExe pkgs.git} init -q -b main ${lib.escapeShellArg wiki.path}
+          fi
+        '')
+      hostWikis);
+      home.activation.hermes-dirs = lib.hm.dag.entryAfter ["writeBoundary"] ''
+        run mkdir -p ${lib.escapeShellArg root} ${lib.escapeShellArg dev}
+        run chmod 0700 ${lib.escapeShellArg root}
+        run ${package.hermesVenv}/bin/python -c \
+          'import json, sys; from pathlib import Path; from hermes_cli.ui_preferences import write_preferences; write_preferences(json.loads(Path(sys.argv[1]).read_text()), path=Path(sys.argv[2]))' \
+          ${desktopSettings} ${lib.escapeShellArg "${root}/ui-preferences.json"}
+      '';
+      systemd.user.services = lib.optionalAttrs isLinux {
+        # Hermes clients look for exactly this unit name and start it instead of spawning their own gateway.
+        hermes-gateway = {
+          Unit = {
+            Description = "Hermes Agent gateway";
+            X-RestartIfChanged = false;
+            Wants = ["hermes-git-agent.service"];
+            After = ["hermes-git-agent.service"];
+          };
+          Service = {
+            Environment = ["HERMES_HOME=${root}" "PATH=${profileDirectory}/bin:/run/current-system/sw/bin"];
+            WorkingDirectory = dev;
+            ExecStart = "${lib.getExe hermes} -p default gateway run";
+            Restart = "on-failure";
+            RestartSec = 10;
+          };
+          Install.WantedBy = ["default.target"];
+        };
+        hermes-git-agent = {
+          Unit.Description = "SSH agent holding only the Hermes agent key";
+          Service = {
+            ExecStart = "${gitAgent}";
+            Restart = "on-failure";
+            RestartSec = 5;
+          };
+          Install.WantedBy = ["default.target"];
+        };
+        wiki-sync = {
+          Unit.Description = "Audit, commit and sync the wiki vault";
+          Service = {
+            Type = "oneshot";
+            Environment = lib.mapAttrsToList (name: value: "${name}=${value}") (syncEnv augustoWiki);
+            ExecStart = "${lib.getExe vaultSync} ${augustoWiki.path} ${augustoWiki.tree} ${augustoWiki.dir}";
+          };
         };
       };
-    });
-  programs.claude-code.mcpServers.hermes-board = {
-    command = lib.getExe pkgs.python3;
-    args = ["${./mcp.py}" url];
-  };
-  omp.mcpServers.hermes-board = {
-    type = "stdio";
-    command = lib.getExe pkgs.python3;
-    args = ["${./mcp.py}" url];
-  };
-}
+      systemd.user.timers = lib.optionalAttrs isLinux {
+        wiki-sync = {
+          Unit.Description = "Sync the wiki vault every 15 minutes";
+          Timer = {
+            OnCalendar = "*:0/15";
+            Persistent = true;
+          };
+          Install.WantedBy = ["timers.target"];
+        };
+      };
+      launchd.agents = lib.optionalAttrs (!isLinux) (lib.listToAttrs (map (wiki:
+          lib.nameValuePair "wiki-sync-${wiki.tree}" {
+            enable = true;
+            config = {
+              ProgramArguments = [(lib.getExe vaultSync) wiki.path wiki.tree wiki.dir];
+              EnvironmentVariables = syncEnv wiki;
+              StartInterval = 900;
+              RunAtLoad = true;
+              StandardOutPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
+              StandardErrorPath = "${homeDirectory}/Library/Logs/wiki-sync-${wiki.tree}.log";
+            };
+          })
+        hostWikis)
+        // {
+          # Linux runs this as the hermes-git-agent user service. A LaunchAgent starts at login, so until the
+          # user logs in on the macmini, Git there has no agent key.
+          hermes-git-agent = {
+            enable = true;
+            config = {
+              ProgramArguments = ["${gitAgent}"];
+              KeepAlive = true;
+              RunAtLoad = true;
+              StandardOutPath = "${homeDirectory}/Library/Logs/hermes-git-agent.log";
+              StandardErrorPath = "${homeDirectory}/Library/Logs/hermes-git-agent.log";
+            };
+          };
+        });
+      # A local terminal runs Git with the user's own config, so a host without the YubiKey takes the agent identity.
+      programs.git.includes = lib.optional hostCfg.agentGit {path = "${agentGitConfig}";};
+      # Hermes strips GH_TOKEN from terminal commands, so gh reads the agent token from its hosts file instead.
+      sops.templates = lib.optionalAttrs hostCfg.agentGit {
+        "gh-hosts.yml" = {
+          path = "${config.xdg.configHome}/gh/hosts.yml";
+          content = ''
+            github.com:
+              oauth_token: ${config.sops.placeholder.github_token}
+              git_protocol: ssh
+          '';
+        };
+      };
+    }
+    (lib.optionalAttrs (options ? herdr) {
+      herdr.programs.hermes = {
+        name = "Hermes";
+        icon = "icons/hermes.svg";
+        tint = true;
+        tile = "#1c1d21";
+        color = "#ffffff";
+        run = ["hermes" "-p" "coordinator"];
+      };
+      herdr.keys."super-s" = "terminal.open:hermes";
+    })
+    (lib.optionalAttrs (options.programs ? claude-code) {
+      programs.claude-code.mcpServers.hermes-board = {
+        command = lib.getExe pkgs.python3;
+        args = ["${./mcp.py}" url];
+      };
+    })
+    (lib.optionalAttrs (options ? omp) {
+      omp.mcpServers.hermes-board = {
+        type = "stdio";
+        command = lib.getExe pkgs.python3;
+        args = ["${./mcp.py}" url];
+      };
+    })
+  ]

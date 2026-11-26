@@ -33,6 +33,9 @@ in {
     url = "github:oslook/hermes-desktop-plugin-office-3d";
     flake = false;
   };
-  den.aspects.hermes-agent.darwin = import ./_darwin.nix;
-  den.aspects.hermes-work.homeManager = import ./_work.nix {inherit inputs models fallbacks disabledSkills;};
+  # Include from a user aspect: den hands the darwin daemon to that user's host.
+  den.aspects.hermes = {
+    homeManager = import ./_work.nix {inherit inputs models fallbacks disabledSkills;};
+    darwin = import ./_darwin.nix;
+  };
 }

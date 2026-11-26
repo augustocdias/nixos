@@ -6,7 +6,8 @@ let
     augusto = {
       vault = "obsidian-vault";
       dir = "";
-      hosts = ["laptop" "macmini"];
+      hosts = ["laptop" "macmini" "vps-hermes"];
+      # limit: the laptop curates until the VPS takes over; set "vps-hermes" at cutover, which drops the laptop's librarian.
       curator = "laptop";
       librarian = "librarian";
       writers = ["default" "coordinator"];

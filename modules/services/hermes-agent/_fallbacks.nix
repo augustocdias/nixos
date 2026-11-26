@@ -18,7 +18,7 @@ let
       base_url = "http://127.0.0.1:11434/v1";
     }
   ];
-in {
+in rec {
   laptop = {
     default = claude "claude-sonnet-5-5[1m]";
     librarian = claude "claude-fable-5-2[1m]";
@@ -40,4 +40,5 @@ in {
     livia = ollama;
     librarian-livia = ollama;
   };
+  vps-hermes = laptop;
 }

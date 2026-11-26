@@ -3,7 +3,7 @@
     includes = with den.aspects; [
       user-base
       omniwm
-      hermes-work
+      hermes
     ];
 
     homeManager = {pkgs, ...}: {

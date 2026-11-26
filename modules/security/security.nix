@@ -159,6 +159,25 @@ in {
           extra-socket /tmp/S.gpg-agent.extra
         '';
       };
+
+      programs.ssh = {
+        enable = true;
+        enableDefaultConfig = false;
+        matchBlocks.vps-hermes = {
+          # limit: no address until the VPS is provisioned; set hostname to its IP or DNS name then.
+          user = "augusto";
+          remoteForwards = [
+            {
+              bind.address = "/run/user/1000/gnupg/S.gpg-agent";
+              # gpg-agent runs supervised, so its extra socket is the socket unit's, not the conf's extra-socket.
+              host.address =
+                if isDarwin
+                then "/private/var/run/org.nix-community.home.gpg-agent/S.gpg-agent.extra"
+                else "/run/user/1000/gnupg/S.gpg-agent.extra";
+            }
+          ];
+        };
+      };
     };
   };
 }

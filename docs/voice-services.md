@@ -56,9 +56,9 @@ Tools are rows in WebUI's `tool` table. `_tools.nix` pins their sources, and the
 
 ## Hermes Agent
 
-On macmini, the `hermes-agent` aspect (`_darwin.nix`) runs one boot-time system LaunchDaemon as `augusto`. It starts the shared Home Manager `hermes` wrapper with `-p default gateway run`; the wrapper bootstraps every profile first. The wrapper uses upstream's Nix `messaging` package. `gateway.multiplex_profiles=true` serves the root profile (Augusto), `livia` and the work profiles. The daemon gets a sanitized environment so it never inherits ambient cloud credentials. The user LaunchAgents are the wiki sync agents (see [LLM wiki](#llm-wiki)) and the Hermes Git agent.
+On macmini, the `hermes` aspect's darwin class (`_darwin.nix`) runs one boot-time system LaunchDaemon as `augusto`. It starts the shared Home Manager `hermes` wrapper with `-p default gateway run`; the wrapper bootstraps every profile first. The wrapper uses upstream's Nix `messaging` package. `gateway.multiplex_profiles=true` serves the root profile (Augusto), `livia` and the work profiles. The daemon gets a sanitized environment so it never inherits ambient cloud credentials. The user LaunchAgents are the wiki sync agents (see [LLM wiki](#llm-wiki)) and the Hermes Git agent.
 
-The people profiles are built by `_work.nix` like every other profile; see [Work Hermes](coding-agents.md#work-hermes-laptop-and-macmini) for the builder, bootstrap, SOULs, skills and the per-host `_hosts.nix`. Augusto is the root `default` profile on both hosts; Livia and `librarian-livia` exist only on macmini (`persons` in `_hosts.nix`).
+The people profiles are built by `_work.nix` like every other profile; see [Work Hermes](coding-agents.md#work-hermes) for the builder, bootstrap, SOULs, skills and the per-host `_hosts.nix`. Augusto is the root `default` profile on both hosts; Livia and `librarian-livia` exist only on macmini (`persons` in `_hosts.nix`).
 
 Bootstrap merges Nix-owned settings into each existing YAML and `.env`, keeping channel tokens, sender allowlists and other local settings, but replacing `plugins.enabled` with the Nix list. Each person gets their own SOPS-managed API key; missing or shared keys block startup.
 

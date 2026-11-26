@@ -11,7 +11,6 @@
       jgrep
       claude-code
       claude-code-jail
-      hermes-work
     ];
 
     homeManager = {

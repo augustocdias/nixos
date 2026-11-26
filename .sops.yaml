@@ -7,6 +7,9 @@ keys:
   - &macmini age1vaevu0nh0njp06aylzgn8fgx6nfltk469dtvn7xkq0rdtmfp2gkqprgpxz
   - &raspi age19mg5etl3u38x4udzkhu7euqs27aqv2wfcmk6sxkwztuq4xc3d5psgyz8ty
 creation_rules:
+  # Only what the VPS's hermes user needs; add the VPS age key once the machine exists.
+  - path_regex: modules/hardware/vps-hermes/secrets\.ya?ml$
+    pgp: [*yubikey]
   - path_regex: modules/security/secrets/.*\.ya?ml$
     age: [*nixos, *macmini, *raspi]
     pgp: [*yubikey]

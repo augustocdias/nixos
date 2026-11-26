@@ -15,4 +15,11 @@
     hostName = "home";
     aspect = den.aspects.raspi;
   };
+
+  den.hosts.x86_64-linux.vps-hermes = {
+    hostName = "vps-hermes";
+    aspect = den.aspects.vps-hermes;
+    users.augusto.aspect = den.aspects.user-server;
+    users.hermes.aspect = den.aspects.user-hermes;
+  };
 }
